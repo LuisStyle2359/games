@@ -152,6 +152,39 @@ tbody tr.sel td { background: var(--select); }
 .vtitle { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 3px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .vcard:hover .vtitle { color: var(--check); }
 .vmeta { color: var(--muted); font-size: 11px; }
+#chat { position: absolute; inset: 0; padding: 8px; outline: none; }
+.cpage { display: flex; width: 100%; height: 100%; background: var(--paper); border: 1px solid var(--page-grid-strong); }
+.clist { display: flex; flex-direction: column; flex: none; width: 210px; border-right: 1px solid var(--page-grid-strong); }
+.chead { display: flex; align-items: center; gap: 8px; height: 30px; flex: none; padding: 0 10px; background: var(--search-band); border-bottom: 1px solid var(--search-line); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cstat { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 400; }
+.cpeople { flex: 1; overflow: auto; }
+.cperson { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--grid-line); cursor: pointer; }
+.cperson:hover { background: var(--hover); }
+.cperson[aria-selected="true"] { background: var(--select); }
+.cperson:focus-visible, .clink:focus-visible { outline: 2px solid var(--check); outline-offset: -2px; }
+.cav { position: relative; display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: #6f86a3; color: #fff; font-weight: 600; }
+.cav.on::after { content: ""; position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%; background: #3aa64a; border: 1.5px solid var(--paper); }
+.cpname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cpsub { display: block; color: var(--muted); font-size: 11px; }
+.cbadge { display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--check); color: #fff; font-size: 10px; font-weight: 600; }
+.cme { display: flex; align-items: center; gap: 6px; flex: none; padding: 6px 10px; border-top: 1px solid var(--grid-line); color: var(--muted); font-size: 11px; }
+.cme span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clink { padding: 0; border: 0; background: none; color: var(--check); font: inherit; cursor: pointer; }
+.cconv { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.cmsgs { display: flex; flex: 1; flex-direction: column; gap: 5px; overflow: auto; padding: 10px 12px; background: #f4f6f9; user-select: text; -webkit-user-select: text; }
+.cmsg { align-self: flex-start; max-width: 75%; padding: 5px 8px 3px; border: 1px solid var(--grid-line); border-radius: 6px; background: var(--paper); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cmsg.me { align-self: flex-end; background: #dbe8f7; border-color: #c4d6ee; }
+.cfrom { color: var(--check); font-size: 11px; font-weight: 600; }
+.ctime { margin-top: 1px; color: var(--muted); font-size: 10px; text-align: right; }
+.csys { align-self: center; margin: auto 0; color: var(--muted); font-size: 11px; text-align: center; }
+.cform { display: flex; gap: 6px; flex: none; padding: 6px 8px; border-top: 1px solid var(--grid-line); background: var(--desk); }
+.cin { max-width: none; }
+.cin:disabled { background: var(--desk); }
+.cnameform { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: var(--paper); }
+.cnameform label { font-weight: 600; }
+.crow { display: flex; gap: 6px; width: min(100%, 300px); }
+.cnote { max-width: 300px; margin: 0; color: var(--muted); font-size: 11px; text-align: center; }
+@media (max-width: 560px) { .clist { width: 120px; } .cperson { padding: 6px; } .cpsub, .cstat, .cme span { display: none; } }
 #video.gray img, #video.gray iframe { filter: grayscale(1) contrast(0.92) brightness(1.04); }
 
 .statusbar { display: flex; align-items: center; justify-content: space-between; height: 24px; color: var(--muted); }
@@ -229,7 +262,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
         <span class="rbtn"><svg><use href="#i-printer"/><use href="#o-tiff"/></svg>TIFF<br>Print ▾</span>
         <span class="rbtn"><svg><use href="#i-printer"/></svg>PDF Print<br>Preview</span>
         <span class="rbtn"><svg><use href="#i-mail"/><use href="#o-check"/></svg>Quick<br>Email ▾</span>
-        <span class="rbtn"><svg><use href="#i-mail"/></svg>Email</span>
+        <span class="rbtn" id="ribbonMail"><svg><use href="#i-mail"/></svg>Email<span id="mailCount"></span></span>
         <span class="rbtn"><svg><use href="#i-export"/></svg>Export</span>
       </div>
       <div class="group-label">Share</div>
@@ -292,6 +325,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
           <tr data-doc="Audits/Assessments"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-01</td><td>Audits/Assessments</td><td>EuDeclarationAcceptance</td><td></td><td>1</td><td>22.09.2026 14:12</td><td></td><td></td></tr>
           <tr data-doc="Clearance Advice"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-02</td><td>Clearance Advice</td><td></td><td></td><td>2</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
           <tr data-doc="Commercial Invoice" data-game="snake"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-03</td><td>Commercial Invoice</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
+          <tr data-doc="Correspondence" data-chat="1"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-11</td><td>Correspondence</td><td>Email</td><td></td><td>1</td><td>16.10.2026 08:47</td><td></td><td></td></tr>
           <tr data-doc="Customer Images" data-video="1"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-10</td><td>Customer Images</td><td>Scan</td><td class="flag">Q</td><td>1</td><td>15.10.2026 09:12</td><td></td><td></td></tr>
           <tr data-doc="House Airway Bill" data-game="tetris"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-04</td><td>House Airway Bill - Original</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:32</td><td></td><td></td></tr>
           <tr data-doc="OLA"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-05</td><td>OLA</td><td></td><td></td><td>6</td><td>24.09.2026 14:48</td><td></td><td></td></tr>
@@ -320,12 +354,37 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
           <div class="vbody" id="vbody"></div>
         </div>
       </div>
+      <div id="chat" tabindex="-1" hidden>
+        <div class="cpage">
+          <aside class="clist">
+            <div class="chead">Posteingang<span class="cstat" id="cstat"></span></div>
+            <div class="cpeople" id="cpeople" role="listbox" aria-label="Kontakte"></div>
+            <div class="cme"><span id="cme"></span><button class="clink" id="crename" type="button">Name ändern</button></div>
+          </aside>
+          <section class="cconv">
+            <div class="chead" id="ctitle"></div>
+            <div class="cmsgs" id="cmsgs" aria-live="polite"></div>
+            <form class="cform" id="cform">
+              <input class="vlinkin cin" id="cin" type="text" maxlength="500" placeholder="Nachricht schreiben" autocomplete="off" aria-label="Nachricht">
+              <button class="vbtn" type="submit" title="Senden" aria-label="Senden"><svg viewBox="0 0 12 12"><path d="M1 1.5l10 4.5-10 4.5 1.5-4.5z"/></svg></button>
+            </form>
+            <form class="cnameform" id="cnameform" hidden>
+              <label for="cnamein">Dein Name im Chat</label>
+              <div class="crow">
+                <input class="vlinkin" id="cnamein" type="text" maxlength="24" autocomplete="off" spellcheck="false">
+                <button class="vbtn" type="submit">Beitreten</button>
+              </div>
+              <p class="cnote">Andere sehen dich, sobald du beigetreten bist. Nachrichten laufen über einen öffentlichen Server und sind nicht privat.</p>
+            </form>
+          </section>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <div class="statusbar band">
-  <span>10 documents</span>
+  <span>11 documents</span>
   <span class="views">
     <span class="on" id="layoutSplit" role="button" tabindex="0" title="Documents and preview" aria-label="Documents and preview"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M.5 6.5h11"/></svg></span>
     <span id="layoutBig" role="button" tabindex="0" title="Preview only" aria-label="Preview only"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M6.5 .5v12"/></svg></span>
@@ -1106,7 +1165,7 @@ function makeDoc(seed) {
 const REF = '2563318804';
 const refInput = $('ref'), videoEl = $('video'), vbody = $('vbody'), vlink = $('vlink'), vmsg = $('vmsg');
 const videoRow = rows.find(r => r.dataset.video);
-const videoDoc = {video: true};
+const videoDoc = {video: true, panel: true};
 let playing = null, msgTimer = 0;
 
 // Earlier versions stored a YouTube API key here; it is no longer used.
@@ -1264,12 +1323,258 @@ function setColor(on) {
 colorBtn.addEventListener('click', () => setColor(colorBtn.getAttribute('aria-pressed') !== 'true'));
 setColor(store.get('ytColor', false));
 
+/* ---------- Chat ---------- */
+// GitHub Pages only serves static files, so messages are relayed through free public MQTT brokers.
+const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+const ROOT = 'dv-2563318804-chat/';
+const ALL = 'all', MAXLEN = 500, STALE = 6 * 60000;
+const chatEl = $('chat'), cpeople = $('cpeople'), cmsgs = $('cmsgs'), cin = $('cin'), cstat = $('cstat');
+const ctitle = $('ctitle'), cnameform = $('cnameform'), cnamein = $('cnamein'), mailCount = $('mailCount');
+const chatDoc = {panel: true};
+const chatRow = rows.find(r => r.dataset.chat);
+const validId = id => typeof id === 'string' && /^[a-z0-9]{8,24}$/.test(id);
+const cleanName = s => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+const me = {id: store.get('chatId', ''), name: cleanName(store.get('chatName', ''))};
+if (!validId(me.id)) { me.id = (Math.random().toString(36).slice(2, 10) + Date.now().toString(36)).slice(0, 16); store.set('chatId', me.id); }
+const people = new Map();
+const log = store.get('chatLog', {}), unread = store.get('chatUnread', {});
+let conv = ALL, mq = null, brokerIdx = 0, retry = 0, beat = 0;
+
+function mqttClient(url, {clientId, will, onopen, onmessage, onclose}) {
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  const str = s => { const b = enc.encode(s); return [b.length >> 8, b.length & 255, ...b]; };
+  const varLen = n => { const out = []; do { let b = n % 128; n = Math.floor(n / 128); if (n) b |= 128; out.push(b); } while (n); return out; };
+  const ws = new WebSocket(url, 'mqtt');
+  ws.binaryType = 'arraybuffer';
+  let buf = new Uint8Array(0), ping = 0, pid = 0, open = false;
+  const send = (head, body) => { if (ws.readyState === 1) ws.send(new Uint8Array([head, ...varLen(body.length), ...body])); };
+
+  function handle(head, body) {
+    const type = head >> 4;
+    if (type === 2) {
+      if (body[1] !== 0) { ws.close(); return; }
+      open = true;
+      ping = setInterval(() => send(0xc0, []), 25000);
+      onopen();
+    } else if (type === 3) {
+      const tl = (body[0] << 8) | body[1];
+      const qos = (head >> 1) & 3;
+      onmessage(dec.decode(body.subarray(2, 2 + tl)), dec.decode(body.subarray(2 + tl + (qos ? 2 : 0))));
+    }
+  }
+
+  ws.onopen = () => send(0x10, [...str('MQTT'), 4, 0x26, 0, 30, ...str(clientId), ...str(will.topic), ...str(will.payload)]);
+  ws.onmessage = e => {
+    const add = new Uint8Array(e.data), next = new Uint8Array(buf.length + add.length);
+    next.set(buf);
+    next.set(add, buf.length);
+    buf = next;
+    for (;;) {
+      let n = 0, mul = 1, i = 1, b;
+      do {
+        if (i >= buf.length) return;
+        b = buf[i++];
+        n += (b & 127) * mul;
+        mul *= 128;
+      } while (b & 128);
+      if (buf.length < i + n) return;
+      const head = buf[0], body = buf.subarray(i, i + n);
+      buf = buf.slice(i + n);
+      handle(head, body);
+    }
+  };
+  ws.onclose = () => { clearInterval(ping); onclose(open); };
+  return {
+    sub: topics => { pid = pid % 65535 + 1; send(0x82, [pid >> 8, pid & 255, ...topics.flatMap(t => [...str(t), 0])]); },
+    pub: (topic, payload, retain) => send(0x30 | (retain ? 1 : 0), [...str(topic), ...enc.encode(payload)]),
+    close: () => ws.close()
+  };
+}
+
+const presenceTopic = () => ROOT + 'p/' + me.id;
+function announce() { if (mq) mq.pub(presenceTopic(), JSON.stringify({name: me.name, t: Date.now()}), true); }
+
+function connect() {
+  if (mq || !me.name) return;
+  setStatus('Verbinde…');
+  const c = mqttClient(BROKERS[brokerIdx], {
+    clientId: me.id + Math.random().toString(36).slice(2, 6),
+    will: {topic: presenceTopic(), payload: ''},
+    onopen() {
+      retry = 0;
+      c.sub([ROOT + 'p/+', ROOT + ALL, ROOT + 'dm/' + me.id]);
+      announce();
+      beat = setInterval(announce, 2 * 60000);
+      setStatus('Online');
+    },
+    onmessage: receive,
+    onclose(wasOpen) {
+      clearInterval(beat);
+      if (mq !== c) return;
+      mq = null;
+      people.clear();
+      if (!wasOpen) brokerIdx = (brokerIdx + 1) % BROKERS.length;
+      setStatus('Offline');
+      renderChat();
+      setTimeout(connect, Math.min(30000, 1000 * 2 ** retry++));
+    }
+  });
+  mq = c;
+}
+
+function setStatus(s) { cstat.textContent = s; updateComposer(); }
+
+function receive(topic, payload) {
+  const sub = topic.slice(ROOT.length);
+  let d = null;
+  try { d = payload ? JSON.parse(payload) : null; } catch (e) { return; }
+  if (sub.startsWith('p/')) {
+    const id = sub.slice(2);
+    if (!validId(id) || id === me.id) return;
+    if (d && cleanName(d.name) && Date.now() - d.t < STALE) people.set(id, {name: cleanName(d.name), seen: Date.now()});
+    else people.delete(id);
+    renderPeople();
+    if (id === conv) renderMsgs();
+    return;
+  }
+  if (!d || !validId(d.from) || d.from === me.id || typeof d.text !== 'string' || !d.text.trim()) return;
+  if (sub !== ALL && sub !== 'dm/' + me.id) return;
+  addMsg(sub === ALL ? ALL : d.from, {id: String(d.id || '').slice(0, 40), from: d.from, name: cleanName(d.name) || 'Unbekannt', text: d.text.slice(0, MAXLEN), ts: Date.now()});
+}
+
+function chatVisible() { return showing && current === chatDoc && document.visibilityState === 'visible'; }
+
+function saveChat() { store.set('chatLog', log); store.set('chatUnread', unread); }
+
+function addMsg(c, m) {
+  const list = log[c] || (log[c] = []);
+  if (m.id && list.some(x => x.id === m.id)) return;
+  list.push(m);
+  if (list.length > 200) list.splice(0, list.length - 200);
+  if (m.from !== me.id && !(chatVisible() && conv === c)) unread[c] = (unread[c] || 0) + 1;
+  saveChat();
+  renderPeople();
+  if (c === conv) renderMsgs();
+}
+
+function nameOf(id) {
+  if (id === ALL) return 'Alle';
+  if (people.has(id)) return people.get(id).name;
+  const last = (log[id] || []).filter(m => m.from === id).pop();
+  return last ? last.name : 'Unbekannt';
+}
+
+function renderBadge() {
+  const n = Object.values(unread).reduce((a, b) => a + b, 0);
+  mailCount.textContent = n ? ` (${n})` : '';
+}
+
+function selectConv(id) {
+  conv = id;
+  delete unread[id];
+  saveChat();
+  renderChat();
+  if (!cin.disabled) cin.focus();
+}
+
+function renderPeople() {
+  const online = [...people.keys()].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const offline = Object.keys(log).filter(id => id !== ALL && !people.has(id) && validId(id));
+  const ids = [ALL, ...online, ...offline];
+  if (!ids.includes(conv)) conv = ALL;
+  cpeople.replaceChildren(...ids.map(id => {
+    const on = id === ALL ? !!mq : people.has(id);
+    const sub = id === ALL ? `${people.size + (me.name && mq ? 1 : 0)} online` : (on ? 'online' : 'offline');
+    return el('div', {class: 'cperson', role: 'option', tabindex: '0', 'aria-selected': String(id === conv),
+                      onclick: () => selectConv(id), onkeydown: e => { if (e.key === 'Enter') selectConv(id); }},
+      el('span', {class: 'cav' + (on ? ' on' : ''), text: id === ALL ? '#' : nameOf(id).charAt(0).toUpperCase()}),
+      el('span', {class: 'cpname'}, nameOf(id), el('span', {class: 'cpsub', text: sub})),
+      unread[id] ? el('span', {class: 'cbadge', text: String(unread[id])}) : null);
+  }));
+  renderBadge();
+}
+
+function fmtTime(ts) {
+  const t = new Date(ts), hm = [t.getHours(), t.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+  return t.toDateString() === new Date().toDateString() ? hm : `${String(t.getDate()).padStart(2, '0')}.${String(t.getMonth() + 1).padStart(2, '0')}. ${hm}`;
+}
+
+function renderMsgs() {
+  ctitle.textContent = nameOf(conv) + (conv !== ALL && !people.has(conv) ? ' (offline)' : '');
+  const list = log[conv] || [];
+  cmsgs.replaceChildren(...(list.length ? list.map(m => el('div', {class: 'cmsg' + (m.from === me.id ? ' me' : '')},
+      conv === ALL && m.from !== me.id ? el('div', {class: 'cfrom', text: m.name}) : null,
+      el('div', {text: m.text}),
+      el('div', {class: 'ctime', text: fmtTime(m.ts)})))
+    : [el('div', {class: 'csys', text: conv === ALL ? 'Noch keine Nachrichten. Schreib allen, die gerade online sind.' : 'Noch keine Nachrichten.'})]));
+  cmsgs.scrollTop = cmsgs.scrollHeight;
+  updateComposer();
+}
+
+function updateComposer() {
+  const offline = conv !== ALL && !people.has(conv);
+  cin.disabled = !mq || offline;
+  cin.placeholder = !mq ? 'Keine Verbindung' : offline ? nameOf(conv) + ' ist offline' : 'Nachricht schreiben';
+}
+
+function renderChat() {
+  cnameform.hidden = !!me.name;
+  $('cme').textContent = me.name ? 'Angemeldet als ' + me.name : '';
+  $('crename').hidden = !me.name;
+  renderPeople();
+  renderMsgs();
+}
+
+function openChat() {
+  delete unread[conv];
+  saveChat();
+  renderChat();
+  (me.name ? cin : cnamein).focus();
+}
+
+cnameform.addEventListener('submit', e => {
+  e.preventDefault();
+  const n = cleanName(cnamein.value);
+  if (!n) { cnamein.focus(); return; }
+  me.name = n;
+  store.set('chatName', n);
+  renderChat();
+  if (mq) announce(); else connect();
+  cin.focus();
+});
+$('crename').addEventListener('click', () => {
+  cnamein.value = me.name;
+  cnameform.hidden = false;
+  cnamein.focus();
+  cnamein.select();
+});
+$('cform').addEventListener('submit', e => {
+  e.preventDefault();
+  const text = cin.value.trim().slice(0, MAXLEN);
+  if (!text || cin.disabled) return;
+  const m = {id: me.id + Date.now().toString(36), from: me.id, name: me.name, text};
+  mq.pub(ROOT + (conv === ALL ? ALL : 'dm/' + conv), JSON.stringify(m));
+  addMsg(conv, {...m, ts: Date.now()});
+  cin.value = '';
+});
+$('ribbonMail').addEventListener('click', () => showPreview(chatRow));
+document.addEventListener('visibilitychange', () => { if (chatVisible() && unread[conv]) openChat(); });
+setInterval(() => {
+  let changed = false;
+  for (const [id, p] of people) if (Date.now() - p.seen > STALE) { people.delete(id); changed = true; }
+  if (changed) renderChat();
+}, 30000);
+window.addEventListener('pagehide', () => { if (mq) { mq.pub(presenceTopic(), '', true); mq.close(); } });
+renderBadge();
+connect();
+
 /* ---------- Viewer ---------- */
 const games = {snake: makeSnake(), tetris: makeTetris(), '2048': make2048(), wordle: makeWordle(), flappy: makeFlappy()};
 const docs = new Map();
 let scale = 1, showing = false, selectedRow = rows.find(r => r.dataset.game === 'snake'), current = null;
 
 function contentFor(row) {
+  if (row.dataset.chat) return chatDoc;
   if (row.dataset.video) return videoDoc;
   if (row.dataset.game) return games[row.dataset.game];
   if (!docs.has(row)) docs.set(row, makeDoc(rows.indexOf(row) + 1));
@@ -1277,7 +1582,7 @@ function contentFor(row) {
 }
 
 function render() {
-  if (!showing || current.video) return;
+  if (!showing || current.panel) return;
   const [center, right] = current.stats();
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.fillStyle = C.paper;
@@ -1306,8 +1611,7 @@ function render() {
 }
 
 function fit() {
-  if (!showing) return;
-  if (current.video) return;
+  if (!showing || current.panel) return;
   const r = previewEl.getBoundingClientRect();
   scale = Math.max(0.2, Math.min((r.width - 24) / PW, (r.height - 24) / PH));
   canvas.style.width = PW * scale + 'px';
@@ -1325,10 +1629,12 @@ function showPreview(row) {
   selectedRow = row;
   current = next;
   showing = true;
-  stage.hidden = current.video;
-  videoEl.hidden = !current.video;
+  stage.hidden = !!current.panel;
+  videoEl.hidden = current !== videoDoc;
+  chatEl.hidden = current !== chatDoc;
   placeholder.hidden = true;
   if (current.video && !vbody.childElementCount) renderVideo();
+  if (current === chatDoc) openChat();
   fit();
 }
 
@@ -1339,6 +1645,7 @@ function hidePreview() {
   showing = false;
   stage.hidden = true;
   videoEl.hidden = true;
+  chatEl.hidden = true;
   placeholder.hidden = false;
 }
 
@@ -1378,7 +1685,7 @@ document.addEventListener('keydown', e => {
   }
   const handled = showing && current.key && current.key(k, e.repeat);
   if (handled) render();
-  if (handled || ((DIRS[k] || k === ' ') && !(showing && current.video))) e.preventDefault();
+  if (handled || ((DIRS[k] || k === ' ') && !(showing && current.panel))) e.preventDefault();
 });
 
 let px = 0, py = 0;
