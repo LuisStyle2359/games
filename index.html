@@ -334,7 +334,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
 
 <script>
 (function(){
-  if(sessionStorage.getItem('_v')!=='1'){
+  {
     const o=document.createElement('div');
     o.id='_lock';
     o.style.cssText='position:fixed;inset:0;background:#f0f0f0;display:flex;align-items:center;justify-content:center;z-index:9999;font:12px "Segoe UI",Tahoma,Arial,sans-serif';
@@ -358,7 +358,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
       const enc=new TextEncoder();
       const buf=await crypto.subtle.digest('SHA-256',enc.encode(i.value));
       const hex=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-      if(hex==='05b9115df05a2a467841772eccc969822d884c9e71841050fe9e0893cce7d11b'){sessionStorage.setItem('_v','1');o.remove();}
+      if(hex==='05b9115df05a2a467841772eccc969822d884c9e71841050fe9e0893cce7d11b'){o.remove();}
       else{i.value='';err.style.display='';setTimeout(()=>{err.style.display='none';},2000);}
     }
     btn.addEventListener('click',()=>check());
