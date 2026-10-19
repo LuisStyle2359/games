@@ -253,7 +253,7 @@ tbody tr.sel td { background: var(--select); }
           <tr data-doc="House Airway Bill" data-game="tetris"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-04</td><td>House Airway Bill - Original</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:32</td><td></td><td></td></tr>
           <tr data-doc="OLA"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-05</td><td>OLA</td><td></td><td></td><td>6</td><td>24.09.2026 14:48</td><td></td><td></td></tr>
           <tr data-doc="OLA" data-game="2048"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-06</td><td>OLA</td><td>generell</td><td class="flag">Q</td><td>4</td><td>08.10.2026 12:05</td><td></td><td></td></tr>
-          <tr data-doc="Shipment Alert"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-07</td><td>Shipment Alert</td><td>24.09.2026 10:29</td><td></td><td>1</td><td>24.09.2026 10:29</td><td></td><td></td></tr>
+          <tr data-doc="Shipment Alert" data-game="flappy"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-07</td><td>Shipment Alert</td><td>24.09.2026 10:29</td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:29</td><td></td><td></td></tr>
           <tr data-doc="T1 Document" data-game="wordle"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-08</td><td>T1 Document</td><td></td><td class="flag">Q</td><td>2</td><td>24.09.2026 10:33</td><td></td><td></td></tr>
           <tr data-doc="T1 Document"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-09</td><td>T1 Document</td><td></td><td></td><td>2</td><td>03.10.2026 12:17</td><td></td><td></td></tr>
           <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
@@ -847,6 +847,128 @@ function makeWordle() {
   };
 }
 
+/* ---------- Flappy ---------- */
+function makeFlappy() {
+  const BIRD_X = 110, R = 10, GROUND = 28, PIPE_W = 52, GAP = 124, SPACING = 210;
+  const GRAVITY = 1500, FLAP = -430, SPEED = 140;
+  let y, vy, pipes, score, state, paused, travel, last = 0, overAt = 0;
+  let best = store.get('flappyBest', 0);
+
+  function reset() {
+    y = AREA / 2 - 20;
+    vy = 0;
+    pipes = [];
+    score = 0;
+    state = 'ready';
+    paused = false;
+    travel = 0;
+  }
+  function addPipe(x) {
+    const min = 50 + GAP / 2, max = AREA - GROUND - 50 - GAP / 2;
+    pipes.push({x, gapY: min + Math.random() * (max - min), passed: false});
+  }
+  function flap() {
+    if (state === 'over') {
+      if (performance.now() - overAt < 500) return;
+      reset();
+    }
+    if (state === 'ready') {
+      state = 'play';
+      addPipe(AREA + 40);
+    }
+    paused = false;
+    vy = FLAP;
+  }
+  function hit() {
+    if (y + R >= AREA - GROUND) return true;
+    return pipes.some(p => BIRD_X + R - 2 > p.x && BIRD_X - R + 2 < p.x + PIPE_W &&
+      (y - R + 2 < p.gapY - GAP / 2 || y + R - 2 > p.gapY + GAP / 2));
+  }
+  function update(dt) {
+    vy += GRAVITY * dt;
+    y += vy * dt;
+    if (y < R) { y = R; vy = 0; }
+    travel += SPEED * dt;
+    pipes.forEach(p => { p.x -= SPEED * dt; });
+    pipes = pipes.filter(p => p.x + PIPE_W > -10);
+    const lastPipe = pipes[pipes.length - 1];
+    if (!lastPipe) addPipe(AREA + 10);
+    else if (lastPipe.x + SPACING <= AREA + 10) addPipe(lastPipe.x + SPACING);
+    pipes.forEach(p => {
+      if (!p.passed && p.x + PIPE_W < BIRD_X - R) {
+        p.passed = true;
+        score++;
+        if (score > best) { best = score; store.set('flappyBest', best); }
+      }
+    });
+    if (hit()) {
+      state = 'over';
+      overAt = performance.now();
+      y = Math.min(y, AREA - GROUND - R);
+    }
+  }
+  reset();
+
+  return {
+    pause() { if (state === 'play') paused = true; },
+    stats: () => ['Cleared: ' + score, 'Max: ' + best],
+    step(now) {
+      const dt = Math.min(0.033, (now - last) / 1000);
+      last = now;
+      if (state !== 'play' || paused) return false;
+      update(dt);
+      return true;
+    },
+    draw() {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(GX, GY, AREA, AREA);
+      ctx.clip();
+      drawGrid(GX, GY, 20, 20, AREA / 20, 5);
+      pipes.forEach(p => {
+        const top = p.gapY - GAP / 2, bot = p.gapY + GAP / 2;
+        ctx.fillStyle = C.tiles[5];
+        ctx.fillRect(GX + p.x, GY, PIPE_W, top);
+        ctx.fillRect(GX + p.x, GY + bot, PIPE_W, AREA - GROUND - bot);
+        ctx.fillStyle = C.snake;
+        ctx.fillRect(GX + p.x - 3, GY + top - 10, PIPE_W + 6, 10);
+        ctx.fillRect(GX + p.x - 3, GY + bot, PIPE_W + 6, 10);
+      });
+      const gy = GY + AREA - GROUND;
+      ctx.fillStyle = C.grid;
+      ctx.fillRect(GX, gy, AREA, GROUND);
+      ctx.fillStyle = C.gridStrong;
+      ctx.fillRect(GX, gy, AREA, 1.5);
+      ctx.strokeStyle = C.gridStrong;
+      ctx.lineWidth = 1;
+      for (let x = -(travel % 16); x < AREA + 16; x += 16) {
+        ctx.beginPath(); ctx.moveTo(GX + x, gy + GROUND); ctx.lineTo(GX + x + 10, gy + 4); ctx.stroke();
+      }
+      const bx = GX + BIRD_X, by = GY + y;
+      ctx.fillStyle = C.head;
+      ctx.beginPath(); ctx.arc(bx, by, R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.food;
+      ctx.beginPath(); ctx.moveTo(bx + R - 2, by - 3); ctx.lineTo(bx + R + 6, by); ctx.lineTo(bx + R - 2, by + 3); ctx.fill();
+      ctx.fillStyle = C.paper;
+      ctx.beginPath(); ctx.arc(bx + 4, by - 4, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      if (state === 'ready') text('Press Space or click to flap', GX + AREA / 2, GY + AREA / 2 + 50, {color: C.muted, align: 'center'});
+      else if (state === 'over') overlay('Game over', 'Press Space or click to try again');
+      else if (paused) overlay('Paused', 'Press Space or click to continue');
+    },
+    key(k, repeat) {
+      if (k === ' ' || k === 'arrowup' || k === 'w' || (k === 'enter' && state === 'over')) {
+        if (!repeat) flap();
+        return true;
+      }
+      if (k === 'p' && state === 'play') { paused = !paused; return true; }
+      return !!DIRS[k];
+    },
+    press: flap
+  };
+}
+
 /* ---------- Plain documents ---------- */
 function makeDoc(seed) {
   let s = seed * 7919;
@@ -887,7 +1009,7 @@ function makeDoc(seed) {
 }
 
 /* ---------- Viewer ---------- */
-const games = {snake: makeSnake(), tetris: makeTetris(), '2048': make2048(), wordle: makeWordle()};
+const games = {snake: makeSnake(), tetris: makeTetris(), '2048': make2048(), wordle: makeWordle(), flappy: makeFlappy()};
 const docs = new Map();
 let scale = 1, showing = false, selectedRow = rows.find(r => r.dataset.game === 'snake'), current = null;
 
@@ -968,7 +1090,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     return;
   }
-  const handled = showing && current.key && current.key(k);
+  const handled = showing && current.key && current.key(k, e.repeat);
   if (handled) render();
   if (handled || DIRS[k] || k === ' ') e.preventDefault();
 });
@@ -978,6 +1100,7 @@ canvas.addEventListener('pointerdown', e => {
   px = e.clientX;
   py = e.clientY;
   canvas.focus();
+  if (current.press) { current.press(); render(); }
 });
 canvas.addEventListener('pointerup', e => {
   if (!current.pointer) return;
