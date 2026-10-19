@@ -343,8 +343,8 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
     </div>
     <div class="preview-head">Document Preview</div>
     <div class="box preview" id="preview">
-      <div id="placeholder" hidden>Select a document to preview...</div>
-      <div id="stage"><canvas id="c" tabindex="0" aria-label="Document preview"></canvas></div>
+      <div id="placeholder">Select a document to preview...</div>
+      <div id="stage" hidden><canvas id="c" tabindex="0" aria-label="Document preview"></canvas></div>
       <div id="video" tabindex="-1" hidden>
         <div class="vpage">
           <div class="vbar">
@@ -1625,6 +1625,5 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-showPreview(selectedRow);
 requestAnimationFrame(loop);
 </script>
