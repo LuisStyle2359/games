@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Document Viewer</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 1.5h6l3 3v10h-9z' fill='%23fff' stroke='%234a78b5'/%3E%3Cpath d='M5.5 7h5M5.5 9h5M5.5 11h5' stroke='%238fb0dc'/%3E%3C/svg%3E">
 <style>
 /* Layout: Windows desktop document viewer. Title bar, ribbon, search strip, references tree beside a document grid, preview pane (the games) below. Single light theme on purpose. */
 :root {
@@ -138,7 +139,12 @@ tbody tr.sel td { background: var(--select); }
   .refs, .splitter { display: none; }
   .tb-title { font-size: 11px; }
 }
+/* In an app window the real window title bar already shows the title, so drop the drawn one. */
+:root.app-mode .titlebar { display: none; }
 </style>
+<script>
+if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('app-mode');
+</script>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
