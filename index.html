@@ -1325,7 +1325,13 @@ setColor(store.get('ytColor', false));
 
 /* ---------- Chat ---------- */
 // GitHub Pages only serves static files, so messages are relayed through free public MQTT brokers.
-const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+// Port 443 first: office firewalls often block the brokers' usual 8084/8884.
+const BROKERS = [
+  {url: 'wss://mqtt.eclipseprojects.io/mqtt'},
+  {url: 'wss://public.cloud.shiftr.io', user: 'public', pass: 'public'},
+  {url: 'wss://broker.hivemq.com:8884/mqtt'},
+  {url: 'wss://broker.emqx.io:8084/mqtt'}
+];
 const ROOT = 'dv-2563318804-chat/';
 const ALL = 'all', MAXLEN = 500, STALE = 6 * 60000;
 const chatEl = $('chat'), cpeople = $('cpeople'), cmsgs = $('cmsgs'), cin = $('cin'), cstat = $('cstat');
@@ -1340,7 +1346,7 @@ const people = new Map();
 const log = store.get('chatLog', {}), unread = store.get('chatUnread', {});
 let conv = ALL, mq = null, brokerIdx = 0, retry = 0, beat = 0;
 
-function mqttClient(url, {clientId, will, onopen, onmessage, onclose}) {
+function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
   const enc = new TextEncoder(), dec = new TextDecoder();
   const str = s => { const b = enc.encode(s); return [b.length >> 8, b.length & 255, ...b]; };
   const varLen = n => { const out = []; do { let b = n % 128; n = Math.floor(n / 128); if (n) b |= 128; out.push(b); } while (n); return out; };
@@ -1363,7 +1369,8 @@ function mqttClient(url, {clientId, will, onopen, onmessage, onclose}) {
     }
   }
 
-  ws.onopen = () => send(0x10, [...str('MQTT'), 4, 0x26, 0, 30, ...str(clientId), ...str(will.topic), ...str(will.payload)]);
+  ws.onopen = () => send(0x10, [...str('MQTT'), 4, 0x26 | (user ? 0xc0 : 0), 0, 30, ...str(clientId), ...str(will.topic), ...str(will.payload),
+                                ...(user ? [...str(user), ...str(pass)] : [])]);
   ws.onmessage = e => {
     const add = new Uint8Array(e.data), next = new Uint8Array(buf.length + add.length);
     next.set(buf);
@@ -1397,7 +1404,9 @@ function announce() { if (mq) mq.pub(presenceTopic(), JSON.stringify({name: me.n
 function connect() {
   if (mq || !me.name) return;
   setStatus('Verbinde…');
-  const c = mqttClient(BROKERS[brokerIdx], {
+  const broker = BROKERS[brokerIdx];
+  cstat.title = new URL(broker.url).host;
+  const c = mqttClient(broker, {
     clientId: me.id + Math.random().toString(36).slice(2, 6),
     will: {topic: presenceTopic(), payload: ''},
     onopen() {
@@ -1416,7 +1425,7 @@ function connect() {
       if (!wasOpen) brokerIdx = (brokerIdx + 1) % BROKERS.length;
       setStatus('Offline');
       renderChat();
-      setTimeout(connect, Math.min(30000, 1000 * 2 ** retry++));
+      setTimeout(connect, wasOpen ? 1000 : Math.min(20000, 500 * 2 ** Math.floor(retry++ / BROKERS.length)));
     }
   });
   mq = c;
