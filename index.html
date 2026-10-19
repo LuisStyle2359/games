@@ -354,11 +354,14 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
     err.textContent='Incorrect password.';
     b.append(l,i,btn,err);
     o.append(b);
-    function check(){
-      if(i.value==='stefano'){sessionStorage.setItem('_v','1');o.remove();}
+    async function check(){
+      const enc=new TextEncoder();
+      const buf=await crypto.subtle.digest('SHA-256',enc.encode(i.value));
+      const hex=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      if(hex==='05b9115df05a2a467841772eccc969822d884c9e71841050fe9e0893cce7d11b'){sessionStorage.setItem('_v','1');o.remove();}
       else{i.value='';err.style.display='';setTimeout(()=>{err.style.display='none';},2000);}
     }
-    btn.addEventListener('click',check);
+    btn.addEventListener('click',()=>check());
     i.addEventListener('keydown',e=>{if(e.key==='Enter')check();});
     document.body.appendChild(o);
     i.focus();
