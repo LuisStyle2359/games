@@ -334,38 +334,44 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
 
 <script>
 (function(){
-  {
-    const o=document.createElement('div');
-    o.id='_lock';
-    o.style.cssText='position:fixed;inset:0;background:#f0f0f0;display:flex;align-items:center;justify-content:center;z-index:9999;font:12px "Segoe UI",Tahoma,Arial,sans-serif';
-    const b=document.createElement('div');
-    b.style.cssText='background:#fff;border:1px solid #a0a0a0;padding:18px 22px;display:flex;flex-direction:column;gap:8px;min-width:240px';
-    const l=document.createElement('label');
-    l.style.cssText='font-size:11px;color:#444';
-    l.textContent='Password:';
-    const i=document.createElement('input');
-    i.type='password';
-    i.style.cssText='height:22px;padding:0 6px;border:1px solid #a9b6c6;background:#fff;font:12px "Segoe UI",Tahoma,Arial,sans-serif;outline:none;width:100%';
-    const btn=document.createElement('button');
-    btn.textContent='OK';
-    btn.style.cssText='align-self:flex-end;height:22px;padding:0 14px;border:1px solid #a9b6c6;background:#f0f0f0;font:12px "Segoe UI",Tahoma,Arial,sans-serif;cursor:pointer';
-    const err=document.createElement('span');
-    err.style.cssText='font-size:11px;color:#c00;display:none';
-    err.textContent='Incorrect password.';
-    b.append(l,i,btn,err);
-    o.append(b);
-    async function check(){
-      const enc=new TextEncoder();
-      const buf=await crypto.subtle.digest('SHA-256',enc.encode(i.value));
-      const hex=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-      if(hex==='05b9115df05a2a467841772eccc969822d884c9e71841050fe9e0893cce7d11b'){o.remove();}
-      else{i.value='';err.style.display='';setTimeout(()=>{err.style.display='none';},2000);}
-    }
-    btn.addEventListener('click',()=>check());
-    i.addEventListener('keydown',e=>{if(e.key==='Enter')check();});
-    document.body.appendChild(o);
-    i.focus();
+  const _a=['05b9115d','f05a2a46','7841772e','ccc96982'],_b=['2d884c9e','71841050','fe9e0893','cce7d11b'];
+  const _s=_a.concat(_b).join('');
+  const _w=document.createElement('div');
+  _w.style.cssText='position:fixed;inset:0;background:#f0f0f0;display:flex;align-items:center;justify-content:center;z-index:9999;font:12px "Segoe UI",Tahoma,Arial,sans-serif';
+  const _d=document.createElement('div');
+  _d.style.cssText='background:#fff;border:1px solid #a0a0a0;padding:18px 22px;display:flex;flex-direction:column;gap:8px;min-width:260px';
+  const _h=document.createElement('div');
+  _h.style.cssText='font-size:11px;font-weight:600;color:#1f1f1f;border-bottom:1px solid #e0e0e0;padding-bottom:6px;margin-bottom:2px';
+  _h.textContent='Document Viewer — Sign In';
+  const _l=document.createElement('label');
+  _l.style.cssText='font-size:11px;color:#444';
+  _l.textContent='User ID:';
+  const _i=document.createElement('input');
+  _i.type='password';
+  _i.style.cssText='height:22px;padding:0 6px;border:1px solid #a9b6c6;background:#fff;font:12px "Segoe UI",Tahoma,Arial,sans-serif;outline:none;width:100%';
+  _i.setAttribute('autocomplete','username');
+  const _r=document.createElement('div');
+  _r.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-top:2px';
+  const _e=document.createElement('span');
+  _e.style.cssText='font-size:11px;color:#c00;visibility:hidden';
+  _e.textContent='Invalid user ID.';
+  const _btn=document.createElement('button');
+  _btn.textContent='Sign In';
+  _btn.style.cssText='height:22px;padding:0 14px;border:1px solid #a9b6c6;background:#f0f0f0;font:12px "Segoe UI",Tahoma,Arial,sans-serif;cursor:pointer';
+  _r.append(_e,_btn);
+  _d.append(_h,_l,_i,_r);
+  _w.append(_d);
+  async function _v(){
+    const _enc=new TextEncoder();
+    const _buf=await crypto.subtle.digest('SHA-256',_enc.encode(_i.value));
+    const _t=Array.from(new Uint8Array(_buf)).map(x=>x.toString(16).padStart(2,'0')).join('');
+    if(_t===_s){_w.remove();}
+    else{_i.value='';_e.style.visibility='visible';setTimeout(()=>{_e.style.visibility='hidden';},2000);}
   }
+  _btn.addEventListener('click',()=>_v());
+  _i.addEventListener('keydown',e=>{if(e.key==='Enter')_v();});
+  document.body.appendChild(_w);
+  _i.focus();
 })();
 const $ = id => document.getElementById(id);
 const PW = 440, PH = 580, GX = 20, GY = 146, AREA = 400;
