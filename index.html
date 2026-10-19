@@ -176,6 +176,7 @@ tbody tr.sel td { background: var(--select); }
 .cmsg.me { align-self: flex-end; background: #dbe8f7; border-color: #c4d6ee; }
 .cfrom { color: var(--check); font-size: 11px; font-weight: 600; }
 .ctime { margin-top: 1px; color: var(--muted); font-size: 10px; text-align: right; }
+.cdiag { flex: none; padding: 5px 10px; background: #fff4e5; border-bottom: 1px solid #f0d9b5; color: #6b4a12; font-size: 11px; user-select: text; -webkit-user-select: text; }
 .csys { align-self: center; margin: auto 0; color: var(--muted); font-size: 11px; text-align: center; }
 .cform { display: flex; gap: 6px; flex: none; padding: 6px 8px; border-top: 1px solid var(--grid-line); background: var(--desk); }
 .cin { max-width: none; }
@@ -367,6 +368,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
           </aside>
           <section class="cconv">
             <div class="chead" id="ctitle"></div>
+            <div class="cdiag" id="cdiag" hidden></div>
             <div class="cmsgs" id="cmsgs" aria-live="polite"></div>
             <form class="cform" id="cform">
               <input class="vlinkin cin" id="cin" type="text" maxlength="500" placeholder="Nachricht schreiben" autocomplete="off" aria-label="Nachricht">
@@ -1362,15 +1364,15 @@ function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclo
   const varLen = n => { const out = []; do { let b = n % 128; n = Math.floor(n / 128); if (n) b |= 128; out.push(b); } while (n); return out; };
   const ws = new WebSocket(url, 'mqtt');
   ws.binaryType = 'arraybuffer';
-  let buf = new Uint8Array(0), ping = 0, pid = 0, open = false;
+  let buf = new Uint8Array(0), ping = 0, pid = 0, open = false, why = 'blocked';
   // Firewalls often drop the connection silently instead of refusing it, so give up and try the next broker.
-  const giveUp = setTimeout(() => ws.close(), 7000);
+  const giveUp = setTimeout(() => { why = ws.readyState === 1 ? 'noreply' : 'timeout'; ws.close(); }, 7000);
   const send = (head, body) => { if (ws.readyState === 1) ws.send(new Uint8Array([head, ...varLen(body.length), ...body])); };
 
   function handle(head, body) {
     const type = head >> 4;
     if (type === 2) {
-      if (body[1] !== 0) { ws.close(); return; }
+      if (body[1] !== 0) { why = 'refused'; ws.close(); return; }
       open = true;
       clearTimeout(giveUp);
       ping = setInterval(() => send(0xc0, []), 25000);
@@ -1403,7 +1405,7 @@ function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclo
       handle(head, body);
     }
   };
-  ws.onclose = () => { clearTimeout(giveUp); clearInterval(ping); onclose(open); };
+  ws.onclose = () => { clearTimeout(giveUp); clearInterval(ping); onclose(open, open ? 'dropped' : why); };
   return {
     sub: topics => { pid = pid % 65535 + 1; send(0x82, [pid >> 8, pid & 255, ...topics.flatMap(t => [...str(t), 0])]); },
     pub: (topic, payload, retain) => send(0x30 | (retain ? 1 : 0), [...str(topic), ...enc.encode(payload)]),
@@ -1509,14 +1511,15 @@ function announce() {
 function connect() {
   if (mq || !me.name || !room || !ident) return;
   setStatus('Verbinde…');
-  const broker = BROKERS[brokerIdx], base = ROOT + room.tag + '/';
-  cstat.title = new URL(broker.url).host;
+  const broker = BROKERS[brokerIdx], base = ROOT + room.tag + '/', host = new URL(broker.url).host;
+  cstat.title = host;
   let beat = 0;
   const c = mqttClient(broker, {
     clientId: me.id + Math.random().toString(36).slice(2, 6),
     will: {topic: base + 'p/' + me.id, payload: ''},
     onopen() {
       retry = 0;
+      diag.set(host, 'verbunden');
       c.sub(['p/+', ALL, 'dm/' + me.id, 'hello'].map(t => base + t));
       announce();
       // Ask everyone to re-announce, in case the broker does not keep retained presence messages.
@@ -1526,9 +1529,10 @@ function connect() {
       setStatus('Online');
     },
     onmessage: receive,
-    onclose(wasOpen) {
+    onclose(wasOpen, why) {
       clearInterval(beat);
       if (mq !== c) return;
+      diag.set(host, DIAG[why]);
       mq = null;
       people.clear();
       if (!wasOpen) brokerIdx = (brokerIdx + 1) % BROKERS.length;
@@ -1550,7 +1554,22 @@ function disconnect() {
   setStatus('Offline');
 }
 
-function setStatus(s) { cstat.textContent = s; updateComposer(); }
+const diag = new Map();
+const DIAG = {
+  blocked: 'blockiert oder nicht erreichbar',
+  timeout: 'keine Antwort (Zeitüberschreitung)',
+  noreply: 'verbunden, aber keine Anmeldung',
+  refused: 'Anmeldung abgelehnt',
+  dropped: 'Verbindung getrennt'
+};
+
+function setStatus(s) {
+  cstat.textContent = s;
+  const d = $('cdiag');
+  d.hidden = !!mq || !diag.size;
+  d.textContent = 'Keine Verbindung. ' + [...diag].map(([h, r]) => h.replace(/:\d+$/, '') + ': ' + r).join(' · ');
+  updateComposer();
+}
 
 let inbox = Promise.resolve();
 function receive(t, payload) { inbox = inbox.then(() => incoming(t, payload)).catch(() => {}); }
