@@ -1325,10 +1325,11 @@ setColor(store.get('ytColor', false));
 
 /* ---------- Chat ---------- */
 // GitHub Pages only serves static files, so messages are relayed through free public MQTT brokers.
-// Port 443 first: office firewalls often block the brokers' usual 8084/8884.
+// Everyone must land on the same broker to see each other. shiftr.io comes first because it is
+// reachable from the office network; the rest are fallbacks.
 const BROKERS = [
-  {url: 'wss://mqtt.eclipseprojects.io/mqtt'},
   {url: 'wss://public.cloud.shiftr.io', user: 'public', pass: 'public'},
+  {url: 'wss://mqtt.eclipseprojects.io/mqtt'},
   {url: 'wss://broker.hivemq.com:8884/mqtt'},
   {url: 'wss://broker.emqx.io:8084/mqtt'}
 ];
@@ -1414,8 +1415,11 @@ function connect() {
     will: {topic: presenceTopic(), payload: ''},
     onopen() {
       retry = 0;
-      c.sub([ROOT + 'p/+', ROOT + ALL, ROOT + 'dm/' + me.id]);
+      c.sub([ROOT + 'p/+', ROOT + ALL, ROOT + 'dm/' + me.id, ROOT + 'hello']);
       announce();
+      // Ask everyone to re-announce, in case the broker does not keep retained presence messages.
+      c.pub(ROOT + 'hello', me.id);
+      renderPeople();
       beat = setInterval(announce, 2 * 60000);
       setStatus('Online');
     },
@@ -1438,6 +1442,7 @@ function setStatus(s) { cstat.textContent = s; updateComposer(); }
 
 function receive(topic, payload) {
   const sub = topic.slice(ROOT.length);
+  if (sub === 'hello') { if (payload !== me.id) announce(); return; }
   let d = null;
   try { d = payload ? JSON.parse(payload) : null; } catch (e) { return; }
   if (sub.startsWith('p/')) {
