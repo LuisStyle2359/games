@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dispatch Console</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: warehouse ops console. Nav band, KPI strip, zone grid (the game) beside an event log, shipments table below. */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --surface-2: #f5f7f9;
+  --fg: #1d2733;
+  --muted: #5f6d7c;
+  --line: #d8dee6;
+  --accent: #1f5fae;
+  --accent-soft: #e3ecf8;
+  --on-accent: #ffffff;
+  --pickup: #c97a12;
+  --ok: #2c7f53;
+  --ok-soft: #e1f2e8;
+  --warn: #9a6512;
+  --warn-soft: #fbf0dc;
+  --crit: #b8382b;
+  --crit-soft: #fbe5e2;
+  --nav: #1b2a3a;
+  --nav-active: #2b3d51;
+  --nav-fg: #e3eaf1;
+  --nav-muted: #98a8b8;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161c; --surface: #19212a; --surface-2: #1e2731; --fg: #e2e8ee; --muted: #8d9aa8; --line: #2b3540;
+    --accent: #5e9ce6; --accent-soft: #1f3249; --on-accent: #0d1620; --pickup: #e09a3a;
+    --ok: #57b583; --ok-soft: #1b3428; --warn: #e0a84a; --warn-soft: #3a2e17; --crit: #e8705f; --crit-soft: #3d201c;
+    --nav: #0c1117; --nav-active: #1d2733; --nav-fg: #e2e8ee; --nav-muted: #8592a0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161c; --surface: #19212a; --surface-2: #1e2731; --fg: #e2e8ee; --muted: #8d9aa8; --line: #2b3540;
+  --accent: #5e9ce6; --accent-soft: #1f3249; --on-accent: #0d1620; --pickup: #e09a3a;
+  --ok: #57b583; --ok-soft: #1b3428; --warn: #e0a84a; --warn-soft: #3a2e17; --crit: #e8705f; --crit-soft: #3d201c;
+  --nav: #0c1117; --nav-active: #1d2733; --nav-fg: #e2e8ee; --nav-muted: #8592a0;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--font-sans); }
+
+.topbar { background: var(--nav); color: var(--nav-fg); }
+.topbar-inner, .page {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.topbar-inner { display: flex; align-items: center; gap: 24px; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; white-space: nowrap; }
+.logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 12px; letter-spacing: .04em; }
+.tabs { display: flex; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; }
+.tab { padding: 6px 12px; border-radius: 6px; color: var(--nav-muted); font-size: 13px; white-space: nowrap; }
+.tab.active { color: var(--nav-fg); background: var(--nav-active); }
+.who { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 12px; color: var(--nav-muted); white-space: nowrap; }
+.avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--nav-active); color: var(--nav-fg); font-size: 11px; font-weight: 600; }
+
+.page { display: grid; gap: 16px; padding-block: 20px 32px; }
+.page-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.crumbs { font-size: 12px; color: var(--muted); }
+h1 { margin: 2px 0 0; font-size: 22px; font-weight: 600; text-wrap: balance; }
+.updated { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kpi { display: grid; gap: 4px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.kpi-label, th { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.kpi-value { display: flex; align-items: center; min-height: 34px; font-family: var(--font-mono); font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.kpi-sub { font-size: 12px; color: var(--muted); }
+
+.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-family: var(--font-sans); font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.crit { background: var(--crit-soft); color: var(--crit); }
+.pill.info { background: var(--accent-soft); color: var(--accent); }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+.card { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.small { font-size: 12px; color: var(--muted); }
+
+.map-view { display: grid; justify-items: center; gap: 12px; padding: 16px; }
+canvas { display: block; width: min(422px, 100%); max-width: 100%; height: auto; aspect-ratio: 1; border-radius: 4px; touch-action: none; cursor: pointer; }
+canvas:focus { outline: none; }
+canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; width: min(422px, 100%); font-size: 12px; color: var(--muted); }
+.sw { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: -1px; }
+.sw.route { background: var(--accent); }
+.sw.pick { background: var(--pickup); }
+.keys { margin-left: auto; font-family: var(--font-mono); font-size: 11px; }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { padding: 4px 14px; border: 0; background: var(--surface); color: var(--muted); font: 500 12px var(--font-sans); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ok); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.log { max-height: 480px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.log li { display: grid; grid-template-columns: 40px 8px minmax(0, 1fr); align-items: baseline; gap: 10px; padding: 9px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.log li:last-child { border-bottom: 0; }
+.log time { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.dot { align-self: center; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.ok { background: var(--ok); }
+.dot.info { background: var(--accent); }
+.dot.crit { background: var(--crit); }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 10px 16px; text-align: left; white-space: nowrap; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+td { padding: 10px 16px; white-space: nowrap; border-bottom: 1px solid var(--line); }
+tbody tr:last-child td { border-bottom: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
+
+@media (max-width: 880px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .log { max-height: 300px; }
+}
+@media (max-width: 720px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tabs, .hub { display: none; }
+  .keys { margin-left: 0; }
+}
+</style>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><span class="logo">OC</span>Ops Console</div>
+    <nav class="tabs" aria-label="Sections">
+      <span class="tab active">Dispatch</span>
+      <span class="tab">Shipments</span>
+      <span class="tab">Fleet</span>
+      <span class="tab">Warehouse</span>
+      <span class="tab">Reports</span>
+    </nav>
+    <div class="who"><span class="hub">Hub DC-2 · Hall C</span><span class="avatar" aria-hidden="true">OP</span></div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <div class="crumbs">Dispatch / Hall C / Routes</div>
+      <h1>Live route board</h1>
+    </div>
+    <div class="updated">Shift B · Updated <span id="clock">--:--:--</span></div>
+  </div>
+
+  <section class="kpis" aria-label="Route summary">
+    <div class="kpi"><div class="kpi-label">Pickups cleared</div><div class="kpi-value" id="score">0</div><div class="kpi-sub">on this route</div></div>
+    <div class="kpi"><div class="kpi-label">Shift record</div><div class="kpi-value" id="best">0</div><div class="kpi-sub">pickups on one route</div></div>
+    <div class="kpi"><div class="kpi-label">Route stops</div><div class="kpi-value" id="len">3</div><div class="kpi-sub">units in convoy</div></div>
+    <div class="kpi"><div class="kpi-label">Route status</div><div class="kpi-value"><span class="pill warn" id="status">On hold</span></div><div class="kpi-sub mono" id="routeId">R-0000</div></div>
+  </section>
+
+  <section class="main">
+    <div class="card">
+      <div class="card-head">
+        <h2>Zone grid · Hall C</h2>
+        <div class="seg" role="tablist" aria-label="View">
+          <button id="viewMap" class="on" role="tab" aria-selected="true" type="button">Map</button>
+          <button id="viewList" role="tab" aria-selected="false" type="button">List</button>
+        </div>
+      </div>
+      <div id="mapView" class="map-view">
+        <canvas id="c" tabindex="0" aria-label="Hall C zone grid"></canvas>
+        <div class="legend">
+          <span><i class="sw route"></i>Active route</span>
+          <span><i class="sw pick"></i>Pending pickup</span>
+          <span class="keys">Arrows route · Space hold · Esc list</span>
+        </div>
+      </div>
+      <div id="listView" class="table-wrap" hidden>
+        <table>
+          <thead><tr><th>Dock</th><th>Trailer</th><th>Carrier</th><th>Window</th><th class="num">Pallets</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">D1</td><td class="mono">TR-5512</td><td>Nordline Freight</td><td class="mono">09:30–10:15</td><td class="num">22</td><td><span class="pill">Departed</span></td></tr>
+            <tr><td class="mono">D2</td><td class="mono">TR-5518</td><td>Baltic Haulage</td><td class="mono">10:00–10:45</td><td class="num">18</td><td><span class="pill warn">Loading</span></td></tr>
+            <tr><td class="mono">D3</td><td class="mono">TR-5521</td><td>Rhône Transport</td><td class="mono">10:30–11:15</td><td class="num">24</td><td><span class="pill warn">Loading</span></td></tr>
+            <tr><td class="mono">D4</td><td class="mono">TR-5520</td><td>Alpi Cargo</td><td class="mono">11:00–11:45</td><td class="num">12</td><td><span class="pill ok">Sealed</span></td></tr>
+            <tr><td class="mono">D5</td><td class="mono">TR-5527</td><td>Vistula Road</td><td class="mono">11:30–12:15</td><td class="num">16</td><td><span class="pill info">Arriving</span></td></tr>
+            <tr><td class="mono">D6</td><td class="mono">TR-5530</td><td>Iberia Linehaul</td><td class="mono">12:00–12:45</td><td class="num">20</td><td><span class="pill info">Arriving</span></td></tr>
+            <tr><td class="mono">D7</td><td class="mono">—</td><td>Nordline Freight</td><td class="mono">12:30–13:15</td><td class="num">26</td><td><span class="pill">Open</span></td></tr>
+            <tr><td class="mono">D8</td><td class="mono">—</td><td>Baltic Haulage</td><td class="mono">13:00–13:45</td><td class="num">14</td><td><span class="pill">Open</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <aside class="card">
+      <div class="card-head"><h2>Event log</h2><span class="live"><i></i>Live</span></div>
+      <ol id="log" class="log"></ol>
+    </aside>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Outbound shipments</h2><span class="small">6 of 42 today</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Shipment</th><th>Destination</th><th>Carrier</th><th class="num">Pallets</th><th class="num">Weight (kg)</th><th>ETA</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">SHP-240871</td><td>Hamburg, DE</td><td>Nordline Freight</td><td class="num">18</td><td class="num">9,420</td><td class="mono">14:40</td><td><span class="pill warn">Loading</span></td></tr>
+          <tr><td class="mono">SHP-240872</td><td>Antwerp, BE</td><td>Baltic Haulage</td><td class="num">12</td><td class="num">6,105</td><td class="mono">15:15</td><td><span class="pill ok">Ready</span></td></tr>
+          <tr><td class="mono">SHP-240875</td><td>Lyon, FR</td><td>Rhône Transport</td><td class="num">24</td><td class="num">13,880</td><td class="mono">17:05</td><td><span class="pill ok">Ready</span></td></tr>
+          <tr><td class="mono">SHP-240879</td><td>Milan, IT</td><td>Alpi Cargo</td><td class="num">9</td><td class="num">4,260</td><td class="mono">18:30</td><td><span class="pill crit">Delayed</span></td></tr>
+          <tr><td class="mono">SHP-240880</td><td>Warsaw, PL</td><td>Vistula Road</td><td class="num">16</td><td class="num">8,730</td><td class="mono">19:10</td><td><span class="pill info">Picking</span></td></tr>
+          <tr><td class="mono">SHP-240884</td><td>Madrid, ES</td><td>Iberia Linehaul</td><td class="num">21</td><td class="num">11,540</td><td class="mono">21:45</td><td><span class="pill">Scheduled</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const N = 20, CELL = 20, OFF = 22, SIZE = OFF + N * CELL;
+const COLS = 'ABCDEFGHIJKLMNOPQRST';
+const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+const canvas = $('c');
+const ctx = canvas.getContext('2d');
+const scoreEl = $('score'), bestEl = $('best'), lenEl = $('len');
+const statusEl = $('status'), routeEl = $('routeId'), logEl = $('log');
+
+const dpr = window.devicePixelRatio || 1;
+canvas.width = canvas.height = SIZE * dpr;
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+let best = 0;
+try { best = +localStorage.getItem('snakeBest') || 0; } catch (e) {}
+bestEl.textContent = best;
+
+let snake, dir, queue, food, score, over, paused, routeId, view = 'map';
+
+const zone = p => COLS[p.x] + (p.y + 1);
+const pad = n => String(n).padStart(2, '0');
+const hhmm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+const token = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function log(kind, text, when = new Date()) {
+  const li = document.createElement('li');
+  const time = document.createElement('time');
+  const dot = document.createElement('span');
+  const msg = document.createElement('span');
+  time.textContent = hhmm(when);
+  dot.className = 'dot ' + kind;
+  msg.textContent = text;
+  li.append(time, dot, msg);
+  logEl.prepend(li);
+  while (logEl.children.length > 12) logEl.lastChild.remove();
+}
+
+function setStatus() {
+  const [cls, label] = over ? ['crit', 'Interrupted'] : paused ? ['warn', 'On hold'] : ['ok', 'On schedule'];
+  statusEl.className = 'pill ' + cls;
+  statusEl.textContent = label;
+}
+
+function setPaused(p) {
+  paused = p;
+  setStatus();
+  draw();
+}
+
+function reset(startPaused) {
+  snake = [{x: 10, y: 10}, {x: 9, y: 10}, {x: 8, y: 10}];
+  dir = {x: 1, y: 0};
+  queue = [];
+  score = 0;
+  over = false;
+  paused = startPaused || view !== 'map';
+  routeId = 'R-' + (1100 + Math.floor(Math.random() * 8900));
+  scoreEl.textContent = 0;
+  lenEl.textContent = snake.length;
+  routeEl.textContent = routeId;
+  placeFood();
+  setStatus();
+  log('info', `Route ${routeId} dispatched at ${zone(snake[0])}`);
+  draw();
+}
+
+function placeFood() {
+  do {
+    food = {x: Math.floor(Math.random() * N), y: Math.floor(Math.random() * N)};
+  } while (snake.some(p => p.x === food.x && p.y === food.y));
+}
+
+function turn(x, y) {
+  const last = queue.length ? queue[queue.length - 1] : dir;
+  if (last.x === -x && last.y === -y) return;
+  if (last.x === x && last.y === y) return;
+  if (queue.length < 3) queue.push({x, y});
+}
+
+function tick() {
+  if (paused || over) return;
+  if (queue.length) dir = queue.shift();
+  const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+  const eating = head.x === food.x && head.y === food.y;
+  const body = eating ? snake : snake.slice(0, -1);
+  if (head.x < 0 || head.y < 0 || head.x >= N || head.y >= N ||
+      body.some(p => p.x === head.x && p.y === head.y)) {
+    over = true;
+    setStatus();
+    log('crit', `Route ${routeId} interrupted at ${zone(snake[0])} · ${score} pickups`);
+    draw();
+    return;
+  }
+  snake.unshift(head);
+  if (eating) {
+    score++;
+    scoreEl.textContent = score;
+    if (score > best) {
+      best = score;
+      bestEl.textContent = best;
+      try { localStorage.setItem('snakeBest', best); } catch (e) {}
+    }
+    log('ok', `Pickup PK-${4000 + Math.floor(Math.random() * 6000)} cleared at ${zone(head)}`);
+    placeFood();
+  } else {
+    snake.pop();
+  }
+  lenEl.textContent = snake.length;
+  draw();
+}
+
+function draw() {
+  const surface = token('--surface'), surface2 = token('--surface-2');
+  const line = token('--line'), muted = token('--muted'), fg = token('--fg');
+  const accent = token('--accent'), pickup = token('--pickup');
+  const W = N * CELL;
+
+  ctx.fillStyle = surface;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  ctx.fillStyle = surface2;
+  ctx.fillRect(OFF, OFF, W, W);
+
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const p = OFF + i * CELL + 0.5;
+    ctx.moveTo(p, OFF); ctx.lineTo(p, OFF + W);
+    ctx.moveTo(OFF, p); ctx.lineTo(OFF + W, p);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = muted;
+  ctx.font = '10px ' + MONO;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < N; i++) {
+    ctx.fillText(COLS[i], OFF + i * CELL + CELL / 2, OFF / 2);
+    ctx.fillText(String(i + 1), OFF / 2, OFF + i * CELL + CELL / 2);
+  }
+
+  const fx = OFF + food.x * CELL, fy = OFF + food.y * CELL;
+  ctx.fillStyle = pickup;
+  ctx.fillRect(fx + 4, fy + 4, CELL - 8, CELL - 8);
+  ctx.fillStyle = surface2;
+  ctx.fillRect(fx + 8, fy + 8, CELL - 16, CELL - 16);
+
+  const cx = p => OFF + p.x * CELL + CELL / 2;
+  const cy = p => OFF + p.y * CELL + CELL / 2;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = CELL * 0.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  snake.forEach((p, i) => i ? ctx.lineTo(cx(p), cy(p)) : ctx.moveTo(cx(p), cy(p)));
+  ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(cx(snake[0]), cy(snake[0]), CELL * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = surface;
+  ctx.beginPath();
+  ctx.arc(cx(snake[0]), cy(snake[0]), CELL * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (over || paused) {
+    ctx.globalAlpha = 0.86;
+    ctx.fillStyle = surface;
+    ctx.fillRect(OFF, OFF, W, W);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = fg;
+    ctx.font = '600 16px ' + SANS;
+    ctx.fillText(over ? 'Route interrupted' : 'Route on hold', OFF + W / 2, OFF + W / 2 - 10);
+    ctx.fillStyle = muted;
+    ctx.font = '12px ' + SANS;
+    ctx.fillText(over ? 'Press Enter or tap to re-dispatch' : 'Press Space or tap to continue', OFF + W / 2, OFF + W / 2 + 14);
+  }
+}
+
+function setView(v) {
+  view = v;
+  $('mapView').hidden = v !== 'map';
+  $('listView').hidden = v === 'map';
+  $('viewMap').classList.toggle('on', v === 'map');
+  $('viewList').classList.toggle('on', v !== 'map');
+  $('viewMap').setAttribute('aria-selected', v === 'map');
+  $('viewList').setAttribute('aria-selected', v !== 'map');
+  if (v !== 'map' && !over) setPaused(true);
+}
+
+$('viewMap').addEventListener('click', () => setView('map'));
+$('viewList').addEventListener('click', () => setView('list'));
+
+const DIRS = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1],
+              arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]};
+
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'escape') setView(view === 'map' ? 'list' : 'map');
+  else if (view !== 'map') {
+    if (DIRS[k] || k === ' ') e.preventDefault();
+    return;
+  } else if (DIRS[k]) {
+    if (over) return;
+    turn(...DIRS[k]);
+    if (paused) setPaused(false);
+  } else if (k === ' ' || k === 'enter') {
+    if (over) reset(false);
+    else setPaused(!paused);
+  } else return;
+  e.preventDefault();
+});
+
+let px = 0, py = 0;
+canvas.addEventListener('pointerdown', e => {
+  px = e.clientX;
+  py = e.clientY;
+  canvas.focus();
+});
+canvas.addEventListener('pointerup', e => {
+  const dx = e.clientX - px, dy = e.clientY - py;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) {
+    if (over) reset(false);
+    else if (paused) setPaused(false);
+    return;
+  }
+  if (over) return;
+  if (Math.abs(dx) > Math.abs(dy)) turn(Math.sign(dx), 0);
+  else turn(0, Math.sign(dy));
+  if (paused) setPaused(false);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && !over && !paused) setPaused(true);
+});
+
+function clock() {
+  const d = new Date();
+  $('clock').textContent = hhmm(d) + ':' + pad(d.getSeconds());
+}
+
+const now = Date.now();
+log('', 'Hall C scanners online', new Date(now - 14 * 60000));
+log('ok', 'Trailer TR-5520 sealed at Dock 4', new Date(now - 9 * 60000));
+log('info', 'Shift B handover complete', new Date(now - 3 * 60000));
+
+reset(true);
+clock();
+setInterval(clock, 1000);
+setInterval(tick, 110);
+
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+new MutationObserver(draw).observe(document.documentElement, {attributes: true, attributeFilter: ['data-theme']});
+if (document.fonts) document.fonts.ready.then(draw);
+</script>
