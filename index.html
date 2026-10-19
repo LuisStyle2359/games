@@ -182,7 +182,11 @@ tbody tr.sel td { background: var(--select); }
 .cin:disabled { background: var(--desk); }
 .cnameform { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: var(--paper); }
 .cnameform label { font-weight: 600; }
-.crow { display: flex; gap: 6px; width: min(100%, 300px); }
+.cfields { display: grid; gap: 4px; width: min(100%, 280px); }
+.cfields label { margin-top: 4px; }
+.cfields .vlinkin { max-width: none; width: 100%; }
+.crow { display: flex; gap: 6px; margin-top: 6px; }
+.cerr { min-height: 15px; margin: 0; color: var(--flag); font-size: 11px; }
 .cnote { max-width: 300px; margin: 0; color: var(--muted); font-size: 11px; text-align: center; }
 @media (max-width: 560px) { .clist { width: 120px; } .cperson { padding: 6px; } .cpsub, .cstat, .cme span { display: none; } }
 #video.gray img, #video.gray iframe { filter: grayscale(1) contrast(0.92) brightness(1.04); }
@@ -359,7 +363,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
           <aside class="clist">
             <div class="chead">Posteingang<span class="cstat" id="cstat"></span></div>
             <div class="cpeople" id="cpeople" role="listbox" aria-label="Kontakte"></div>
-            <div class="cme"><span id="cme"></span><button class="clink" id="crename" type="button">Name ändern</button></div>
+            <div class="cme"><span id="cme"></span><button class="clink" id="crename" type="button">Ändern</button></div>
           </aside>
           <section class="cconv">
             <div class="chead" id="ctitle"></div>
@@ -369,12 +373,15 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <button class="vbtn" type="submit" title="Senden" aria-label="Senden"><svg viewBox="0 0 12 12"><path d="M1 1.5l10 4.5-10 4.5 1.5-4.5z"/></svg></button>
             </form>
             <form class="cnameform" id="cnameform" hidden>
-              <label for="cnamein">Dein Name im Chat</label>
-              <div class="crow">
+              <div class="cfields">
+                <label for="cnamein">Dein Name im Chat</label>
                 <input class="vlinkin" id="cnamein" type="text" maxlength="24" autocomplete="off" spellcheck="false">
-                <button class="vbtn" type="submit">Beitreten</button>
+                <label for="croomin">Raum-Code</label>
+                <input class="vlinkin" id="croomin" type="password" maxlength="100" autocomplete="off">
+                <div class="crow"><button class="vbtn" type="submit">Beitreten</button><button class="vbtn" id="ccancel" type="button">Abbrechen</button></div>
+                <p class="cerr" id="cerr" role="alert"></p>
               </div>
-              <p class="cnote">Andere sehen dich, sobald du beigetreten bist. Nachrichten laufen über einen öffentlichen Server und sind nicht privat.</p>
+              <p class="cnote">Ende-zu-Ende-verschlüsselt: Nur wer denselben Raum-Code hat, kann mitlesen, auch der Server nicht. Einzelchats können nur die beiden lesen. Sag den Code persönlich weiter, am besten einen kurzen Satz.</p>
             </form>
           </section>
         </div>
@@ -1336,16 +1343,18 @@ const BROKERS = [
 const ROOT = 'dv-2563318804-chat/';
 const ALL = 'all', MAXLEN = 500, STALE = 6 * 60000;
 const chatEl = $('chat'), cpeople = $('cpeople'), cmsgs = $('cmsgs'), cin = $('cin'), cstat = $('cstat');
-const ctitle = $('ctitle'), cnameform = $('cnameform'), cnamein = $('cnamein'), mailCount = $('mailCount');
+const ctitle = $('ctitle'), cnameform = $('cnameform'), cnamein = $('cnamein'), croomin = $('croomin'), cerr = $('cerr');
+const mailCount = $('mailCount');
 const chatDoc = {panel: true};
 const chatRow = rows.find(r => r.dataset.chat);
 const validId = id => typeof id === 'string' && /^[a-z0-9]{8,24}$/.test(id);
 const cleanName = s => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 24);
 const me = {id: store.get('chatId', ''), name: cleanName(store.get('chatName', ''))};
 if (!validId(me.id)) { me.id = (Math.random().toString(36).slice(2, 10) + Date.now().toString(36)).slice(0, 16); store.set('chatId', me.id); }
-const people = new Map();
-const log = store.get('chatLog', {}), unread = store.get('chatUnread', {});
-let conv = ALL, mq = null, brokerIdx = 0, retry = 0, beat = 0;
+// Chats from before end-to-end encryption were stored in plain text.
+try { localStorage.removeItem('chatLog'); localStorage.removeItem('chatUnread'); } catch (e) {}
+const people = new Map(), peers = new Map(), pins = store.get('chatPins', {});
+let log = {}, unread = {}, room = null, ident = null, conv = ALL, mq = null, brokerIdx = 0, retry = 0;
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
   const enc = new TextEncoder(), dec = new TextDecoder();
@@ -1402,23 +1411,116 @@ function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclo
   };
 }
 
-const presenceTopic = () => ROOT + 'p/' + me.id;
-function announce() { if (mq) mq.pub(presenceTopic(), JSON.stringify({name: me.name, t: Date.now()}), true); }
+/* End-to-end encryption. Everything on the wire is sealed with the room key (AES-GCM, derived from the
+   room code with PBKDF2), so the broker and anyone without the code see only ciphertext. Presence and
+   group messages are signed (ECDSA); direct messages are additionally sealed with an ECDH key that only
+   the two people share. A contact's keys are pinned on first contact so nobody can take over their name. */
+const te = new TextEncoder(), td = new TextDecoder();
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const EC = name => ({name, namedCurve: 'P-256'});
+const pubJwk = k => ({kty: 'EC', crv: 'P-256', x: String(k.x), y: String(k.y)});
+const fp = k => k.x + '.' + k.y;
+const dmKeys = new Map();
+
+async function seal(key, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  return {iv: b64(iv), ct: b64(await crypto.subtle.encrypt({name: 'AES-GCM', iv}, key, te.encode(JSON.stringify(obj))))};
+}
+async function unseal(key, box) {
+  return JSON.parse(td.decode(await crypto.subtle.decrypt({name: 'AES-GCM', iv: unb64(box.iv)}, key, unb64(box.ct))));
+}
+
+async function loadIdentity() {
+  let s = store.get('chatIdentity', null);
+  if (!s || !s.e || !s.s) {
+    const e = await crypto.subtle.generateKey(EC('ECDH'), true, ['deriveBits']);
+    const g = await crypto.subtle.generateKey(EC('ECDSA'), true, ['sign', 'verify']);
+    const jwk = k => crypto.subtle.exportKey('jwk', k);
+    s = {e: {pub: await jwk(e.publicKey), priv: await jwk(e.privateKey)}, s: {pub: await jwk(g.publicKey), priv: await jwk(g.privateKey)}};
+    store.set('chatIdentity', s);
+  }
+  return {
+    keys: {e: pubJwk(s.e.pub), s: pubJwk(s.s.pub)},
+    ePriv: await crypto.subtle.importKey('jwk', s.e.priv, EC('ECDH'), false, ['deriveBits']),
+    sPriv: await crypto.subtle.importKey('jwk', s.s.priv, EC('ECDSA'), false, ['sign'])
+  };
+}
+
+async function deriveRoom(code) {
+  const base = await crypto.subtle.importKey('raw', te.encode(code), 'PBKDF2', false, ['deriveBits']);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits(
+    {name: 'PBKDF2', hash: 'SHA-256', salt: te.encode('dv-chat-room-v1'), iterations: 300000}, base, 320));
+  return {tag: [...bits.slice(32)].map(b => b.toString(16).padStart(2, '0')).join(''), k: b64(bits.slice(0, 32))};
+}
+
+async function useRoom(saved) {
+  room = {tag: saved.tag, key: await crypto.subtle.importKey('raw', unb64(saved.k), 'AES-GCM', false, ['encrypt', 'decrypt'])};
+  log = store.get('chatLog-' + room.tag, {});
+  unread = store.get('chatUnread-' + room.tag, {});
+  conv = ALL;
+}
+
+async function signed(body) {
+  const b = JSON.stringify({...body, from: me.id, name: me.name, k: ident.keys});
+  return {b, s: b64(await crypto.subtle.sign({name: 'ECDSA', hash: 'SHA-256'}, ident.sPriv, te.encode(b)))};
+}
+
+async function verify(box) {
+  if (typeof box.b !== 'string' || typeof box.s !== 'string') return null;
+  const body = JSON.parse(box.b);
+  if (!validId(body.from) || body.from === me.id || !body.k || !body.k.e || !body.k.s) return null;
+  const k = {e: pubJwk(body.k.e), s: pubJwk(body.k.s)}, f = fp(k.e) + '|' + fp(k.s);
+  const pin = pins[body.from];
+  if (pin && pin.f !== f) return null;
+  let p = peers.get(body.from);
+  if (!p || p.f !== f) p = {f, sKey: await crypto.subtle.importKey('jwk', k.s, EC('ECDSA'), false, ['verify'])};
+  if (!await crypto.subtle.verify({name: 'ECDSA', hash: 'SHA-256'}, p.sKey, unb64(box.s), te.encode(box.b))) return null;
+  peers.set(body.from, p);
+  if (!pin) { pins[body.from] = {f, e: k.e}; store.set('chatPins', pins); }
+  return body;
+}
+
+function dmKey(id) {
+  const pin = pins[id];
+  if (!pin) return Promise.reject(new Error('unknown contact'));
+  if (!dmKeys.has(id)) dmKeys.set(id, (async () => {
+    const pub = await crypto.subtle.importKey('jwk', pin.e, EC('ECDH'), false, []);
+    const shared = await crypto.subtle.deriveBits({name: 'ECDH', public: pub}, ident.ePriv, 256);
+    const hk = await crypto.subtle.importKey('raw', shared, 'HKDF', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      {name: 'HKDF', hash: 'SHA-256', salt: te.encode([me.id, id].sort().join(':')), info: te.encode('dv-chat-dm-v1')},
+      hk, {name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
+  })());
+  return dmKeys.get(id);
+}
+
+async function publish(t, obj, retain) {
+  const c = mq, r = room;
+  if (!c || !r) return;
+  const payload = JSON.stringify(await seal(r.key, obj));
+  if (mq === c && room === r) c.pub(ROOT + r.tag + '/' + t, payload, retain);
+}
+
+function announce() {
+  if (mq && room) signed({kind: 'p', t: Date.now()}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
+}
 
 function connect() {
-  if (mq || !me.name) return;
+  if (mq || !me.name || !room || !ident) return;
   setStatus('Verbinde…');
-  const broker = BROKERS[brokerIdx];
+  const broker = BROKERS[brokerIdx], base = ROOT + room.tag + '/';
   cstat.title = new URL(broker.url).host;
+  let beat = 0;
   const c = mqttClient(broker, {
     clientId: me.id + Math.random().toString(36).slice(2, 6),
-    will: {topic: presenceTopic(), payload: ''},
+    will: {topic: base + 'p/' + me.id, payload: ''},
     onopen() {
       retry = 0;
-      c.sub([ROOT + 'p/+', ROOT + ALL, ROOT + 'dm/' + me.id, ROOT + 'hello']);
+      c.sub(['p/+', ALL, 'dm/' + me.id, 'hello'].map(t => base + t));
       announce();
       // Ask everyone to re-announce, in case the broker does not keep retained presence messages.
-      c.pub(ROOT + 'hello', me.id);
+      publish('hello', {hello: me.id}).catch(() => {});
       renderPeople();
       beat = setInterval(announce, 2 * 60000);
       setStatus('Online');
@@ -1438,30 +1540,57 @@ function connect() {
   mq = c;
 }
 
+function disconnect() {
+  const c = mq;
+  if (!c) return;
+  mq = null;
+  c.pub(ROOT + room.tag + '/p/' + me.id, '', true);
+  c.close();
+  people.clear();
+  setStatus('Offline');
+}
+
 function setStatus(s) { cstat.textContent = s; updateComposer(); }
 
-function receive(topic, payload) {
-  const sub = topic.slice(ROOT.length);
-  if (sub === 'hello') { if (payload !== me.id) announce(); return; }
-  let d = null;
-  try { d = payload ? JSON.parse(payload) : null; } catch (e) { return; }
-  if (sub.startsWith('p/')) {
+let inbox = Promise.resolve();
+function receive(t, payload) { inbox = inbox.then(() => incoming(t, payload)).catch(() => {}); }
+
+async function incoming(t, payload) {
+  const r = room;
+  if (!r || !t.startsWith(ROOT + r.tag + '/')) return;
+  const sub = t.slice(ROOT.length + r.tag.length + 1);
+  if (sub.startsWith('p/') && !payload) {
     const id = sub.slice(2);
-    if (!validId(id) || id === me.id) return;
-    if (d && cleanName(d.name) && Date.now() - d.t < STALE) people.set(id, {name: cleanName(d.name), seen: Date.now()});
-    else people.delete(id);
-    renderPeople();
-    if (id === conv) renderMsgs();
+    if (people.delete(id)) { renderPeople(); if (id === conv) renderMsgs(); }
     return;
   }
-  if (!d || !validId(d.from) || d.from === me.id || typeof d.text !== 'string' || !d.text.trim()) return;
-  if (sub !== ALL && sub !== 'dm/' + me.id) return;
-  addMsg(sub === ALL ? ALL : d.from, {id: String(d.id || '').slice(0, 40), from: d.from, name: cleanName(d.name) || 'Unbekannt', text: d.text.slice(0, MAXLEN), ts: Date.now()});
+  const box = await unseal(r.key, JSON.parse(payload));
+  if (sub === 'hello') { if (box.hello !== me.id) announce(); return; }
+  if (sub.startsWith('p/')) {
+    const body = await verify(box);
+    if (!body || room !== r || body.kind !== 'p' || body.from !== sub.slice(2) || !cleanName(body.name) || !(Date.now() - body.t < STALE)) return;
+    people.set(body.from, {name: cleanName(body.name), seen: Date.now()});
+    renderPeople();
+    if (body.from === conv) renderMsgs();
+  } else if (sub === ALL) {
+    const body = await verify(box);
+    if (!body || room !== r || body.kind !== 'msg' || typeof body.text !== 'string' || !body.text.trim()) return;
+    addMsg(ALL, {id: String(body.id || '').slice(0, 40), from: body.from, name: cleanName(body.name) || 'Unbekannt', text: body.text.slice(0, MAXLEN), ts: Date.now()});
+  } else if (sub === 'dm/' + me.id) {
+    if (!validId(box.from) || box.from === me.id) return;
+    const m = await unseal(await dmKey(box.from), box.box);
+    if (room !== r || m.to !== me.id || typeof m.text !== 'string' || !m.text.trim()) return;
+    addMsg(box.from, {id: String(m.id || '').slice(0, 40), from: box.from, name: cleanName(m.name) || nameOf(box.from), text: m.text.slice(0, MAXLEN), ts: Date.now()});
+  }
 }
 
 function chatVisible() { return showing && current === chatDoc && document.visibilityState === 'visible'; }
 
-function saveChat() { store.set('chatLog', log); store.set('chatUnread', unread); }
+function saveChat() {
+  if (!room) return;
+  store.set('chatLog-' + room.tag, log);
+  store.set('chatUnread-' + room.tag, unread);
+}
 
 function addMsg(c, m) {
   const list = log[c] || (log[c] = []);
@@ -1501,7 +1630,7 @@ function renderPeople() {
   if (!ids.includes(conv)) conv = ALL;
   cpeople.replaceChildren(...ids.map(id => {
     const on = id === ALL ? !!mq : people.has(id);
-    const sub = id === ALL ? `${people.size + (me.name && mq ? 1 : 0)} online` : (on ? 'online' : 'offline');
+    const sub = id === ALL ? `${people.size + (mq ? 1 : 0)} online` : (on ? 'online' : 'offline');
     return el('div', {class: 'cperson', role: 'option', tabindex: '0', 'aria-selected': String(id === conv),
                       onclick: () => selectConv(id), onkeydown: e => { if (e.key === 'Enter') selectConv(id); }},
       el('span', {class: 'cav' + (on ? ' on' : ''), text: id === ALL ? '#' : nameOf(id).charAt(0).toUpperCase()}),
@@ -1523,7 +1652,8 @@ function renderMsgs() {
       conv === ALL && m.from !== me.id ? el('div', {class: 'cfrom', text: m.name}) : null,
       el('div', {text: m.text}),
       el('div', {class: 'ctime', text: fmtTime(m.ts)})))
-    : [el('div', {class: 'csys', text: conv === ALL ? 'Noch keine Nachrichten. Schreib allen, die gerade online sind.' : 'Noch keine Nachrichten.'})]));
+    : [el('div', {class: 'csys', text: 'Noch keine Nachrichten. ' +
+        (conv === ALL ? 'Alles hier ist Ende-zu-Ende-verschlüsselt.' : 'Diesen Chat könnt nur ihr zwei lesen.')})]));
   cmsgs.scrollTop = cmsgs.scrollHeight;
   updateComposer();
 }
@@ -1534,10 +1664,21 @@ function updateComposer() {
   cin.placeholder = !mq ? 'Keine Verbindung' : offline ? nameOf(conv) + ' ist offline' : 'Nachricht schreiben';
 }
 
+function showJoin(show) {
+  cnameform.hidden = !show;
+  if (!show) return;
+  if (!cnamein.value) cnamein.value = me.name;
+  croomin.value = '';
+  croomin.placeholder = room ? 'Leer lassen für denselben Raum' : '';
+  $('ccancel').hidden = !(me.name && room);
+  cerr.textContent = window.crypto && crypto.subtle ? '' : 'Der Chat funktioniert nur über die Web-Adresse (https), nicht als Datei.';
+}
+
 function renderChat() {
-  cnameform.hidden = !!me.name;
+  const joined = !!(me.name && room);
+  if (!joined && cnameform.hidden) showJoin(true);
   $('cme').textContent = me.name ? 'Angemeldet als ' + me.name : '';
-  $('crename').hidden = !me.name;
+  $('crename').hidden = !joined;
   renderPeople();
   renderMsgs();
 }
@@ -1546,33 +1687,55 @@ function openChat() {
   delete unread[conv];
   saveChat();
   renderChat();
-  (me.name ? cin : cnamein).focus();
+  (cnameform.hidden ? cin : cnamein.value ? croomin : cnamein).focus();
 }
 
-cnameform.addEventListener('submit', e => {
+cnameform.addEventListener('submit', async e => {
   e.preventDefault();
-  const n = cleanName(cnamein.value);
+  const n = cleanName(cnamein.value), code = croomin.value, btn = cnameform.querySelector('[type=submit]');
+  if (!window.crypto || !crypto.subtle) return;
   if (!n) { cnamein.focus(); return; }
-  me.name = n;
-  store.set('chatName', n);
-  renderChat();
-  if (mq) announce(); else connect();
-  cin.focus();
+  if (!room && !code) { cerr.textContent = 'Bitte einen Raum-Code eingeben.'; croomin.focus(); return; }
+  if (code && code.length < 8) { cerr.textContent = 'Der Raum-Code braucht mindestens 8 Zeichen.'; croomin.focus(); return; }
+  btn.disabled = true;
+  cerr.textContent = '';
+  try {
+    if (code) {
+      const saved = await deriveRoom(code);
+      if (!room || saved.tag !== room.tag) {
+        disconnect();
+        store.set('chatRoom', saved);
+        await useRoom(saved);
+      }
+    }
+    me.name = n;
+    store.set('chatName', n);
+    showJoin(false);
+    renderChat();
+    if (mq) announce(); else connect();
+    cin.focus();
+  } finally {
+    btn.disabled = false;
+  }
 });
+$('ccancel').addEventListener('click', () => { showJoin(false); cin.focus(); });
 $('crename').addEventListener('click', () => {
   cnamein.value = me.name;
-  cnameform.hidden = false;
+  showJoin(true);
   cnamein.focus();
   cnamein.select();
 });
-$('cform').addEventListener('submit', e => {
+$('cform').addEventListener('submit', async e => {
   e.preventDefault();
-  const text = cin.value.trim().slice(0, MAXLEN);
+  const text = cin.value.trim().slice(0, MAXLEN), to = conv;
   if (!text || cin.disabled) return;
-  const m = {id: me.id + Date.now().toString(36), from: me.id, name: me.name, text};
-  mq.pub(ROOT + (conv === ALL ? ALL : 'dm/' + conv), JSON.stringify(m));
-  addMsg(conv, {...m, ts: Date.now()});
+  const id = me.id + Date.now().toString(36);
   cin.value = '';
+  addMsg(to, {id, from: me.id, name: me.name, text, ts: Date.now()});
+  try {
+    if (to === ALL) await publish(ALL, await signed({kind: 'msg', id, text}));
+    else await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {id, to, name: me.name, text})});
+  } catch (err) {}
 });
 $('ribbonMail').addEventListener('click', () => showPreview(chatRow));
 document.addEventListener('visibilitychange', () => { if (chatVisible() && unread[conv]) openChat(); });
@@ -1581,9 +1744,18 @@ setInterval(() => {
   for (const [id, p] of people) if (Date.now() - p.seen > STALE) { people.delete(id); changed = true; }
   if (changed) renderChat();
 }, 30000);
-window.addEventListener('pagehide', () => { if (mq) { mq.pub(presenceTopic(), '', true); mq.close(); } });
+window.addEventListener('pagehide', disconnect);
+window.addEventListener('pageshow', e => { if (e.persisted) connect(); });
 renderBadge();
-connect();
+if (window.crypto && crypto.subtle) {
+  (async () => {
+    ident = await loadIdentity();
+    const saved = store.get('chatRoom', null);
+    if (saved && saved.tag && saved.k) await useRoom(saved);
+    if (showing && current === chatDoc) renderChat(); else renderBadge();
+    connect();
+  })().catch(() => {});
+}
 
 /* ---------- Viewer ---------- */
 const games = {snake: makeSnake(), tetris: makeTetris(), '2048': make2048(), wordle: makeWordle(), flappy: makeFlappy()};
