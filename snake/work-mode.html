@@ -2,281 +2,301 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dispatch Console</title>
+<title>Document Viewer</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: warehouse ops console. Nav band, KPI strip, zone grid (the game) beside an event log, shipments table below. */
+/* Layout: Windows desktop document viewer. Title bar, ribbon, search strip, references tree beside a document grid, preview pane (the game) below. Single light theme on purpose. */
 :root {
-  --bg: #eef1f4;
-  --surface: #ffffff;
-  --surface-2: #f5f7f9;
-  --fg: #1d2733;
-  --muted: #5f6d7c;
-  --line: #d8dee6;
-  --accent: #1f5fae;
-  --accent-soft: #e3ecf8;
-  --on-accent: #ffffff;
-  --pickup: #c97a12;
-  --ok: #2c7f53;
-  --ok-soft: #e1f2e8;
-  --warn: #9a6512;
-  --warn-soft: #fbf0dc;
-  --crit: #b8382b;
-  --crit-soft: #fbe5e2;
-  --nav: #1b2a3a;
-  --nav-active: #2b3d51;
-  --nav-fg: #e3eaf1;
-  --nav-muted: #98a8b8;
-  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #11161c; --surface: #19212a; --surface-2: #1e2731; --fg: #e2e8ee; --muted: #8d9aa8; --line: #2b3540;
-    --accent: #5e9ce6; --accent-soft: #1f3249; --on-accent: #0d1620; --pickup: #e09a3a;
-    --ok: #57b583; --ok-soft: #1b3428; --warn: #e0a84a; --warn-soft: #3a2e17; --crit: #e8705f; --crit-soft: #3d201c;
-    --nav: #0c1117; --nav-active: #1d2733; --nav-fg: #e2e8ee; --nav-muted: #8592a0;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #11161c; --surface: #19212a; --surface-2: #1e2731; --fg: #e2e8ee; --muted: #8d9aa8; --line: #2b3540;
-  --accent: #5e9ce6; --accent-soft: #1f3249; --on-accent: #0d1620; --pickup: #e09a3a;
-  --ok: #57b583; --ok-soft: #1b3428; --warn: #e0a84a; --warn-soft: #3a2e17; --crit: #e8705f; --crit-soft: #3d201c;
-  --nav: #0c1117; --nav-active: #1d2733; --nav-fg: #e2e8ee; --nav-muted: #8592a0;
-  color-scheme: dark;
+  color-scheme: light;
+  --desk: #f0f0f0;
+  --chrome: #ffffff;
+  --ribbon: #f5f6f7;
+  --ribbon-line: #dadbdc;
+  --hover: #e5f1fb;
+  --hover-line: #cce4f7;
+  --file: #2a6bc1;
+  --on-file: #ffffff;
+  --text: #1f1f1f;
+  --muted: #666666;
+  --search-band: #dce7f5;
+  --search-line: #b9cce6;
+  --field: #ffffff;
+  --field-line: #a9b6c6;
+  --pane-line: #a0a0a0;
+  --grid-line: #ececec;
+  --select: #cce8ff;
+  --tree-select: #d9d9d9;
+  --flag: #e01b1b;
+  --help: #1565c0;
+  --check: #1e6fd0;
+  --paper: #ffffff;
+  --ink: #1f1f1f;
+  --ink-soft: #c9ced4;
+  --page-grid: #e6e6e6;
+  --page-grid-strong: #c4c4c4;
+  --snake: #2f3b4c;
+  --snake-head: #111820;
+  --food: #d0281e;
+  --font-ui: "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--font-sans); }
+html, body { height: 100%; }
+body { margin: 0; display: flex; flex-direction: column; overflow: auto; background: var(--desk); color: var(--text); font: 12px/1.35 var(--font-ui); user-select: none; -webkit-user-select: none; }
+.band { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+svg { flex: none; }
+.i16 { width: 16px; height: 16px; }
 
-.topbar { background: var(--nav); color: var(--nav-fg); }
-.topbar-inner, .page {
-  max-width: 1240px; margin: 0 auto;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-}
-.topbar-inner { display: flex; align-items: center; gap: 24px; padding-block: 10px; }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; white-space: nowrap; }
-.logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 12px; letter-spacing: .04em; }
-.tabs { display: flex; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; }
-.tab { padding: 6px 12px; border-radius: 6px; color: var(--nav-muted); font-size: 13px; white-space: nowrap; }
-.tab.active { color: var(--nav-fg); background: var(--nav-active); }
-.who { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 12px; color: var(--nav-muted); white-space: nowrap; }
-.avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--nav-active); color: var(--nav-fg); font-size: 11px; font-weight: 600; }
+.titlebar { display: flex; align-items: center; gap: 8px; height: 31px; background: var(--chrome); }
+.tb-sep { width: 1px; height: 14px; background: var(--ribbon-line); }
+.tb-qat { width: 10px; height: 10px; }
+.tb-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.win { display: flex; align-self: stretch; }
+.wbtn { display: grid; place-items: center; width: 46px; }
+.wbtn svg { width: 10px; height: 10px; fill: none; stroke: var(--text); stroke-width: 1; }
 
-.page { display: grid; gap: 16px; padding-block: 20px 32px; }
-.page-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
-.crumbs { font-size: 12px; color: var(--muted); }
-h1 { margin: 2px 0 0; font-size: 22px; font-weight: 600; text-wrap: balance; }
-.updated { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tabs { display: flex; align-items: flex-end; gap: 2px; height: 25px; background: var(--chrome); border-bottom: 1px solid var(--ribbon-line); }
+.tab { padding: 4px 16px 5px; color: var(--text); white-space: nowrap; }
+.tab.file { background: var(--file); color: var(--on-file); }
+.tab.active { margin-bottom: -1px; background: var(--ribbon); border: 1px solid var(--ribbon-line); border-bottom-color: var(--ribbon); }
+.tabs-right { display: flex; align-items: center; gap: 10px; margin-left: auto; align-self: center; }
+.tabs-right svg { width: 10px; height: 10px; fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.help { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--help); color: var(--on-file); font-size: 11px; font-weight: 700; }
 
-.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.kpi { display: grid; gap: 4px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
-.kpi-label, th { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.kpi-value { display: flex; align-items: center; min-height: 34px; font-family: var(--font-mono); font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.kpi-sub { font-size: 12px; color: var(--muted); }
+.ribbon-wrap { background: var(--ribbon); border-bottom: 1px solid var(--ribbon-line); overflow-x: auto; }
+.ribbon { display: flex; height: 94px; width: max-content; }
+.group { display: flex; flex-direction: column; padding: 3px 4px 0; border-right: 1px solid var(--ribbon-line); }
+.group-items { display: flex; flex: 1; align-items: flex-start; gap: 1px; }
+.group-label { padding: 1px 0 4px; text-align: center; white-space: nowrap; color: var(--muted); }
+.rbtn { display: flex; flex-direction: column; align-items: center; min-width: 42px; padding: 2px 4px; border: 1px solid transparent; text-align: center; line-height: 1.15; white-space: nowrap; }
+.rbtn:hover, .srow:hover { background: var(--hover); border-color: var(--hover-line); }
+.rbtn svg { width: 32px; height: 32px; margin-bottom: 3px; }
+.stack { display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+.srow { display: flex; align-items: center; gap: 5px; height: 21px; padding: 0 4px; border: 1px solid transparent; white-space: nowrap; }
+.set-box { display: flex; justify-content: flex-end; align-items: center; width: 96px; height: 19px; margin-left: 6px; padding: 0 3px; background: var(--field); border: 1px solid var(--field-line); }
+.set-box svg, .combo svg { width: 9px; height: 9px; fill: none; stroke: var(--text); }
 
-.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-family: var(--font-sans); font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
-.pill.ok { background: var(--ok-soft); color: var(--ok); }
-.pill.warn { background: var(--warn-soft); color: var(--warn); }
-.pill.crit { background: var(--crit-soft); color: var(--crit); }
-.pill.info { background: var(--accent-soft); color: var(--accent); }
+.searchbar { display: flex; align-items: center; gap: 8px; height: 36px; background: var(--search-band); border-top: 1px solid var(--search-line); border-bottom: 1px solid var(--search-line); overflow-x: auto; white-space: nowrap; }
+.searchbar .label { padding-left: 14px; }
+.combo { display: flex; flex: none; justify-content: space-between; align-items: center; width: 286px; height: 22px; padding: 0 5px; background: var(--field); border: 1px solid var(--field-line); }
+.combo.narrow { width: 230px; }
+.sb-ico { width: 18px; height: 18px; margin-left: 8px; }
+.checkbox { display: inline-grid; place-items: center; width: 13px; height: 13px; margin-left: 10px; border-radius: 2px; background: var(--check); }
+.checkbox svg { width: 9px; height: 9px; fill: none; stroke: var(--on-file); stroke-width: 2; }
 
-.main { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
-.card { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
-.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-h2 { margin: 0; font-size: 14px; font-weight: 600; }
-.small { font-size: 12px; color: var(--muted); }
+.workspace { display: flex; flex: 1; gap: 3px; min-height: 520px; padding-block: 2px 0; }
+.pane-label { padding: 1px 4px 1px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.refs { display: flex; flex-direction: column; width: 180px; flex: none; }
+.box { background: var(--paper); border: 1px solid var(--pane-line); }
+.refs .box { flex: 1; padding: 6px 4px; }
+.tree { display: flex; align-items: center; gap: 2px; }
+.tree-line { width: 12px; border-top: 1px dotted var(--muted); }
+.tree-sel { padding: 0 3px; background: var(--tree-select); border: 1px dotted var(--muted); }
+.splitter { display: grid; place-items: center; width: 4px; flex: none; }
+.splitter span { width: 0; height: 14px; border-left: 2px dotted var(--pane-line); }
+.docs { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.grid { height: 250px; flex: none; overflow: auto; }
+table { width: 100%; min-width: 700px; table-layout: fixed; border-collapse: collapse; }
+th { height: 25px; padding: 0 5px; text-align: left; font-weight: 400; background: var(--paper); border-right: 1px solid var(--grid-line); border-bottom: 1px solid var(--grid-line); white-space: nowrap; }
+td { height: 18px; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-right: 1px solid var(--grid-line); border-bottom: 1px solid var(--grid-line); }
+td .i16 { width: 15px; height: 15px; margin-right: 2px; vertical-align: -4px; }
+tbody tr[data-doc] { cursor: default; }
+tbody tr.sel td { background: var(--select); }
+.flag { color: var(--flag); }
+.sort { font-size: 9px; margin-left: 8px; }
 
-.map-view { display: grid; justify-items: center; gap: 12px; padding: 16px; }
-canvas { display: block; width: min(422px, 100%); max-width: 100%; height: auto; aspect-ratio: 1; border-radius: 4px; touch-action: none; cursor: pointer; }
-canvas:focus { outline: none; }
-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; width: min(422px, 100%); font-size: 12px; color: var(--muted); }
-.sw { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: -1px; }
-.sw.route { background: var(--accent); }
-.sw.pick { background: var(--pickup); }
-.keys { margin-left: auto; font-family: var(--font-mono); font-size: 11px; }
+.preview-head { margin-top: 3px; padding: 1px 0; text-align: center; font-size: 10px; background: var(--desk); border: 1px solid var(--pane-line); border-bottom: 0; }
+.preview { display: grid; flex: 1; place-items: center; min-height: 340px; position: relative; overflow: hidden; }
+#c { display: block; border: 1px solid var(--page-grid-strong); touch-action: none; }
+#c:focus { outline: none; }
 
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-.seg button { padding: 4px 14px; border: 0; background: var(--surface); color: var(--muted); font: 500 12px var(--font-sans); cursor: pointer; }
-.seg button + button { border-left: 1px solid var(--line); }
-.seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.statusbar { display: flex; align-items: center; justify-content: space-between; height: 24px; color: var(--muted); }
+.views { display: flex; gap: 6px; }
+.views span { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid transparent; }
+.views span.on { background: var(--select); border-color: var(--hover-line); }
+.views svg { width: 12px; height: 13px; fill: none; stroke: var(--muted); }
 
-.live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ok); }
-.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
-.log { max-height: 480px; margin: 0; padding: 0; overflow: auto; list-style: none; }
-.log li { display: grid; grid-template-columns: 40px 8px minmax(0, 1fr); align-items: baseline; gap: 10px; padding: 9px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
-.log li:last-child { border-bottom: 0; }
-.log time { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
-.dot { align-self: center; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-.dot.ok { background: var(--ok); }
-.dot.info { background: var(--accent); }
-.dot.crit { background: var(--crit); }
-
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { padding: 10px 16px; text-align: left; white-space: nowrap; background: var(--surface-2); border-bottom: 1px solid var(--line); }
-td { padding: 10px 16px; white-space: nowrap; border-bottom: 1px solid var(--line); }
-tbody tr:last-child td { border-bottom: 0; }
-.num { text-align: right; font-variant-numeric: tabular-nums; }
-.mono { font-family: var(--font-mono); font-size: 12px; }
-
-@media (max-width: 880px) {
-  .main { grid-template-columns: minmax(0, 1fr); }
-  .log { max-height: 300px; }
-}
-@media (max-width: 720px) {
-  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tabs, .hub { display: none; }
-  .keys { margin-left: 0; }
+@media (max-width: 640px) {
+  .refs, .splitter { display: none; }
+  .tb-title { font-size: 11px; }
 }
 </style>
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="brand"><span class="logo">OC</span>Ops Console</div>
-    <nav class="tabs" aria-label="Sections">
-      <span class="tab active">Dispatch</span>
-      <span class="tab">Shipments</span>
-      <span class="tab">Fleet</span>
-      <span class="tab">Warehouse</span>
-      <span class="tab">Reports</span>
-    </nav>
-    <div class="who"><span class="hub">Hub DC-2 · Hall C</span><span class="avatar" aria-hidden="true">OP</span></div>
-  </div>
-</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-open" viewBox="0 0 32 32"><path d="M4 6.5h11l5 5v18H4z" fill="#e4eefa" stroke="#4a78b5"/><path d="M10 2.5h11l6 6v17H10z" fill="#fff" stroke="#4a78b5"/><path d="M21 2.5v6h6" fill="#d6e4f5" stroke="#4a78b5"/><path d="M13 12h11M13 15h11M13 18h11M13 21h8" stroke="#8fb0dc" stroke-width="1.5"/></symbol>
+    <symbol id="i-page" viewBox="0 0 32 32"><path d="M6.5 2.5h12.5l6 6v21H6.5z" fill="#fff" stroke="#4a78b5"/><path d="M19 2.5v6h6" fill="#d6e4f5" stroke="#4a78b5"/><path d="M9.5 12h12M9.5 15h12M9.5 18h12M9.5 21h9" stroke="#8fb0dc" stroke-width="1.5"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 32 32"><path d="M9 3.5h14v9H9z" fill="#fff" stroke="#777"/><path d="M3.5 12.5h25v11h-25z" fill="#cfd3d8" stroke="#6d7379"/><path d="M3.5 12.5h25v3h-25z" fill="#e3e6ea" stroke="#6d7379"/><path d="M8 20.5h16v8H8z" fill="#fff" stroke="#777"/><circle cx="25" cy="18" r="1.2" fill="#4caf50"/></symbol>
+    <symbol id="o-tiff" viewBox="0 0 32 32"><rect x="11" y="18" width="20" height="10" rx="1" fill="#2b3a4f"/><text x="21" y="25.8" font-size="7.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Arial, sans-serif">TIFF</text></symbol>
+    <symbol id="i-mail" viewBox="0 0 32 32"><path d="M2.5 8.5h27v17h-27z" fill="#dbe8f7" stroke="#5f86bb"/><path d="M2.5 8.5l13.5 10 13.5-10" fill="none" stroke="#5f86bb"/><path d="M2.5 25.5l10-8M29.5 25.5l-10-8" stroke="#9db7da"/></symbol>
+    <symbol id="o-check" viewBox="0 0 32 32"><circle cx="9" cy="8" r="7" fill="#3aa64a" stroke="#fff"/><path d="M5.5 8l2.5 2.5 4.5-5" fill="none" stroke="#fff" stroke-width="2"/></symbol>
+    <symbol id="i-export" viewBox="0 0 32 32"><path d="M6 7v16c0 2 4.5 3.5 10 3.5s10-1.5 10-3.5V7" fill="#b9bec4" stroke="#6b7177"/><ellipse cx="16" cy="7" rx="10" ry="3.5" fill="#d9dcdf" stroke="#6b7177"/><path d="M13 11h6v7h4l-7 8-7-8h4z" fill="#2f7fd8" stroke="#1d5fae"/></symbol>
+    <symbol id="o-plus" viewBox="0 0 32 32"><circle cx="23" cy="23" r="7" fill="#2f7fd8" stroke="#fff"/><path d="M23 19v8M19 23h8" stroke="#fff" stroke-width="2"/></symbol>
+    <symbol id="o-minus" viewBox="0 0 32 32"><circle cx="23" cy="23" r="7" fill="#d33a2c" stroke="#fff"/><path d="M19 23h8" stroke="#fff" stroke-width="2.2"/></symbol>
+    <symbol id="o-dash" viewBox="0 0 32 32"><path d="M2 16.5h28" stroke="#d33a2c" stroke-width="2" stroke-dasharray="3 2"/></symbol>
+    <symbol id="o-arrow" viewBox="0 0 32 32"><path d="M13 14.5h8v-5l9 8.5-9 8.5v-5h-8z" fill="#2f7fd8" stroke="#1d5fae"/></symbol>
+    <symbol id="i-restore" viewBox="0 0 32 32"><path d="M4.5 15.5h23v13h-23z" fill="#cfd8e3" stroke="#5d6f86"/><path d="M4.5 15.5l3-5h17l3 5z" fill="#e6ecf3" stroke="#5d6f86"/><path d="M16 1.5l7.5 8H19v9h-6v-9H8.5z" fill="#2f7fd8" stroke="#1d5fae"/></symbol>
+    <symbol id="i-collate" viewBox="0 0 32 32"><g fill="#fff" stroke="#4a78b5"><path d="M2.5 5.5h10v15h-10z"/><path d="M11 9.5h10v15H11z"/><path d="M19.5 13.5h10v15h-10z"/></g><path d="M4.5 9h6M4.5 12h6M13 13h6M13 16h6M21.5 17h6M21.5 20h6M21.5 23h6" stroke="#8fb0dc" stroke-width="1.4"/></symbol>
+    <symbol id="i-disc" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#d7dade" stroke="#8a9097"/><circle cx="16" cy="16" r="9" fill="#eceef0"/><circle cx="16" cy="16" r="3.5" fill="#fff" stroke="#8a9097"/><path d="M7.5 10a10.5 10.5 0 0 1 7.5-5" stroke="#fff" stroke-width="2" fill="none"/></symbol>
+    <symbol id="i-launch" viewBox="0 0 32 32"><rect x="3" y="4" width="11" height="11" fill="#2f7fd8"/><rect x="18" y="4" width="11" height="11" fill="#3aa64a"/><rect x="3" y="17" width="11" height="11" fill="#f2a71b"/><rect x="18" y="17" width="11" height="11" fill="#d33a2c"/><path d="M10 16h12" stroke="#1f2a37" stroke-width="3"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16"><path d="M1 3.5h5l1.5 1.5H15v8.5H1z" fill="#f6c94c" stroke="#c9952a"/></symbol>
+    <symbol id="i-sets" viewBox="0 0 16 16"><path d="M1 5.5h5l1.5 1.5H15v7.5H1z" fill="#f6c94c" stroke="#c9952a"/><circle cx="5" cy="4.5" r="3" fill="#fff" stroke="#c9952a"/><circle cx="5" cy="4.5" r="1" fill="#c9952a"/></symbol>
+    <symbol id="i-set" viewBox="0 0 16 16"><path d="M3.5 1.5h6l3 3v10h-9z" fill="#fff" stroke="#6d7379"/><path d="M5.5 7h5M5.5 9h5M5.5 11h5" stroke="#9aa0a6"/></symbol>
+    <symbol id="i-audit" viewBox="0 0 16 16"><path d="M3.5 1.5h6l3 3v10h-9z" fill="#fff" stroke="#6d7379"/><path d="M1.5 10l3 3 5.5-6" fill="none" stroke="#3aa64a" stroke-width="2"/></symbol>
+    <symbol id="i-pdf" viewBox="0 0 16 16"><path d="M3.5 1.5h7l3 3v10h-10z" fill="#fff" stroke="#8a8a8a"/><rect x="0.5" y="2.5" width="11" height="6" fill="#c8281e"/><text x="6" y="7.4" font-size="5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Arial, sans-serif">PDF</text><path d="M5 11h6M5 13h6" stroke="#c8281e"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4"/></symbol>
+  </defs>
+</svg>
 
-<main class="page">
-  <div class="page-head">
-    <div>
-      <div class="crumbs">Dispatch / Hall C / Routes</div>
-      <h1>Live route board</h1>
+<div class="titlebar band">
+  <svg class="i16" aria-hidden="true"><use href="#i-set"/></svg>
+  <span class="tb-sep"></span>
+  <svg class="tb-qat" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2h6" stroke="#444"/><path d="M2 4.5l3 3 3-3z" fill="#444"/></svg>
+  <span class="tb-title">Document Viewer</span>
+  <span class="win" aria-hidden="true">
+    <span class="wbtn"><svg viewBox="0 0 10 10"><path d="M0 5.5h10"/></svg></span>
+    <span class="wbtn"><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9"/></svg></span>
+    <span class="wbtn"><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10"/></svg></span>
+  </span>
+</div>
+
+<div class="tabs band">
+  <span class="tab file">File</span>
+  <span class="tab active">Home</span>
+  <span class="tab">Options</span>
+  <span class="tabs-right"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 7l4-4 4 4"/></svg><span class="help">?</span></span>
+</div>
+
+<div class="ribbon-wrap band">
+  <div class="ribbon">
+    <div class="group">
+      <div class="group-items">
+        <span class="rbtn"><svg><use href="#i-open"/></svg>Open<br>▾</span>
+      </div>
+      <div class="group-label">Open</div>
     </div>
-    <div class="updated">Shift B · Updated <span id="clock">--:--:--</span></div>
-  </div>
-
-  <section class="kpis" aria-label="Route summary">
-    <div class="kpi"><div class="kpi-label">Pickups cleared</div><div class="kpi-value" id="score">0</div><div class="kpi-sub">on this route</div></div>
-    <div class="kpi"><div class="kpi-label">Shift record</div><div class="kpi-value" id="best">0</div><div class="kpi-sub">pickups on one route</div></div>
-    <div class="kpi"><div class="kpi-label">Route stops</div><div class="kpi-value" id="len">3</div><div class="kpi-sub">units in convoy</div></div>
-    <div class="kpi"><div class="kpi-label">Route status</div><div class="kpi-value"><span class="pill warn" id="status">On hold</span></div><div class="kpi-sub mono" id="routeId">R-0000</div></div>
-  </section>
-
-  <section class="main">
-    <div class="card">
-      <div class="card-head">
-        <h2>Zone grid · Hall C</h2>
-        <div class="seg" role="tablist" aria-label="View">
-          <button id="viewMap" class="on" role="tab" aria-selected="true" type="button">Map</button>
-          <button id="viewList" role="tab" aria-selected="false" type="button">List</button>
-        </div>
+    <div class="group">
+      <div class="group-items">
+        <span class="rbtn"><svg><use href="#i-printer"/><use href="#o-tiff"/></svg>TIFF<br>Print ▾</span>
+        <span class="rbtn"><svg><use href="#i-printer"/></svg>PDF Print<br>Preview</span>
+        <span class="rbtn"><svg><use href="#i-mail"/><use href="#o-check"/></svg>Quick<br>Email ▾</span>
+        <span class="rbtn"><svg><use href="#i-mail"/></svg>Email</span>
+        <span class="rbtn"><svg><use href="#i-export"/></svg>Export</span>
       </div>
-      <div id="mapView" class="map-view">
-        <canvas id="c" tabindex="0" aria-label="Hall C zone grid"></canvas>
-        <div class="legend">
-          <span><i class="sw route"></i>Active route</span>
-          <span><i class="sw pick"></i>Pending pickup</span>
-          <span class="keys">Arrows route · Space hold · Esc list</span>
-        </div>
-      </div>
-      <div id="listView" class="table-wrap" hidden>
-        <table>
-          <thead><tr><th>Dock</th><th>Trailer</th><th>Carrier</th><th>Window</th><th class="num">Pallets</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td class="mono">D1</td><td class="mono">TR-5512</td><td>Nordline Freight</td><td class="mono">09:30–10:15</td><td class="num">22</td><td><span class="pill">Departed</span></td></tr>
-            <tr><td class="mono">D2</td><td class="mono">TR-5518</td><td>Baltic Haulage</td><td class="mono">10:00–10:45</td><td class="num">18</td><td><span class="pill warn">Loading</span></td></tr>
-            <tr><td class="mono">D3</td><td class="mono">TR-5521</td><td>Rhône Transport</td><td class="mono">10:30–11:15</td><td class="num">24</td><td><span class="pill warn">Loading</span></td></tr>
-            <tr><td class="mono">D4</td><td class="mono">TR-5520</td><td>Alpi Cargo</td><td class="mono">11:00–11:45</td><td class="num">12</td><td><span class="pill ok">Sealed</span></td></tr>
-            <tr><td class="mono">D5</td><td class="mono">TR-5527</td><td>Vistula Road</td><td class="mono">11:30–12:15</td><td class="num">16</td><td><span class="pill info">Arriving</span></td></tr>
-            <tr><td class="mono">D6</td><td class="mono">TR-5530</td><td>Iberia Linehaul</td><td class="mono">12:00–12:45</td><td class="num">20</td><td><span class="pill info">Arriving</span></td></tr>
-            <tr><td class="mono">D7</td><td class="mono">—</td><td>Nordline Freight</td><td class="mono">12:30–13:15</td><td class="num">26</td><td><span class="pill">Open</span></td></tr>
-            <tr><td class="mono">D8</td><td class="mono">—</td><td>Baltic Haulage</td><td class="mono">13:00–13:45</td><td class="num">14</td><td><span class="pill">Open</span></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="group-label">Share</div>
     </div>
+    <div class="group">
+      <div class="group-items">
+        <span class="rbtn"><svg><use href="#i-page"/><use href="#o-plus"/></svg>Copy To<br>Folders</span>
+        <span class="rbtn"><svg><use href="#i-page"/><use href="#o-dash"/></svg>Rearrange</span>
+        <span class="rbtn"><svg><use href="#i-page"/><use href="#o-arrow"/></svg>Move</span>
+        <span class="rbtn"><svg><use href="#i-page"/><use href="#o-minus"/></svg>Delete</span>
+        <span class="rbtn"><svg><use href="#i-restore"/></svg>Restore</span>
+      </div>
+      <div class="group-label">Edit and Organize</div>
+    </div>
+    <div class="group">
+      <div class="group-items stack">
+        <span class="srow"><svg class="i16"><use href="#i-sets"/></svg>Document Sets Setup</span>
+        <span class="srow"><svg class="i16"><use href="#i-set"/></svg>Set<span class="set-box"><svg><use href="#i-chev"/></svg></span></span>
+        <span class="srow"><svg class="i16"><use href="#i-audit"/></svg>Audit Selected Set</span>
+      </div>
+      <div class="group-label">Document Sets</div>
+    </div>
+    <div class="group">
+      <div class="group-items">
+        <span class="rbtn"><svg><use href="#i-collate"/></svg>Collation</span>
+        <span class="rbtn"><svg><use href="#i-disc"/></svg>Customer<br>Images</span>
+        <span class="rbtn"><svg><use href="#i-launch"/></svg>Launch<br>Portal</span>
+      </div>
+      <div class="group-label">Tools</div>
+    </div>
+  </div>
+</div>
 
-    <aside class="card">
-      <div class="card-head"><h2>Event log</h2><span class="live"><i></i>Live</span></div>
-      <ol id="log" class="log"></ol>
-    </aside>
-  </section>
+<div class="searchbar band">
+  <span class="label">Reference Number</span>
+  <span class="combo">2563318804<svg><use href="#i-chev"/></svg></span>
+  <span class="combo narrow">SHIPMENT<svg><use href="#i-chev"/></svg></span>
+  <svg class="sb-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="#1f6fd1" stroke-width="2"/><path d="M10 10l4.5 4.5" stroke="#1f6fd1" stroke-width="2.5"/></svg>
+  <svg class="sb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 6A5.3 5.3 0 0 0 3.3 4.6" fill="none" stroke="#1f6fd1" stroke-width="2"/><path d="M2.5 1.5v4h4" fill="none" stroke="#1f6fd1" stroke-width="2"/><path d="M3 10a5.3 5.3 0 0 0 9.7 1.4" fill="none" stroke="#1f6fd1" stroke-width="2"/><path d="M13.5 14.5v-4h-4" fill="none" stroke="#1f6fd1" stroke-width="2"/></svg>
+  <svg class="sb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="#b5161b" stroke-width="2.6"/></svg>
+  <span class="checkbox"><svg viewBox="0 0 10 10"><path d="M1.5 5l2.5 2.5 4.5-5"/></svg></span>
+  <span>Default Key Type</span>
+</div>
 
-  <section class="card">
-    <div class="card-head"><h2>Outbound shipments</h2><span class="small">6 of 42 today</span></div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Shipment</th><th>Destination</th><th>Carrier</th><th class="num">Pallets</th><th class="num">Weight (kg)</th><th>ETA</th><th>Status</th></tr></thead>
+<div class="workspace band">
+  <div class="refs">
+    <div class="pane-label">References</div>
+    <div class="box">
+      <div class="tree"><span class="tree-line"></span><svg class="i16"><use href="#i-folder"/></svg><span class="tree-sel">2563318804</span></div>
+    </div>
+  </div>
+  <div class="splitter"><span></span></div>
+  <div class="docs">
+    <div class="pane-label">Documents &nbsp;for 2563318804, SHIPMENT</div>
+    <div class="box grid">
+      <table id="docs">
+        <colgroup><col style="width:92px"><col style="width:128px"><col style="width:100px"><col style="width:48px"><col style="width:48px"><col style="width:112px"><col style="width:150px"><col></colgroup>
+        <thead><tr><th>Doc Location</th><th>Name<span class="sort">▲</span></th><th>Label</th><th>Flags</th><th>Pages</th><th>Creation Date</th><th>References</th><th></th></tr></thead>
         <tbody>
-          <tr><td class="mono">SHP-240871</td><td>Hamburg, DE</td><td>Nordline Freight</td><td class="num">18</td><td class="num">9,420</td><td class="mono">14:40</td><td><span class="pill warn">Loading</span></td></tr>
-          <tr><td class="mono">SHP-240872</td><td>Antwerp, BE</td><td>Baltic Haulage</td><td class="num">12</td><td class="num">6,105</td><td class="mono">15:15</td><td><span class="pill ok">Ready</span></td></tr>
-          <tr><td class="mono">SHP-240875</td><td>Lyon, FR</td><td>Rhône Transport</td><td class="num">24</td><td class="num">13,880</td><td class="mono">17:05</td><td><span class="pill ok">Ready</span></td></tr>
-          <tr><td class="mono">SHP-240879</td><td>Milan, IT</td><td>Alpi Cargo</td><td class="num">9</td><td class="num">4,260</td><td class="mono">18:30</td><td><span class="pill crit">Delayed</span></td></tr>
-          <tr><td class="mono">SHP-240880</td><td>Warsaw, PL</td><td>Vistula Road</td><td class="num">16</td><td class="num">8,730</td><td class="mono">19:10</td><td><span class="pill info">Picking</span></td></tr>
-          <tr><td class="mono">SHP-240884</td><td>Madrid, ES</td><td>Iberia Linehaul</td><td class="num">21</td><td class="num">11,540</td><td class="mono">21:45</td><td><span class="pill">Scheduled</span></td></tr>
+          <tr data-doc="Audits/Assessments"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-01</td><td>Audits/Assessments</td><td>EuDeclarationAcceptance</td><td></td><td>1</td><td>22.09.2026 14:12</td><td></td><td></td></tr>
+          <tr data-doc="Clearance Advice"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-02</td><td>Clearance Advice</td><td></td><td class="flag">Q</td><td>2</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
+          <tr data-doc="Commercial Invoice"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-03</td><td>Commercial Invoice</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
+          <tr data-doc="House Airway Bill"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-04</td><td>House Airway Bill - Original</td><td></td><td></td><td>1</td><td>24.09.2026 10:32</td><td></td><td></td></tr>
+          <tr data-doc="OLA"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-05</td><td>OLA</td><td></td><td></td><td>6</td><td>24.09.2026 14:48</td><td></td><td></td></tr>
+          <tr data-doc="OLA"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-06</td><td>OLA</td><td>generell</td><td></td><td>4</td><td>08.10.2026 12:05</td><td></td><td></td></tr>
+          <tr data-doc="Shipment Alert"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-07</td><td>Shipment Alert</td><td>24.09.2026 10:29</td><td></td><td>1</td><td>24.09.2026 10:29</td><td></td><td></td></tr>
+          <tr data-doc="T1 Document"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-08</td><td>T1 Document</td><td></td><td></td><td>2</td><td>24.09.2026 10:33</td><td></td><td></td></tr>
+          <tr data-doc="T1 Document"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-09</td><td>T1 Document</td><td></td><td></td><td>2</td><td>03.10.2026 12:17</td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
         </tbody>
       </table>
     </div>
-  </section>
-</main>
+    <div class="preview-head">Document Preview</div>
+    <div class="box preview" id="preview">
+      <div id="placeholder" hidden>Select a document to preview...</div>
+      <div id="stage"><canvas id="c" tabindex="0" aria-label="Document preview"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar band">
+  <span>9 documents</span>
+  <span class="views" aria-hidden="true">
+    <span class="on"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M.5 6.5h11"/></svg></span>
+    <span><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M6.5 .5v12"/></svg></span>
+  </span>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
-const N = 20, CELL = 20, OFF = 22, SIZE = OFF + N * CELL;
-const COLS = 'ABCDEFGHIJKLMNOPQRST';
-const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
-const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+const N = 20, CELL = 20, PW = 440, PH = 580, GX = 20, GY = 146;
+const UI = '"Segoe UI", Tahoma, Arial, sans-serif';
 const canvas = $('c');
 const ctx = canvas.getContext('2d');
-const scoreEl = $('score'), bestEl = $('best'), lenEl = $('len');
-const statusEl = $('status'), routeEl = $('routeId'), logEl = $('log');
-
+const previewEl = $('preview'), stage = $('stage'), placeholder = $('placeholder');
+const rows = [...document.querySelectorAll('#docs tr[data-doc]')];
 const dpr = window.devicePixelRatio || 1;
-canvas.width = canvas.height = SIZE * dpr;
-ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+const css = getComputedStyle(document.documentElement);
+const col = name => css.getPropertyValue(name).trim();
+const C = {
+  paper: col('--paper'), ink: col('--ink'), muted: col('--muted'), inkSoft: col('--ink-soft'),
+  grid: col('--page-grid'), gridStrong: col('--page-grid-strong'),
+  snake: col('--snake'), head: col('--snake-head'), food: col('--food')
+};
+const d = new Date();
+const today = [d.getDate(), d.getMonth() + 1].map(n => String(n).padStart(2, '0')).join('.') + '.' + d.getFullYear();
 
 let best = 0;
 try { best = +localStorage.getItem('snakeBest') || 0; } catch (e) {}
-bestEl.textContent = best;
 
-let snake, dir, queue, food, score, over, paused, routeId, view = 'map';
-
-const zone = p => COLS[p.x] + (p.y + 1);
-const pad = n => String(n).padStart(2, '0');
-const hhmm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
-const token = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
-function log(kind, text, when = new Date()) {
-  const li = document.createElement('li');
-  const time = document.createElement('time');
-  const dot = document.createElement('span');
-  const msg = document.createElement('span');
-  time.textContent = hhmm(when);
-  dot.className = 'dot ' + kind;
-  msg.textContent = text;
-  li.append(time, dot, msg);
-  logEl.prepend(li);
-  while (logEl.children.length > 12) logEl.lastChild.remove();
-}
-
-function setStatus() {
-  const [cls, label] = over ? ['crit', 'Interrupted'] : paused ? ['warn', 'On hold'] : ['ok', 'On schedule'];
-  statusEl.className = 'pill ' + cls;
-  statusEl.textContent = label;
-}
-
-function setPaused(p) {
-  paused = p;
-  setStatus();
-  draw();
-}
+let snake, dir, queue, food, score, over, paused;
+let scale = 1, showing = false, selectedRow = rows[2];
 
 function reset(startPaused) {
   snake = [{x: 10, y: 10}, {x: 9, y: 10}, {x: 8, y: 10}];
@@ -284,14 +304,8 @@ function reset(startPaused) {
   queue = [];
   score = 0;
   over = false;
-  paused = startPaused || view !== 'map';
-  routeId = 'R-' + (1100 + Math.floor(Math.random() * 8900));
-  scoreEl.textContent = 0;
-  lenEl.textContent = snake.length;
-  routeEl.textContent = routeId;
+  paused = startPaused || !showing;
   placeFood();
-  setStatus();
-  log('info', `Route ${routeId} dispatched at ${zone(snake[0])}`);
   draw();
 }
 
@@ -308,8 +322,13 @@ function turn(x, y) {
   if (queue.length < 3) queue.push({x, y});
 }
 
+function setPaused(p) {
+  paused = p;
+  draw();
+}
+
 function tick() {
-  if (paused || over) return;
+  if (paused || over || !showing) return;
   if (queue.length) dir = queue.shift();
   const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
   const eating = head.x === food.x && head.y === food.y;
@@ -317,124 +336,146 @@ function tick() {
   if (head.x < 0 || head.y < 0 || head.x >= N || head.y >= N ||
       body.some(p => p.x === head.x && p.y === head.y)) {
     over = true;
-    setStatus();
-    log('crit', `Route ${routeId} interrupted at ${zone(snake[0])} · ${score} pickups`);
     draw();
     return;
   }
   snake.unshift(head);
   if (eating) {
     score++;
-    scoreEl.textContent = score;
     if (score > best) {
       best = score;
-      bestEl.textContent = best;
       try { localStorage.setItem('snakeBest', best); } catch (e) {}
     }
-    log('ok', `Pickup PK-${4000 + Math.floor(Math.random() * 6000)} cleared at ${zone(head)}`);
     placeFood();
   } else {
     snake.pop();
   }
-  lenEl.textContent = snake.length;
   draw();
 }
 
 function draw() {
-  const surface = token('--surface'), surface2 = token('--surface-2');
-  const line = token('--line'), muted = token('--muted'), fg = token('--fg');
-  const accent = token('--accent'), pickup = token('--pickup');
+  if (!showing || !snake) return;
   const W = N * CELL;
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+  ctx.fillStyle = C.paper;
+  ctx.fillRect(0, 0, PW, PH);
 
-  ctx.fillStyle = surface;
-  ctx.fillRect(0, 0, SIZE, SIZE);
-  ctx.fillStyle = surface2;
-  ctx.fillRect(OFF, OFF, W, W);
+  const title = selectedRow.dataset.doc.toUpperCase();
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = C.ink;
+  ctx.font = '700 15px ' + UI;
+  ctx.fillText(title, GX, 34);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = C.muted;
+  ctx.font = '11px ' + UI;
+  ctx.fillText('Page 1 of 1', PW - GX, 34);
+  ctx.fillStyle = C.ink;
+  ctx.fillRect(GX, 44, PW - 2 * GX, 1.5);
 
-  ctx.strokeStyle = line;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let i = 0; i <= N; i++) {
-    const p = OFF + i * CELL + 0.5;
-    ctx.moveTo(p, OFF); ctx.lineTo(p, OFF + W);
-    ctx.moveTo(OFF, p); ctx.lineTo(OFF + W, p);
-  }
-  ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.font = '700 9px ' + UI;
+  ctx.fillText('SHIPPER', GX, 62);
+  ctx.fillText('CONSIGNEE', PW / 2 + 5, 62);
+  ctx.fillStyle = C.inkSoft;
+  [[GX, 160], [PW / 2 + 5, 150]].forEach(([x, w]) => {
+    for (let i = 0; i < 3; i++) ctx.fillRect(x, 70 + i * 11, w - i * 28, 5);
+  });
 
-  ctx.fillStyle = muted;
-  ctx.font = '10px ' + MONO;
+  ctx.fillStyle = C.ink;
+  ctx.font = '10px ' + UI;
+  ctx.fillText('Ref. 2563318804', GX, 124);
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  for (let i = 0; i < N; i++) {
-    ctx.fillText(COLS[i], OFF + i * CELL + CELL / 2, OFF / 2);
-    ctx.fillText(String(i + 1), OFF / 2, OFF + i * CELL + CELL / 2);
+  ctx.fillText('Line items: ' + score, PW / 2, 124);
+  ctx.textAlign = 'right';
+  ctx.fillText('Max: ' + best, PW - GX, 124);
+  ctx.fillStyle = C.gridStrong;
+  ctx.fillRect(GX, 133, PW - 2 * GX, 1);
+
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= N; i++) {
+    const p = i * CELL;
+    ctx.strokeStyle = i % 5 === 0 ? C.gridStrong : C.grid;
+    ctx.beginPath();
+    ctx.moveTo(GX + p, GY); ctx.lineTo(GX + p, GY + W);
+    ctx.moveTo(GX, GY + p); ctx.lineTo(GX + W, GY + p);
+    ctx.stroke();
   }
 
-  const fx = OFF + food.x * CELL, fy = OFF + food.y * CELL;
-  ctx.fillStyle = pickup;
-  ctx.fillRect(fx + 4, fy + 4, CELL - 8, CELL - 8);
-  ctx.fillStyle = surface2;
-  ctx.fillRect(fx + 8, fy + 8, CELL - 16, CELL - 16);
-
-  const cx = p => OFF + p.x * CELL + CELL / 2;
-  const cy = p => OFF + p.y * CELL + CELL / 2;
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = CELL * 0.5;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  snake.forEach((p, i) => i ? ctx.lineTo(cx(p), cy(p)) : ctx.moveTo(cx(p), cy(p)));
-  ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.arc(cx(snake[0]), cy(snake[0]), CELL * 0.42, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = surface;
-  ctx.beginPath();
-  ctx.arc(cx(snake[0]), cy(snake[0]), CELL * 0.15, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillStyle = C.food;
+  ctx.fillRect(GX + food.x * CELL + 4, GY + food.y * CELL + 4, CELL - 8, CELL - 8);
+  snake.forEach((p, i) => {
+    ctx.fillStyle = i === 0 ? C.head : C.snake;
+    ctx.fillRect(GX + p.x * CELL + 1, GY + p.y * CELL + 1, CELL - 2, CELL - 2);
+  });
 
   if (over || paused) {
     ctx.globalAlpha = 0.86;
-    ctx.fillStyle = surface;
-    ctx.fillRect(OFF, OFF, W, W);
+    ctx.fillStyle = C.paper;
+    ctx.fillRect(GX, GY, W, W);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = fg;
-    ctx.font = '600 16px ' + SANS;
-    ctx.fillText(over ? 'Route interrupted' : 'Route on hold', OFF + W / 2, OFF + W / 2 - 10);
-    ctx.fillStyle = muted;
-    ctx.font = '12px ' + SANS;
-    ctx.fillText(over ? 'Press Enter or tap to re-dispatch' : 'Press Space or tap to continue', OFF + W / 2, OFF + W / 2 + 14);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = C.ink;
+    ctx.font = '600 14px ' + UI;
+    ctx.fillText(over ? 'Game over' : 'Paused', PW / 2, GY + W / 2 - 6);
+    ctx.fillStyle = C.muted;
+    ctx.font = '11px ' + UI;
+    ctx.fillText(over ? 'Press Enter or click to restart' : 'Press Space or click to continue', PW / 2, GY + W / 2 + 14);
   }
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = C.muted;
+  ctx.font = '9px ' + UI;
+  ctx.fillText('Printed ' + today + ' · Document ID ' + selectedRow.cells[0].textContent, PW / 2, PH - 14);
 }
 
-function setView(v) {
-  view = v;
-  $('mapView').hidden = v !== 'map';
-  $('listView').hidden = v === 'map';
-  $('viewMap').classList.toggle('on', v === 'map');
-  $('viewList').classList.toggle('on', v !== 'map');
-  $('viewMap').setAttribute('aria-selected', v === 'map');
-  $('viewList').setAttribute('aria-selected', v !== 'map');
-  if (v !== 'map' && !over) setPaused(true);
+function fit() {
+  if (!showing) return;
+  const r = previewEl.getBoundingClientRect();
+  scale = Math.max(0.2, Math.min((r.width - 24) / PW, (r.height - 24) / PH));
+  canvas.style.width = PW * scale + 'px';
+  canvas.style.height = PH * scale + 'px';
+  canvas.width = Math.round(PW * scale * dpr);
+  canvas.height = Math.round(PH * scale * dpr);
+  draw();
 }
 
-$('viewMap').addEventListener('click', () => setView('map'));
-$('viewList').addEventListener('click', () => setView('list'));
+function showPreview(row) {
+  rows.forEach(r => r.classList.toggle('sel', r === row));
+  selectedRow = row;
+  showing = true;
+  stage.hidden = false;
+  placeholder.hidden = true;
+  fit();
+}
+
+function hidePreview() {
+  rows.forEach(r => r.classList.remove('sel'));
+  showing = false;
+  paused = true;
+  stage.hidden = true;
+  placeholder.hidden = false;
+}
+
+rows.forEach(r => r.addEventListener('click', () => showPreview(r)));
+new ResizeObserver(fit).observe(previewEl);
 
 const DIRS = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1],
               arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]};
 
 document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if (k === 'escape') setView(view === 'map' ? 'list' : 'map');
-  else if (view !== 'map') {
+  if (k === 'escape') {
+    if (showing) hidePreview();
+    else showPreview(selectedRow);
+  } else if (!showing) {
     if (DIRS[k] || k === ' ') e.preventDefault();
     return;
   } else if (DIRS[k]) {
-    if (over) return;
-    turn(...DIRS[k]);
-    if (paused) setPaused(false);
+    if (!over) {
+      turn(...DIRS[k]);
+      if (paused) setPaused(false);
+    }
   } else if (k === ' ' || k === 'enter') {
     if (over) reset(false);
     else setPaused(!paused);
@@ -465,22 +506,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && !over && !paused) setPaused(true);
 });
 
-function clock() {
-  const d = new Date();
-  $('clock').textContent = hhmm(d) + ':' + pad(d.getSeconds());
-}
-
-const now = Date.now();
-log('', 'Hall C scanners online', new Date(now - 14 * 60000));
-log('ok', 'Trailer TR-5520 sealed at Dock 4', new Date(now - 9 * 60000));
-log('info', 'Shift B handover complete', new Date(now - 3 * 60000));
-
 reset(true);
-clock();
-setInterval(clock, 1000);
+showPreview(selectedRow);
 setInterval(tick, 110);
-
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
-new MutationObserver(draw).observe(document.documentElement, {attributes: true, attributeFilter: ['data-theme']});
-if (document.fonts) document.fonts.ready.then(draw);
 </script>
