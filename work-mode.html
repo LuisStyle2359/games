@@ -87,6 +87,7 @@ svg { flex: none; }
 .searchbar .label { padding-left: 14px; }
 .combo { display: flex; flex: none; justify-content: space-between; align-items: center; width: 286px; height: 22px; padding: 0 5px; background: var(--field); border: 1px solid var(--field-line); }
 .combo.narrow { width: 230px; }
+.combo input { flex: 1; min-width: 0; padding: 0; border: 0; outline: none; background: transparent; color: var(--text); font: inherit; user-select: text; -webkit-user-select: text; }
 .sb-ico { width: 18px; height: 18px; margin-left: 8px; }
 .checkbox { display: inline-grid; place-items: center; width: 13px; height: 13px; margin-left: 10px; border-radius: 2px; background: var(--check); }
 .checkbox svg { width: 9px; height: 9px; fill: none; stroke: var(--on-file); stroke-width: 2; }
@@ -116,6 +117,16 @@ tbody tr.sel td { background: var(--select); }
 .preview { display: grid; flex: 1; place-items: center; min-height: 340px; position: relative; overflow: hidden; }
 #c { display: block; border: 1px solid var(--page-grid-strong); touch-action: none; }
 #c:focus { outline: none; }
+#video { display: grid; place-items: center; width: 100%; height: 100%; padding: 12px; outline: none; }
+.vpage { display: grid; gap: 8px; width: 600px; max-width: 100%; padding: 14px 16px 10px; background: var(--paper); border: 1px solid var(--page-grid-strong); }
+.vhead { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px; border-bottom: 1.5px solid var(--ink); }
+.vhead b { font-size: 15px; }
+.vhead span { color: var(--muted); font-size: 11px; }
+.vframe { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--page-grid); border: 1px solid var(--page-grid-strong); }
+.vframe iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; filter: grayscale(1) contrast(0.92) brightness(1.04); }
+.vempty { position: absolute; inset: 0; display: grid; place-content: center; gap: 4px; text-align: center; color: var(--muted); }
+.vempty b { color: var(--text); font-weight: 600; }
+.vfoot { text-align: center; font-size: 9px; color: var(--muted); }
 
 .statusbar { display: flex; align-items: center; justify-content: space-between; height: 24px; color: var(--muted); }
 .views { display: flex; gap: 6px; }
@@ -213,7 +224,7 @@ tbody tr.sel td { background: var(--select); }
     <div class="group">
       <div class="group-items">
         <span class="rbtn"><svg><use href="#i-collate"/></svg>Collation</span>
-        <span class="rbtn"><svg><use href="#i-disc"/></svg>Customer<br>Images</span>
+        <span class="rbtn" id="ribbonImages"><svg><use href="#i-disc"/></svg>Customer<br>Images</span>
         <span class="rbtn"><svg><use href="#i-launch"/></svg>Launch<br>Portal</span>
       </div>
       <div class="group-label">Tools</div>
@@ -223,7 +234,7 @@ tbody tr.sel td { background: var(--select); }
 
 <div class="searchbar band">
   <span class="label">Reference Number</span>
-  <span class="combo">2563318804<svg><use href="#i-chev"/></svg></span>
+  <label class="combo"><input id="ref" value="2563318804" spellcheck="false" autocomplete="off" aria-label="Reference Number"><svg><use href="#i-chev"/></svg></label>
   <span class="combo narrow">SHIPMENT<svg><use href="#i-chev"/></svg></span>
   <svg class="sb-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="#1f6fd1" stroke-width="2"/><path d="M10 10l4.5 4.5" stroke="#1f6fd1" stroke-width="2.5"/></svg>
   <svg class="sb-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 6A5.3 5.3 0 0 0 3.3 4.6" fill="none" stroke="#1f6fd1" stroke-width="2"/><path d="M2.5 1.5v4h4" fill="none" stroke="#1f6fd1" stroke-width="2"/><path d="M3 10a5.3 5.3 0 0 0 9.7 1.4" fill="none" stroke="#1f6fd1" stroke-width="2"/><path d="M13.5 14.5v-4h-4" fill="none" stroke="#1f6fd1" stroke-width="2"/></svg>
@@ -250,6 +261,7 @@ tbody tr.sel td { background: var(--select); }
           <tr data-doc="Audits/Assessments"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-01</td><td>Audits/Assessments</td><td>EuDeclarationAcceptance</td><td></td><td>1</td><td>22.09.2026 14:12</td><td></td><td></td></tr>
           <tr data-doc="Clearance Advice"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-02</td><td>Clearance Advice</td><td></td><td></td><td>2</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
           <tr data-doc="Commercial Invoice" data-game="snake"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-03</td><td>Commercial Invoice</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
+          <tr data-doc="Customer Images" data-video="1"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-10</td><td>Customer Images</td><td>Scan</td><td class="flag">Q</td><td>1</td><td>15.10.2026 09:12</td><td></td><td></td></tr>
           <tr data-doc="House Airway Bill" data-game="tetris"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-04</td><td>House Airway Bill - Original</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:32</td><td></td><td></td></tr>
           <tr data-doc="OLA"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-05</td><td>OLA</td><td></td><td></td><td>6</td><td>24.09.2026 14:48</td><td></td><td></td></tr>
           <tr data-doc="OLA" data-game="2048"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-06</td><td>OLA</td><td>generell</td><td class="flag">Q</td><td>4</td><td>08.10.2026 12:05</td><td></td><td></td></tr>
@@ -266,12 +278,21 @@ tbody tr.sel td { background: var(--select); }
     <div class="box preview" id="preview">
       <div id="placeholder" hidden>Select a document to preview...</div>
       <div id="stage"><canvas id="c" tabindex="0" aria-label="Document preview"></canvas></div>
+      <div id="video" tabindex="-1" hidden>
+        <div class="vpage" id="vpage">
+          <div class="vhead"><b id="vtitle">CUSTOMER IMAGES</b><span>Page 1 of 1</span></div>
+          <div class="vframe" id="vframe">
+            <div class="vempty" id="vempty"><b>No images loaded</b><span>Paste a link into Reference Number and press Enter</span></div>
+          </div>
+          <div class="vfoot" id="vfoot"></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <div class="statusbar band">
-  <span>9 documents</span>
+  <span>10 documents</span>
   <span class="views" aria-hidden="true">
     <span class="on"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M.5 6.5h11"/></svg></span>
     <span><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M6.5 .5v12"/></svg></span>
@@ -1008,19 +1029,101 @@ function makeDoc(seed) {
   };
 }
 
+/* ---------- Video ---------- */
+const REF = '2563318804';
+const refInput = $('ref'), videoEl = $('video'), vframe = $('vframe'), vempty = $('vempty');
+const videoRow = rows.find(r => r.dataset.video);
+const videoDoc = {video: true};
+let video = store.get('video', null);
+
+function parseTime(t) {
+  const m = String(t).match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
+  return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0;
+}
+
+function parseVideo(s) {
+  s = s.trim();
+  if (/^[\w-]{11}$/.test(s)) return {id: s, start: 0};
+  let u;
+  try { u = new URL(/^https?:\/\//.test(s) ? s : 'https://' + s); } catch (e) { return null; }
+  const host = u.hostname.replace(/^(www|m|music)\./, '');
+  if (!['youtube.com', 'youtu.be', 'youtube-nocookie.com'].includes(host)) return null;
+  let id = u.searchParams.get('v');
+  if (!id) {
+    const m = host === 'youtu.be' ? u.pathname.match(/^\/([\w-]{11})/) : u.pathname.match(/\/(?:embed|shorts|live|v)\/([\w-]{11})/);
+    if (m) id = m[1];
+  }
+  if (!id || !/^[\w-]{11}$/.test(id)) return null;
+  return {id, start: parseTime(u.searchParams.get('t') || u.searchParams.get('start') || '0')};
+}
+
+function setVideo(v) {
+  vframe.querySelectorAll('iframe').forEach(f => f.remove());
+  const f = document.createElement('iframe');
+  f.src = `https://www.youtube-nocookie.com/embed/${v.id}?enablejsapi=1&rel=0&playsinline=1&start=${v.start}`;
+  f.title = 'Customer images';
+  f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+  f.allowFullscreen = true;
+  f.referrerPolicy = 'strict-origin-when-cross-origin';
+  vframe.append(f);
+  vempty.hidden = true;
+}
+
+function pauseVideo() {
+  const f = vframe.querySelector('iframe');
+  if (f && f.contentWindow) f.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'pauseVideo', args: []}), '*');
+}
+
+function fitVideo() {
+  const r = previewEl.getBoundingClientRect();
+  $('vpage').style.width = Math.max(200, Math.min(r.width - 24, 900, (r.height - 24 - 80) * 16 / 9 + 34)) + 'px';
+}
+
+function loadVideo(s) {
+  const v = parseVideo(s);
+  refInput.value = REF;
+  refInput.blur();
+  if (!v) return;
+  video = v;
+  store.set('video', v);
+  setVideo(v);
+  showPreview(videoRow);
+}
+
+refInput.addEventListener('focus', () => refInput.select());
+refInput.addEventListener('blur', () => { refInput.value = REF; });
+refInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); loadVideo(refInput.value); }
+});
+refInput.addEventListener('paste', e => {
+  const s = (e.clipboardData || window.clipboardData).getData('text');
+  if (parseVideo(s)) { e.preventDefault(); loadVideo(s); }
+});
+$('ribbonImages').addEventListener('click', () => showPreview(videoRow));
+
+// Clicking into the player moves keyboard focus into it; take it back so Esc keeps working.
+window.addEventListener('blur', () => setTimeout(() => {
+  if (document.activeElement && document.activeElement.tagName === 'IFRAME') videoEl.focus();
+}, 0));
+
+if (location.protocol === 'file:') {
+  $('vfoot').textContent = 'If playback shows an error, open this page from its web address instead of the file.';
+}
+
 /* ---------- Viewer ---------- */
 const games = {snake: makeSnake(), tetris: makeTetris(), '2048': make2048(), wordle: makeWordle(), flappy: makeFlappy()};
 const docs = new Map();
 let scale = 1, showing = false, selectedRow = rows.find(r => r.dataset.game === 'snake'), current = null;
 
 function contentFor(row) {
+  if (row.dataset.video) return videoDoc;
   if (row.dataset.game) return games[row.dataset.game];
   if (!docs.has(row)) docs.set(row, makeDoc(rows.indexOf(row) + 1));
   return docs.get(row);
 }
 
 function render() {
-  if (!showing) return;
+  if (!showing || current.video) return;
   const [center, right] = current.stats();
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   ctx.fillStyle = C.paper;
@@ -1050,6 +1153,7 @@ function render() {
 
 function fit() {
   if (!showing) return;
+  if (current.video) { fitVideo(); return; }
   const r = previewEl.getBoundingClientRect();
   scale = Math.max(0.2, Math.min((r.width - 24) / PW, (r.height - 24) / PH));
   canvas.style.width = PW * scale + 'px';
@@ -1061,20 +1165,26 @@ function fit() {
 
 function showPreview(row) {
   if (current && current.pause) current.pause();
+  const next = contentFor(row);
+  if (current === videoDoc && next !== videoDoc) pauseVideo();
   rows.forEach(r => r.classList.toggle('sel', r === row));
   selectedRow = row;
-  current = contentFor(row);
+  current = next;
   showing = true;
-  stage.hidden = false;
+  stage.hidden = current.video;
+  videoEl.hidden = !current.video;
   placeholder.hidden = true;
+  if (current.video && video && !vframe.querySelector('iframe')) setVideo(video);
   fit();
 }
 
 function hidePreview() {
   if (current && current.pause) current.pause();
+  pauseVideo();
   rows.forEach(r => r.classList.remove('sel'));
   showing = false;
   stage.hidden = true;
+  videoEl.hidden = true;
   placeholder.hidden = false;
 }
 
@@ -1083,6 +1193,7 @@ new ResizeObserver(fit).observe(previewEl);
 
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target === refInput && e.key !== 'Escape') return;
   const k = e.key.toLowerCase();
   if (k === 'escape') {
     if (showing) hidePreview();
