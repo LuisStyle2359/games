@@ -1353,6 +1353,8 @@ function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclo
   const ws = new WebSocket(url, 'mqtt');
   ws.binaryType = 'arraybuffer';
   let buf = new Uint8Array(0), ping = 0, pid = 0, open = false;
+  // Firewalls often drop the connection silently instead of refusing it, so give up and try the next broker.
+  const giveUp = setTimeout(() => ws.close(), 7000);
   const send = (head, body) => { if (ws.readyState === 1) ws.send(new Uint8Array([head, ...varLen(body.length), ...body])); };
 
   function handle(head, body) {
@@ -1360,6 +1362,7 @@ function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclo
     if (type === 2) {
       if (body[1] !== 0) { ws.close(); return; }
       open = true;
+      clearTimeout(giveUp);
       ping = setInterval(() => send(0xc0, []), 25000);
       onopen();
     } else if (type === 3) {
@@ -1390,7 +1393,7 @@ function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclo
       handle(head, body);
     }
   };
-  ws.onclose = () => { clearInterval(ping); onclose(open); };
+  ws.onclose = () => { clearTimeout(giveUp); clearInterval(ping); onclose(open); };
   return {
     sub: topics => { pid = pid % 65535 + 1; send(0x82, [pid >> 8, pid & 255, ...topics.flatMap(t => [...str(t), 0])]); },
     pub: (topic, payload, retain) => send(0x30 | (retain ? 1 : 0), [...str(topic), ...enc.encode(payload)]),
