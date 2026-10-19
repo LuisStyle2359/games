@@ -46,6 +46,7 @@
   --w-present: #8aa1bf;
   --w-absent: #d9dce0;
   --key-bg: #e8ebef;
+  --badge: rgba(17, 24, 32, 0.82);
   --font-ui: "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
@@ -120,16 +121,74 @@ tbody tr.sel td { background: var(--select); }
 .preview { display: grid; flex: 1; place-items: center; min-height: 340px; position: relative; overflow: hidden; }
 #c { display: block; border: 1px solid var(--page-grid-strong); touch-action: none; }
 #c:focus { outline: none; }
-#video { display: grid; place-items: center; width: 100%; height: 100%; padding: 12px; outline: none; }
-.vpage { display: grid; gap: 8px; width: 600px; max-width: 100%; padding: 14px 16px 10px; background: var(--paper); border: 1px solid var(--page-grid-strong); }
-.vhead { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px; border-bottom: 1.5px solid var(--ink); }
-.vhead b { font-size: 15px; }
-.vhead span { color: var(--muted); font-size: 11px; }
-.vframe { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--page-grid); border: 1px solid var(--page-grid-strong); }
-.vframe iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; filter: grayscale(1) contrast(0.92) brightness(1.04); }
-.vempty { position: absolute; inset: 0; display: grid; place-content: center; gap: 4px; text-align: center; color: var(--muted); }
-.vempty b { color: var(--text); font-weight: 600; }
-.vfoot { text-align: center; font-size: 9px; color: var(--muted); }
+.docs.big > .grid { display: none; }
+.views span { cursor: default; }
+
+#video { position: absolute; inset: 0; padding: 8px; outline: none; }
+.vpage { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--paper); border: 1px solid var(--page-grid-strong); }
+.vbar { display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--search-band); border-bottom: 1px solid var(--search-line); }
+.vbtn { display: inline-grid; place-items: center; min-width: 26px; height: 24px; padding: 0 6px; border: 1px solid transparent; background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+.vbtn:hover { background: var(--hover); border-color: var(--hover-line); }
+.vbtn:disabled { opacity: 0.4; cursor: default; background: transparent; border-color: transparent; }
+.vbtn svg { width: 16px; height: 16px; fill: none; stroke: var(--text); stroke-width: 1.6; }
+.vtoggle[aria-pressed="true"] { background: var(--select); border-color: var(--hover-line); }
+.vsearch { display: flex; flex: 1; max-width: 520px; margin: 0 auto; }
+.vsearch input { flex: 1; min-width: 0; height: 24px; padding: 0 6px; border: 1px solid var(--field-line); border-right: 0; background: var(--field); color: var(--text); font: inherit; outline: none; user-select: text; -webkit-user-select: text; }
+.vsearch input:focus { border-color: var(--check); }
+.vsearch .vbtn { border: 1px solid var(--field-line); background: var(--desk); }
+.vbtn:focus-visible, .vchip:focus-visible, .vcard:focus-visible, .vbutton:focus-visible, .vlink:focus-visible, .views span:focus-visible { outline: 2px solid var(--check); outline-offset: 1px; }
+.vbody { flex: 1; min-height: 0; overflow: auto; padding: 12px; container-type: inline-size; user-select: text; -webkit-user-select: text; }
+.vchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.vchip { padding: 3px 10px; border: 1px solid var(--field-line); border-radius: 2px; background: var(--paper); color: var(--text); font: inherit; cursor: pointer; }
+.vchip:hover { background: var(--hover); }
+.vchip.on { background: var(--text); border-color: var(--text); color: var(--paper); }
+.vsection { display: grid; gap: 8px; margin-bottom: 20px; }
+.vsection > h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.vgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px 12px; }
+.vgrid.vrow1 { grid-auto-rows: 0; row-gap: 0; overflow: hidden; }
+.vcard { display: grid; align-content: start; gap: 3px; min-width: 0; cursor: pointer; }
+.vthumb { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--page-grid); }
+.vthumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.vdur { position: absolute; right: 4px; bottom: 4px; padding: 0 4px; background: var(--badge); color: var(--paper); font-size: 11px; font-variant-numeric: tabular-nums; }
+.vtitle { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 3px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.vcard:hover .vtitle { color: var(--check); }
+.vmeta { color: var(--muted); font-size: 11px; }
+.vchan { justify-self: start; color: var(--muted); font-size: 11px; cursor: pointer; }
+.vchan:hover { color: var(--text); text-decoration: underline; }
+.vsnip { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--muted); font-size: 11px; }
+.vgrid .vsnip, .vlist.small .vsnip { display: none; }
+.vlist { display: grid; gap: 12px; }
+.vlist .vcard { grid-template-columns: minmax(150px, 250px) minmax(0, 1fr); column-gap: 12px; }
+.vlist .vcard .vthumb { grid-row: span 5; }
+.vlist.small .vcard { grid-template-columns: 136px minmax(0, 1fr); column-gap: 8px; }
+.vlist.small .vtitle { font-size: 12px; margin-top: 0; }
+.vfor { margin-bottom: 10px; }
+.vwatch { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+@container (max-width: 760px) { .vwatch { grid-template-columns: minmax(0, 1fr); } }
+.vplayer { position: relative; aspect-ratio: 16 / 9; background: var(--ink); }
+.vplayer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.vwtitle { margin: 10px 0 4px; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.vwrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.vwrow .vchan { color: var(--text); font-size: 12px; font-weight: 600; }
+.vdesc { margin-top: 10px; padding: 8px 10px; background: var(--desk); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vdesc.clamp { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.vlink { margin-top: 4px; padding: 0; border: 0; background: none; color: var(--check); font: inherit; cursor: pointer; }
+.vsidehead { margin-bottom: 8px; font-weight: 600; }
+.vnotice { display: grid; justify-items: start; gap: 6px; max-width: 520px; margin-bottom: 16px; padding: 14px; background: var(--desk); border: 1px solid var(--ribbon-line); }
+.vstatus { padding: 12px 0; color: var(--muted); }
+.vbutton { padding: 3px 14px; border: 1px solid var(--field-line); background: var(--desk); color: var(--text); font: inherit; cursor: pointer; }
+.vbutton:hover { background: var(--hover); border-color: var(--hover-line); }
+.vmore { display: block; margin: 14px auto 0; }
+.vsettings { display: grid; gap: 8px; max-width: 560px; }
+.vsettings h2 { margin: 0; font-size: 15px; }
+.vsettings h3 { margin: 10px 0 0; font-size: 13px; }
+.vsettings ol { display: grid; gap: 3px; margin: 0; padding-left: 18px; }
+.vrow { display: flex; gap: 6px; }
+.vfield { flex: 1; min-width: 0; height: 24px; padding: 0 6px; border: 1px solid var(--field-line); background: var(--field); color: var(--text); font: inherit; user-select: text; -webkit-user-select: text; }
+.vchanhead { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.vavatar { width: 56px; height: 56px; border-radius: 50%; }
+.vchanhead h2 { margin: 0 0 2px; font-size: 16px; }
+#video.gray img, #video.gray iframe { filter: grayscale(1) contrast(0.92) brightness(1.04); }
 
 .statusbar { display: flex; align-items: center; justify-content: space-between; height: 24px; color: var(--muted); }
 .views { display: flex; gap: 6px; }
@@ -287,12 +346,18 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
       <div id="placeholder" hidden>Select a document to preview...</div>
       <div id="stage"><canvas id="c" tabindex="0" aria-label="Document preview"></canvas></div>
       <div id="video" tabindex="-1" hidden>
-        <div class="vpage" id="vpage">
-          <div class="vhead"><b id="vtitle">CUSTOMER IMAGES</b><span>Page 1 of 1</span></div>
-          <div class="vframe" id="vframe">
-            <div class="vempty" id="vempty"><b>No images loaded</b><span>Paste a link into Reference Number and press Enter</span></div>
+        <div class="vpage">
+          <div class="vbar">
+            <button class="vbtn" id="vBack" type="button" title="Back" aria-label="Back" disabled><svg viewBox="0 0 16 16"><path d="M10 3L5 8l5 5"/></svg></button>
+            <button class="vbtn" id="vHome" type="button" title="Start page" aria-label="Start page"><svg viewBox="0 0 16 16"><path d="M2.5 7.5L8 3l5.5 4.5M4 6.5V13h3V9.5h2V13h3V6.5"/></svg></button>
+            <form class="vsearch" id="vSearch" role="search">
+              <input id="vq" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search">
+              <button class="vbtn" type="submit" title="Search" aria-label="Search"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg></button>
+            </form>
+            <button class="vbtn vtoggle" id="vColor" type="button" aria-pressed="false" title="Show images in color">Color</button>
+            <button class="vbtn" id="vSettings" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg></button>
           </div>
-          <div class="vfoot" id="vfoot"></div>
+          <div class="vbody" id="vbody"></div>
         </div>
       </div>
     </div>
@@ -301,9 +366,9 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
 
 <div class="statusbar band">
   <span>10 documents</span>
-  <span class="views" aria-hidden="true">
-    <span class="on"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M.5 6.5h11"/></svg></span>
-    <span><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M6.5 .5v12"/></svg></span>
+  <span class="views">
+    <span class="on" id="layoutSplit" role="button" tabindex="0" title="Documents and preview" aria-label="Documents and preview"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M.5 6.5h11"/></svg></span>
+    <span id="layoutBig" role="button" tabindex="0" title="Preview only" aria-label="Preview only"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M6.5 .5v12"/></svg></span>
   </span>
 </div>
 
@@ -1039,10 +1104,18 @@ function makeDoc(seed) {
 
 /* ---------- Video ---------- */
 const REF = '2563318804';
-const refInput = $('ref'), videoEl = $('video'), vframe = $('vframe'), vempty = $('vempty');
+const refInput = $('ref'), videoEl = $('video'), vbody = $('vbody'), vq = $('vq');
 const videoRow = rows.find(r => r.dataset.video);
 const videoDoc = {video: true};
-let video = store.get('video', null);
+const LANG = (navigator.language || 'en').split('-')[0];
+const REGION = (((navigator.language || '').match(/-([a-z]{2})$/i) || [])[1] || (LANG === 'de' ? 'DE' : 'US')).toUpperCase();
+const CATS = [['', 'All'], ['10', 'Music'], ['20', 'Gaming'], ['17', 'Sports'], ['25', 'News'],
+  ['24', 'Entertainment'], ['23', 'Comedy'], ['28', 'Science & Tech']];
+const nf = new Intl.NumberFormat('en', {notation: 'compact', maximumFractionDigits: 1});
+const rtf = new Intl.RelativeTimeFormat('en', {numeric: 'auto'});
+const apiKey = () => store.get('ytKey', '');
+const vstack = [];
+let vstate = null, navToken = 0;
 
 function parseTime(t) {
   const m = String(t).match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
@@ -1065,38 +1138,329 @@ function parseVideo(s) {
   return {id, start: parseTime(u.searchParams.get('t') || u.searchParams.get('start') || '0')};
 }
 
-function setVideo(v) {
-  vframe.querySelectorAll('iframe').forEach(f => f.remove());
-  const f = document.createElement('iframe');
-  f.src = `https://www.youtube-nocookie.com/embed/${v.id}?enablejsapi=1&rel=0&playsinline=1&start=${v.start}`;
-  f.title = 'Customer images';
-  f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
-  f.allowFullscreen = true;
-  f.referrerPolicy = 'strict-origin-when-cross-origin';
-  vframe.append(f);
-  vempty.hidden = true;
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  e.append(...kids.filter(c => c != null && c !== false));
+  return e;
+}
+
+function dur(iso, live) {
+  if (live === 'live') return 'LIVE';
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(iso || '');
+  if (!m) return '';
+  const h = (+m[1] || 0) * 24 + (+m[2] || 0), mi = +m[3] || 0, s = +m[4] || 0;
+  if (!h && !mi && !s) return '';
+  const p = n => String(n).padStart(2, '0');
+  return h ? `${h}:${p(mi)}:${p(s)}` : `${mi}:${p(s)}`;
+}
+
+const views = n => n == null ? '' : nf.format(+n) + ' views';
+
+function ago(iso) {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+  for (const [u, sec] of units) if (s >= sec) return rtf.format(-Math.floor(s / sec), u);
+  return 'just now';
 }
 
 function pauseVideo() {
-  const f = vframe.querySelector('iframe');
+  const f = videoEl.querySelector('iframe');
   if (f && f.contentWindow) f.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'pauseVideo', args: []}), '*');
 }
 
-function fitVideo() {
-  const r = previewEl.getBoundingClientRect();
-  $('vpage').style.width = Math.max(200, Math.min(r.width - 24, 900, (r.height - 24 - 80) * 16 / 9 + 34)) + 'px';
+const ERRORS = {
+  nokey: 'Add an API key in Settings to use the start page and search.',
+  quotaExceeded: 'The daily limit for this API key is used up. It resets overnight.',
+  keyInvalid: 'The API key is not valid. Check it in Settings.',
+  badRequest: 'The API key is not valid. Check it in Settings.',
+  ipRefererBlocked: 'This API key is not allowed on this website. Check its website restriction.',
+  forbidden: 'This API key is not allowed on this website. Check its website restriction.',
+  accessNotConfigured: 'YouTube Data API v3 is not turned on for this key\'s project.',
+  videoChartNotFound: 'Nothing is trending in this category right now.',
+  network: 'Could not reach YouTube. Check the internet connection.'
+};
+const KEY_ERRORS = ['nokey', 'keyInvalid', 'badRequest', 'ipRefererBlocked', 'forbidden', 'accessNotConfigured'];
+
+function showError(e) {
+  const reason = e && e.message;
+  const keyIssue = KEY_ERRORS.includes(reason);
+  vbody.querySelectorAll('.vstatus').forEach(s => s.remove());
+  vbody.append(el('div', {class: 'vnotice'},
+    el('b', {text: ERRORS[reason] || `Could not load videos (${reason}).`}),
+    keyIssue ? el('span', {text: 'Links pasted into Reference Number or the search box still play without a key.'}) : null,
+    keyIssue ? el('button', {class: 'vbutton', type: 'button', text: 'Open settings', onclick: () => go('settings')}) : null));
 }
+
+async function yt(path, params) {
+  const key = apiKey();
+  if (!key) throw new Error('nokey');
+  let r;
+  try {
+    r = await fetch(`https://www.googleapis.com/youtube/v3/${path}?` + new URLSearchParams({...params, key}));
+  } catch (e) {
+    throw new Error('network');
+  }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((data.error && data.error.errors && data.error.errors[0] && data.error.errors[0].reason) || 'http' + r.status);
+  return data;
+}
+
+const PARTS = 'snippet,contentDetails,statistics';
+
+function norm(v) {
+  const sn = v.snippet, th = sn.thumbnails || {};
+  return {
+    id: v.id, title: sn.title, channel: sn.channelTitle, channelId: sn.channelId,
+    thumb: (th.medium || th.high || th.default || {}).url, published: sn.publishedAt, desc: sn.description,
+    duration: v.contentDetails && v.contentDetails.duration, live: sn.liveBroadcastContent,
+    views: v.statistics && v.statistics.viewCount, likes: v.statistics && v.statistics.likeCount
+  };
+}
+
+async function details(ids) {
+  if (!ids.length) return [];
+  const d = await yt('videos', {part: PARTS, id: ids.join(','), hl: LANG});
+  const byId = Object.fromEntries(d.items.map(v => [v.id, norm(v)]));
+  return ids.map(id => byId[id]).filter(Boolean);
+}
+
+async function popularPage(cat, pageToken) {
+  const d = await yt('videos', {part: PARTS, chart: 'mostPopular', regionCode: REGION, hl: LANG, maxResults: 24,
+    ...(cat && {videoCategoryId: cat}), ...(pageToken && {pageToken})});
+  return {items: d.items.map(norm), next: d.nextPageToken};
+}
+
+async function searchPage(q, pageToken) {
+  const d = await yt('search', {part: 'snippet', q, type: 'video', maxResults: 20, regionCode: REGION,
+    relevanceLanguage: LANG, ...(pageToken && {pageToken})});
+  return {items: await details(d.items.map(i => i.id.videoId)), next: d.nextPageToken};
+}
+
+async function channelInfo(id) {
+  const d = await yt('channels', {part: PARTS, id});
+  return d.items && d.items[0];
+}
+
+async function uploadsPage(playlistId, pageToken) {
+  const d = await yt('playlistItems', {part: 'contentDetails', playlistId, maxResults: 24, ...(pageToken && {pageToken})});
+  return {items: await details(d.items.map(i => i.contentDetails.videoId)), next: d.nextPageToken};
+}
+
+function addHistory(v) {
+  const h = store.get('ytHistory', []).filter(x => x.id !== v.id);
+  h.unshift({id: v.id, title: v.title, channel: v.channel, channelId: v.channelId, thumb: v.thumb, duration: v.duration});
+  store.set('ytHistory', h.slice(0, 40));
+}
+
+function card(v, list) {
+  const open = () => go('watch', {id: v.id, list});
+  const time = dur(v.duration, v.live);
+  return el('div', {class: 'vcard', role: 'link', tabindex: '0', onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); }},
+    el('div', {class: 'vthumb'},
+      el('img', {src: v.thumb || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, alt: '', loading: 'lazy'}),
+      time ? el('span', {class: 'vdur', text: time}) : null),
+    el('div', {class: 'vtitle', text: v.title || 'Video'}),
+    v.channel ? el('span', {class: 'vchan', text: v.channel, onclick: e => { e.stopPropagation(); go('channel', {id: v.channelId}); }}) : null,
+    el('div', {class: 'vmeta', text: [views(v.views), v.published ? ago(v.published) : ''].filter(Boolean).join(' · ')}),
+    v.desc ? el('div', {class: 'vsnip', text: v.desc}) : null);
+}
+
+const section = (title, ...kids) => el('section', {class: 'vsection'}, el('h3', {text: title}), ...kids);
+
+// Loads pages into container, with a "Show more" button while the API reports another page.
+async function paged(container, load, live, list) {
+  let pageToken;
+  const more = el('button', {class: 'vbutton vmore', type: 'button', text: 'Show more'});
+  const status = el('div', {class: 'vstatus', text: 'Loading…'});
+  async function page() {
+    more.remove();
+    container.after(status);
+    const {items, next} = await load(pageToken);
+    if (!live()) return;
+    status.remove();
+    list.push(...items);
+    container.append(...items.map(v => card(v, list)));
+    if (!list.length) container.after(el('div', {class: 'vstatus', text: 'No videos found.'}));
+    pageToken = next;
+    if (pageToken) container.after(more);
+  }
+  more.addEventListener('click', () => page().catch(e => { if (live()) showError(e); }));
+  await page();
+}
+
+function go(view, params = {}, push = true) {
+  if (push && vstate) vstack.push(vstate);
+  vstate = {view, params};
+  $('vBack').disabled = !vstack.length;
+  const token = ++navToken;
+  const live = () => token === navToken;
+  vbody.replaceChildren();
+  vbody.scrollTop = 0;
+  Promise.resolve(VIEWS[view](params, live)).catch(e => { if (live()) showError(e); });
+}
+
+function back() {
+  if (!vstack.length) return;
+  const s = vstack.pop();
+  go(s.view, s.params, false);
+}
+
+const VIEWS = {
+  async home({cat = ''}, live) {
+    const hist = store.get('ytHistory', []);
+    if (!apiKey()) {
+      showError(new Error('nokey'));
+      if (hist.length) vbody.append(section('Recently watched', el('div', {class: 'vgrid'}, ...hist.map(v => card(v, hist)))));
+      return;
+    }
+    vbody.append(el('div', {class: 'vchips'}, ...CATS.map(([id, name]) =>
+      el('button', {class: 'vchip' + (id === cat ? ' on' : ''), type: 'button', text: name, onclick: () => go('home', {cat: id}, false)}))));
+    if (!cat && hist.length) {
+      vbody.append(section('Recently watched', el('div', {class: 'vgrid vrow1'}, ...hist.slice(0, 8).map(v => card(v, hist)))));
+    }
+    const grid = el('div', {class: 'vgrid'});
+    vbody.append(section(cat ? CATS.find(c => c[0] === cat)[1] : 'Trending', grid));
+    await paged(grid, t => popularPage(cat, t), live, []);
+  },
+
+  async search({q}, live) {
+    vq.value = q;
+    const link = parseVideo(q);
+    if (link) { go('watch', {id: link.id, start: link.start}, false); return; }
+    if (!apiKey()) { showError(new Error('nokey')); return; }
+    const list = el('div', {class: 'vlist'});
+    vbody.append(el('div', {class: 'vmeta vfor', text: `Results for "${q}"`}), list);
+    await paged(list, t => searchPage(q, t), live, []);
+  },
+
+  async watch({id, start = 0, list = null}, live) {
+    const info = el('div', {class: 'vinfo'});
+    const side = el('div', {class: 'vside'});
+    vbody.append(el('div', {class: 'vwatch'},
+      el('div', {class: 'vmain'},
+        el('div', {class: 'vplayer'}, el('iframe', {
+          src: `https://www.youtube-nocookie.com/embed/${id}?enablejsapi=1&rel=0&playsinline=1&autoplay=1&start=${start}`,
+          title: 'Customer images', allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
+          allowfullscreen: '', referrerpolicy: 'strict-origin-when-cross-origin'})),
+        location.protocol === 'file:' ? el('div', {class: 'vmeta', text: 'If playback shows an error, open this page from its web address instead of the file.'}) : null,
+        info),
+      side));
+
+    const known = store.get('ytHistory', []).find(x => x.id === id) || (list || []).find(x => x.id === id);
+    if (!apiKey()) {
+      if (known) info.append(el('h2', {class: 'vwtitle', text: known.title}));
+      addHistory(known || {id});
+      return;
+    }
+    const [v] = await details([id]);
+    if (!live()) return;
+    if (!v) { info.append(el('div', {class: 'vstatus', text: 'This video is not available.'})); return; }
+    addHistory(v);
+    const desc = el('div', {class: 'vdesc clamp', text: v.desc || 'No description.'});
+    info.append(
+      el('h2', {class: 'vwtitle', text: v.title}),
+      el('div', {class: 'vwrow'},
+        el('span', {class: 'vchan', text: v.channel, onclick: () => go('channel', {id: v.channelId})}),
+        el('span', {class: 'vmeta', text: [views(v.views), ago(v.published), v.likes ? nf.format(+v.likes) + ' likes' : ''].filter(Boolean).join(' · ')})),
+      desc,
+      el('button', {class: 'vlink', type: 'button', text: 'Show more', onclick: e => {
+        e.target.textContent = desc.classList.toggle('clamp') ? 'Show more' : 'Show less';
+      }}));
+
+    const sideList = el('div', {class: 'vlist small'});
+    if (list && list.length > 1) {
+      const i = list.findIndex(x => x.id === id);
+      side.append(el('div', {class: 'vsidehead', text: 'Up next'}), sideList);
+      sideList.append(...[...list.slice(i + 1), ...list.slice(0, Math.max(i, 0))].map(x => card(x, list)));
+    } else {
+      side.append(el('div', {class: 'vsidehead', text: 'More from ' + v.channel}), sideList);
+      const ch = await channelInfo(v.channelId);
+      if (!live() || !ch) return;
+      await paged(sideList, t => uploadsPage(ch.contentDetails.relatedPlaylists.uploads, t), live, []);
+    }
+  },
+
+  async channel({id}, live) {
+    if (!apiKey()) { showError(new Error('nokey')); return; }
+    const ch = await channelInfo(id);
+    if (!live()) return;
+    if (!ch) { vbody.append(el('div', {class: 'vstatus', text: 'This channel is not available.'})); return; }
+    const s = ch.statistics || {}, th = ch.snippet.thumbnails || {};
+    vbody.append(el('div', {class: 'vchanhead'},
+      el('img', {class: 'vavatar', src: (th.medium || th.default || {}).url, alt: ''}),
+      el('div', {},
+        el('h2', {text: ch.snippet.title}),
+        el('div', {class: 'vmeta', text: [s.hiddenSubscriberCount ? '' : nf.format(+s.subscriberCount) + ' subscribers',
+          s.videoCount ? nf.format(+s.videoCount) + ' videos' : ''].filter(Boolean).join(' · ')}))));
+    const grid = el('div', {class: 'vgrid'});
+    vbody.append(grid);
+    await paged(grid, t => uploadsPage(ch.contentDetails.relatedPlaylists.uploads, t), live, []);
+  },
+
+  settings() {
+    const input = el('input', {class: 'vfield', id: 'vkey', type: 'text', value: apiKey(), placeholder: 'AIza…', spellcheck: 'false', autocomplete: 'off'});
+    const saved = el('span', {class: 'vmeta'});
+    const cleared = el('span', {class: 'vmeta'});
+    const site = /^https?:$/.test(location.protocol) ? location.host + '/*' : 'your-name.github.io/*';
+    vbody.append(el('div', {class: 'vsettings'},
+      el('h2', {text: 'Settings'}),
+      el('label', {for: 'vkey', text: 'YouTube Data API key'}),
+      el('div', {class: 'vrow'}, input, el('button', {class: 'vbutton', type: 'button', text: 'Save', onclick: () => {
+        store.set('ytKey', input.value.trim());
+        saved.textContent = input.value.trim() ? 'Saved. The start page and search are ready.' : 'Key removed.';
+      }})),
+      saved,
+      el('div', {class: 'vmeta', text: 'The key is stored only in this browser. Pasted links play without a key.'}),
+      el('h3', {text: 'Get a free key'}),
+      el('ol', {}, ...[
+        'Open console.cloud.google.com and create a project.',
+        'Go to APIs & Services, then Library, and enable "YouTube Data API v3".',
+        'Go to Credentials and choose Create credentials, then API key.',
+        `Restrict the key: Websites → ${site}, APIs → YouTube Data API v3.`,
+        'Paste the key above and save.'
+      ].map(t => el('li', {text: t}))),
+      el('h3', {text: 'History'}),
+      el('div', {class: 'vrow'}, el('button', {class: 'vbutton', type: 'button', text: 'Clear history', onclick: () => {
+        store.set('ytHistory', []);
+        cleared.textContent = 'History cleared.';
+      }}), cleared)));
+  }
+};
 
 function loadVideo(s) {
   const v = parseVideo(s);
   refInput.value = REF;
   refInput.blur();
   if (!v) return;
-  video = v;
-  store.set('video', v);
-  setVideo(v);
+  go('watch', {id: v.id, start: v.start});
   showPreview(videoRow);
 }
+
+$('vBack').addEventListener('click', back);
+$('vHome').addEventListener('click', () => go('home'));
+$('vSettings').addEventListener('click', () => go('settings'));
+$('vSearch').addEventListener('submit', e => {
+  e.preventDefault();
+  const q = vq.value.trim();
+  if (!q) return;
+  vq.blur();
+  go('search', {q});
+});
+const colorBtn = $('vColor');
+function setColor(on) {
+  videoEl.classList.toggle('gray', !on);
+  colorBtn.setAttribute('aria-pressed', String(on));
+  store.set('ytColor', on);
+}
+colorBtn.addEventListener('click', () => setColor(colorBtn.getAttribute('aria-pressed') !== 'true'));
+setColor(store.get('ytColor', false));
 
 refInput.addEventListener('focus', () => refInput.select());
 refInput.addEventListener('blur', () => { refInput.value = REF; });
@@ -1113,10 +1477,6 @@ $('ribbonImages').addEventListener('click', () => showPreview(videoRow));
 window.addEventListener('blur', () => setTimeout(() => {
   if (document.activeElement && document.activeElement.tagName === 'IFRAME') videoEl.focus();
 }, 0));
-
-if (location.protocol === 'file:') {
-  $('vfoot').textContent = 'If playback shows an error, open this page from its web address instead of the file.';
-}
 
 /* ---------- Viewer ---------- */
 const games = {snake: makeSnake(), tetris: makeTetris(), '2048': make2048(), wordle: makeWordle(), flappy: makeFlappy()};
@@ -1161,7 +1521,7 @@ function render() {
 
 function fit() {
   if (!showing) return;
-  if (current.video) { fitVideo(); return; }
+  if (current.video) return;
   const r = previewEl.getBoundingClientRect();
   scale = Math.max(0.2, Math.min((r.width - 24) / PW, (r.height - 24) / PH));
   canvas.style.width = PW * scale + 'px';
@@ -1182,7 +1542,7 @@ function showPreview(row) {
   stage.hidden = current.video;
   videoEl.hidden = !current.video;
   placeholder.hidden = true;
-  if (current.video && video && !vframe.querySelector('iframe')) setVideo(video);
+  if (current.video && !vstate) go('home');
   fit();
 }
 
@@ -1199,19 +1559,40 @@ function hidePreview() {
 rows.forEach(r => r.addEventListener('click', () => showPreview(r)));
 new ResizeObserver(fit).observe(previewEl);
 
+const docsEl = document.querySelector('.docs');
+let big = false, bigBeforeHide = false;
+function setLayout(b) {
+  big = b;
+  docsEl.classList.toggle('big', b);
+  $('layoutSplit').classList.toggle('on', !b);
+  $('layoutBig').classList.toggle('on', b);
+}
+[['layoutSplit', false], ['layoutBig', true]].forEach(([id, b]) => {
+  $(id).addEventListener('click', () => setLayout(b));
+  $(id).addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLayout(b); } });
+});
+
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.target === refInput && e.key !== 'Escape') return;
+  const typing = e.target.matches && e.target.matches('input, textarea');
+  if (typing && e.key !== 'Escape') return;
+  if (typing) e.target.blur();
   const k = e.key.toLowerCase();
   if (k === 'escape') {
-    if (showing) hidePreview();
-    else showPreview(selectedRow);
+    if (showing) {
+      bigBeforeHide = big;
+      setLayout(false);
+      hidePreview();
+    } else {
+      showPreview(selectedRow);
+      setLayout(bigBeforeHide);
+    }
     e.preventDefault();
     return;
   }
   const handled = showing && current.key && current.key(k, e.repeat);
   if (handled) render();
-  if (handled || DIRS[k] || k === ' ') e.preventDefault();
+  if (handled || ((DIRS[k] || k === ' ') && !(showing && current.video))) e.preventDefault();
 });
 
 let px = 0, py = 0;
