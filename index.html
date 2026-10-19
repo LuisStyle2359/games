@@ -180,6 +180,25 @@ tbody tr.sel td { background: var(--select); }
 .csys { align-self: center; margin: auto 0; color: var(--muted); font-size: 11px; text-align: center; }
 .cform { display: flex; gap: 6px; flex: none; padding: 6px 8px; border-top: 1px solid var(--grid-line); background: var(--desk); }
 .cin { max-width: none; }
+.ctool { font-size: 11px; font-weight: 600; }
+#cemojiBtn { font-size: 16px; font-weight: 400; }
+.ctool[aria-expanded="true"] { background: var(--select); border-color: var(--hover-line); }
+.cpop { position: absolute; left: 8px; bottom: 42px; z-index: 2; width: min(calc(100% - 16px), 340px); padding: 8px; background: var(--paper); border: 1px solid var(--pane-line); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16); }
+#cemoji { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 1fr)); gap: 2px; max-height: 190px; overflow: auto; }
+#cemoji[hidden] { display: none; }
+.cemo { height: 30px; padding: 0; border: 1px solid transparent; background: none; font-size: 18px; line-height: 1; cursor: pointer; }
+.cemo:hover, .cemo:focus-visible { background: var(--hover); border-color: var(--hover-line); outline: none; }
+#cgif .crow { margin-top: 0; }
+#cgif .vlinkin { flex: 1; max-width: none; }
+.cgifprev { display: grid; place-items: center; margin-top: 8px; }
+.cgifprev:empty { display: none; }
+.cgifprev img { max-width: 100%; max-height: 150px; }
+#cgif .cnote { max-width: none; margin-top: 6px; text-align: left; }
+.cmsg.gif { padding: 3px 3px 2px; }
+.cgif { display: block; max-width: min(240px, 100%); max-height: 180px; border-radius: 4px; }
+.cmsg.gif .ctime { padding-right: 4px; }
+.cmsg.big { border-color: transparent; background: none; font-size: 30px; line-height: 1.15; }
+.cmsg.big .ctime { font-size: 10px; }
 .cin:disabled { background: var(--desk); }
 .cnameform { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: var(--paper); }
 .cnameform label { font-weight: 600; }
@@ -370,7 +389,15 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
             <div class="chead" id="ctitle"></div>
             <div class="cdiag" id="cdiag" hidden></div>
             <div class="cmsgs" id="cmsgs" aria-live="polite"></div>
+            <div class="cpop" id="cemoji" hidden role="dialog" aria-label="Emoji"></div>
+            <div class="cpop" id="cgif" hidden role="dialog" aria-label="GIF senden">
+              <div class="crow"><input class="vlinkin" id="cgifin" type="text" placeholder="GIF-Link von Giphy oder Tenor einfügen" autocomplete="off" spellcheck="false" aria-label="GIF-Link"><button class="vbtn" id="cgifsend" type="button" disabled>Senden</button></div>
+              <div class="cgifprev" id="cgifprev"></div>
+              <p class="cnote" id="cgifnote">Auf giphy.com oder tenor.com ein GIF öffnen, Rechtsklick aufs Bild, „Bildadresse kopieren“ und hier einfügen.</p>
+            </div>
             <form class="cform" id="cform">
+              <button class="vbtn ctool" id="cemojiBtn" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">&#9786;</button>
+              <button class="vbtn ctool" id="cgifBtn" type="button" title="GIF senden" aria-label="GIF senden" aria-expanded="false">GIF</button>
               <input class="vlinkin cin" id="cin" type="text" maxlength="500" placeholder="Nachricht schreiben" autocomplete="off" aria-label="Nachricht">
               <button class="vbtn" type="submit" title="Senden" aria-label="Senden"><svg viewBox="0 0 12 12"><path d="M1 1.5l10 4.5-10 4.5 1.5-4.5z"/></svg></button>
             </form>
@@ -1635,6 +1662,7 @@ function renderBadge() {
 }
 
 function selectConv(id) {
+  closePops();
   conv = id;
   delete unread[id];
   saveChat();
@@ -1667,10 +1695,13 @@ function fmtTime(ts) {
 function renderMsgs() {
   ctitle.textContent = nameOf(conv) + (conv !== ALL && !people.has(conv) ? ' (offline)' : '');
   const list = log[conv] || [];
-  cmsgs.replaceChildren(...(list.length ? list.map(m => el('div', {class: 'cmsg' + (m.from === me.id ? ' me' : '')},
-      conv === ALL && m.from !== me.id ? el('div', {class: 'cfrom', text: m.name}) : null,
-      el('div', {text: m.text}),
-      el('div', {class: 'ctime', text: fmtTime(m.ts)})))
+  cmsgs.replaceChildren(...(list.length ? list.map(m => {
+      const gif = gifUrl(m.text), kind = gif ? ' gif' : BIG_EMOJI.test(m.text) ? ' big' : '';
+      return el('div', {class: 'cmsg' + (m.from === me.id ? ' me' : '') + kind},
+        conv === ALL && m.from !== me.id ? el('div', {class: 'cfrom', text: m.name}) : null,
+        gif ? gifImg(m.id + gif, gif, m.text) : el('div', {text: m.text}),
+        el('div', {class: 'ctime', text: fmtTime(m.ts)}));
+    })
     : [el('div', {class: 'csys', text: 'Noch keine Nachrichten. ' +
         (conv === ALL ? 'Alles hier ist Ende-zu-Ende-verschlüsselt.' : 'Diesen Chat könnt nur ihr zwei lesen.')})]));
   cmsgs.scrollTop = cmsgs.scrollHeight;
@@ -1681,6 +1712,8 @@ function updateComposer() {
   const offline = conv !== ALL && !people.has(conv);
   cin.disabled = !mq || offline;
   cin.placeholder = !mq ? 'Keine Verbindung' : offline ? nameOf(conv) + ' ist offline' : 'Nachricht schreiben';
+  $('cemojiBtn').disabled = $('cgifBtn').disabled = cin.disabled;
+  if (cin.disabled) closePops();
 }
 
 function showJoin(show) {
@@ -1744,18 +1777,105 @@ $('crename').addEventListener('click', () => {
   cnamein.focus();
   cnamein.select();
 });
-$('cform').addEventListener('submit', async e => {
+$('cform').addEventListener('submit', e => {
   e.preventDefault();
-  const text = cin.value.trim().slice(0, MAXLEN), to = conv;
+  const text = cin.value.trim();
   if (!text || cin.disabled) return;
-  const id = me.id + Date.now().toString(36);
   cin.value = '';
+  closePops();
+  sendText(text);
+});
+
+async function sendText(raw) {
+  const text = raw.slice(0, MAXLEN), to = conv;
+  const id = me.id + Date.now().toString(36);
   addMsg(to, {id, from: me.id, name: me.name, text, ts: Date.now()});
   try {
     if (to === ALL) await publish(ALL, await signed({kind: 'msg', id, text}));
     else await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {id, to, name: me.name, text})});
   } catch (err) {}
+}
+
+/* Emojis and GIFs. GIFs travel as an ordinary (encrypted) link and are only displayed from Giphy and
+   Tenor, so a link can't make everyone's browser load an image from someone's own server. */
+const EMOJIS = ('😀 😃 😄 😁 😆 😅 😂 🤣 😊 🙂 😉 😍 😘 😋 😜 🤪 😎 🤓 🤔 🤨 😐 😏 😒 🙄 😬 😴 🥱 😮 😲 🥺 ' +
+  '😢 😭 😤 😡 🤬 🤯 😳 🥵 🥶 😱 🤗 🤫 🤭 🥳 🤩 😇 🤡 💀 👻 🤖 💩 🙈 👍 👎 👌 ✌️ 🤞 👊 👏 🙌 ' +
+  '🙏 💪 🤝 👋 👀 🫡 ❤️ 💔 🔥 💯 ✨ ⭐ 🎉 🎂 🍕 🍔 🍟 🍺 ☕ ⚽ 🏆 🎮 🚚 📦 ✈️ 🚢 ⏰ ✅ ❌ ❓').split(' ');
+const BIG_EMOJI = /^\s*(?:\p{Extended_Pictographic}[\u{FE0F}\u{1F3FB}-\u{1F3FF}]?(?:\u200d\p{Extended_Pictographic}\u{FE0F}?)*\s*){1,3}$/u;
+const gifEls = new Map();
+
+function gifUrl(s) {
+  let u;
+  if (!/^https:\/\/\S+$/.test(s = String(s).trim())) return null;
+  try { u = new URL(s); } catch (e) { return null; }
+  const h = u.hostname, path = u.pathname;
+  let m;
+  if (/^(media\d*|i)\.giphy\.com$/.test(h)) m = path.match(/^\/media\/(?:v1\.[^/]+\/)?([A-Za-z0-9]+)\//) || path.match(/^\/([A-Za-z0-9]+)\.(?:gif|webp)$/);
+  else if (h === 'giphy.com' || h === 'www.giphy.com') m = path.match(/^\/(?:gifs|stickers)\/(?:[\w-]*-)?([A-Za-z0-9]+)\/?$/);
+  else if (/^(media\d*|c)\.tenor\.com$/.test(h) && /^\/[\w./-]+\.(?:gif|webp)$/i.test(path)) return 'https://' + h + path;
+  return m ? `https://media.giphy.com/media/${m[1]}/giphy.gif` : null;
+}
+
+// Messages are re-rendered often; reusing the <img> keeps GIFs from restarting and flickering.
+function gifImg(key, src, text) {
+  if (!gifEls.has(key)) {
+    const img = el('img', {class: 'cgif', src, alt: 'GIF', referrerpolicy: 'no-referrer'});
+    img.addEventListener('load', () => { cmsgs.scrollTop = cmsgs.scrollHeight; });
+    img.addEventListener('error', () => img.replaceWith(el('div', {text})));
+    gifEls.set(key, img);
+  }
+  return gifEls.get(key);
+}
+
+const pops = {cemojiBtn: $('cemoji'), cgifBtn: $('cgif')};
+function closePops() {
+  for (const [btn, pop] of Object.entries(pops)) { pop.hidden = true; $(btn).setAttribute('aria-expanded', 'false'); }
+}
+function togglePop(btn) {
+  const open = pops[btn].hidden;
+  closePops();
+  if (!open) return;
+  pops[btn].hidden = false;
+  $(btn).setAttribute('aria-expanded', 'true');
+}
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('.cpop, .ctool')) closePops();
 });
+
+$('cemoji').append(...EMOJIS.map(x => el('button', {class: 'cemo', type: 'button', text: x, title: x, onclick: () => {
+  const a = cin.selectionStart ?? cin.value.length, b = cin.selectionEnd ?? a;
+  cin.value = cin.value.slice(0, a) + x + cin.value.slice(b);
+  cin.focus();
+  cin.setSelectionRange(a + x.length, a + x.length);
+}})));
+$('cemojiBtn').addEventListener('click', () => togglePop('cemojiBtn'));
+
+const cgifin = $('cgifin'), cgifprev = $('cgifprev'), cgifsend = $('cgifsend'), cgifnote = $('cgifnote');
+const GIF_HINT = cgifnote.textContent;
+function previewGif() {
+  const g = gifUrl(cgifin.value), v = cgifin.value.trim();
+  cgifsend.disabled = !g;
+  cgifprev.replaceChildren(...(g ? [el('img', {src: g, alt: 'Vorschau', referrerpolicy: 'no-referrer'})] : []));
+  cgifnote.textContent = v && !g
+    ? (/tenor\.com\/view\//.test(v) ? 'Das ist die Tenor-Seite. Rechtsklick aufs GIF und „Bildadresse kopieren“ nehmen.' : 'Nur Links von Giphy oder Tenor.')
+    : GIF_HINT;
+}
+function sendGif() {
+  const g = gifUrl(cgifin.value);
+  if (!g || cin.disabled) return;
+  closePops();
+  cgifin.value = '';
+  previewGif();
+  sendText(g);
+  cin.focus();
+}
+$('cgifBtn').addEventListener('click', () => {
+  togglePop('cgifBtn');
+  if (!pops.cgifBtn.hidden) cgifin.focus();
+});
+cgifin.addEventListener('input', previewGif);
+cgifin.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendGif(); } });
+cgifsend.addEventListener('click', sendGif);
 $('ribbonMail').addEventListener('click', () => showPreview(chatRow));
 document.addEventListener('visibilitychange', () => { if (chatVisible() && unread[conv]) openChat(); });
 setInterval(() => {
