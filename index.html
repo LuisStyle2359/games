@@ -229,6 +229,35 @@ tbody tr.sel td { background: var(--select); }
 .cmsg.me .creplyBtn { left: -1px; }
 .cmsg:hover .creplyBtn { display: block; }
 .cmsg { position: relative; }
+.clb { position: absolute; inset: 0; background: var(--paper); z-index: 20; display: flex; flex-direction: column; }
+.clbtabs { display: flex; gap: 0; border-bottom: 1px solid var(--grid-line); padding: 0 8px; flex: none; overflow-x: auto; }
+.clbtab { padding: 6px 10px; font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+.clbtab.on { border-color: var(--check); font-weight: 600; }
+.clbtable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.clbtable th { text-align: left; padding: 4px 8px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--grid-line); }
+.clbtable td { padding: 5px 8px; border-bottom: 1px solid var(--desk); }
+.clbtable .rank { width: 28px; text-align: center; font-weight: 600; }
+.clbtable .gold { color: #d4a017; }
+.clbtable .silver { color: #888; }
+.clbtable .bronze { color: #a0522d; }
+.clbempty { padding: 24px; text-align: center; color: var(--muted); font-size: 12px; }
+.cmpboard { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 12px; gap: 8px; min-height: 0; }
+.cmpstatus { font-weight: 600; font-size: 13px; }
+.cmpresult { display: flex; gap: 8px; align-items: center; }
+.ttt-grid { display: inline-grid; grid-template-columns: repeat(3, 56px); gap: 3px; }
+.ttt-cell { width: 56px; height: 56px; border: 2px solid var(--grid-line); font-size: 28px; font-weight: 700; cursor: pointer; background: var(--paper); display: flex; align-items: center; justify-content: center; border-radius: 3px; user-select: none; }
+.ttt-cell:hover:not(.x):not(.o) { background: var(--desk); }
+.ttt-cell.x { color: #e74c3c; }
+.ttt-cell.o { color: #3498db; }
+.c4-grid { display: inline-grid; grid-template-columns: repeat(7, 34px); gap: 2px; }
+.c4-cell { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--grid-line); background: var(--paper); cursor: pointer; transition: background 0.15s; }
+.c4-cell:hover:not(.c4-r):not(.c4-y) { background: var(--desk); }
+.c4-r { background: #e74c3c !important; border-color: #c0392b; }
+.c4-y { background: #f1c40f !important; border-color: #d4a017; }
+.c4-cell.win, .ttt-cell.win { box-shadow: 0 0 0 2px #2ecc71; }
+.cmpinvite { background: #eef2f8; border: 1px solid #cdd8e8; border-radius: 8px; padding: 8px 12px; margin: 4px 0; display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
+.cmpinvite button { padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; border: 1px solid var(--grid-line); background: var(--paper); }
+.cmpinvite .mpaccept { background: var(--check); color: #fff; border-color: var(--check); }
 .cnameform { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: var(--paper); }
 .cnameform label { font-weight: 600; }
 .cfields { display: grid; gap: 4px; width: min(100%, 280px); }
@@ -410,14 +439,20 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
       <div id="chat" tabindex="-1" hidden>
         <div class="cpage">
           <aside class="clist">
-            <div class="chead">Posteingang<span class="cstat" id="cstat"></span></div>
+            <div class="chead">Posteingang<span class="cstat" id="cstat"></span><span id="clbbtn" style="float:right;cursor:pointer" title="Bestenliste">🏆</span></div>
             <div class="cpeople" id="cpeople" role="listbox" aria-label="Kontakte"></div>
             <div class="cme"><span id="cme"></span><button class="clink" id="crename" type="button">Ändern</button></div>
           </aside>
+          <div class="clb" id="clb" hidden>
+            <div class="chead">Bestenliste<span id="clbclose" style="float:right;cursor:pointer;padding:0 4px">✕</span></div>
+            <div class="clbtabs" id="clbtabs"></div>
+            <div id="clbbody" style="flex:1;overflow-y:auto;padding:4px"></div>
+          </div>
           <section class="cconv">
             <div class="chead" id="ctitle"></div>
             <div class="cdiag" id="cdiag" hidden></div>
             <div class="cmsgs" id="cmsgs" aria-live="polite"></div>
+            <div class="cmpboard" id="cmpboard" hidden><div class="cmpstatus" id="cmpstatus"></div><div id="cmpgrid"></div><div class="cmpresult" id="cmpresult" hidden></div></div>
             <div class="ctyping" id="ctyping"></div>
             <div class="cpop" id="cemoji" hidden role="dialog" aria-label="Emoji"></div>
             <div class="cpop" id="cgif" hidden role="dialog" aria-label="GIF senden">
@@ -426,10 +461,12 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
+            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button></div>
             <div class="creply" id="creply" hidden><span class="crname" id="crname"></span><span class="crtext" id="crtext"></span><button class="crclose" id="crclose" type="button" title="Abbrechen">&times;</button></div>
             <form class="cform" id="cform">
               <button class="vbtn ctool" id="cemojiBtn" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">&#9786;</button>
               <button class="vbtn ctool" id="cgifBtn" type="button" title="GIF senden" aria-label="GIF senden" aria-expanded="false">GIF</button>
+              <button class="vbtn ctool" id="cmpbtn" type="button" title="Spielen" aria-label="Spielen" aria-expanded="false" hidden>🎮</button>
               <input class="vlinkin cin" id="cin" type="text" maxlength="500" placeholder="Nachricht schreiben" autocomplete="off" aria-label="Nachricht">
               <button class="vbtn" type="submit" title="Senden" aria-label="Senden"><svg viewBox="0 0 12 12"><path d="M1 1.5l10 4.5-10 4.5 1.5-4.5z"/></svg></button>
             </form>
@@ -593,6 +630,7 @@ function makeSnake() {
     if (head.x < 0 || head.y < 0 || head.x >= N || head.y >= N ||
         body.some(p => p.x === head.x && p.y === head.y)) {
       over = true;
+      if (score > 0 && typeof reportScore === 'function') reportScore('snake', score);
       return;
     }
     snake.unshift(head);
@@ -704,7 +742,7 @@ function make2048() {
     if (JSON.stringify(board) === before) return;
     addTile();
     if (score > best) { best = score; store.set('best2048', best); }
-    if (!canMove()) over = true;
+    if (!canMove()) { over = true; if (score > 0 && typeof reportScore === 'function') reportScore('2048', score); }
   }
   reset();
 
@@ -793,7 +831,7 @@ function makeTetris() {
       if (y < 0) over = true;
       else grid[y][piece.x + c] = piece.t;
     }));
-    if (over) { bank(); return; }
+    if (over) { bank(); if (score > 0 && typeof reportScore === 'function') reportScore('tetris', score); return; }
     let cleared = 0;
     for (let y = ROWS - 1; y >= 0; y--) {
       if (grid[y].every(v => v)) {
@@ -810,7 +848,7 @@ function makeTetris() {
     }
     bank();
     spawn();
-    if (over) bank();
+    if (over) { bank(); if (score > 0 && typeof reportScore === 'function') reportScore('tetris', score); }
   }
   function down() {
     if (!collides(piece.m, piece.x, piece.y + 1)) { piece.y++; return true; }
@@ -990,6 +1028,7 @@ function makeWordle() {
     if (res.every(r => r === 'correct')) {
       over = won = true;
       st.played++; st.won++; st.streak++;
+      if (typeof reportScore === 'function') reportScore('wordle', 7 - guesses.length);
       store.set('wordleStats', st);
       flash(['Genius', 'Magnificent', 'Impressive', 'Splendid', 'Great', 'Phew'][guesses.length - 1], 2000);
     } else if (guesses.length === ROWS) {
@@ -1126,6 +1165,7 @@ function makeFlappy() {
       state = 'over';
       overAt = performance.now();
       y = Math.min(y, AREA - GROUND - R);
+      if (score > 0 && typeof reportScore === 'function') reportScore('flappy', score);
     }
   }
   reset();
@@ -1420,6 +1460,9 @@ const typing = new Map();
 let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
+let lb = {}, lbGame = 'snake';
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt'};
+let mpGame = null, mpInvites = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
   const enc = new TextEncoder(), dec = new TextDecoder();
@@ -1523,6 +1566,7 @@ async function useRoom(saved) {
   room = {tag: saved.tag, key: await crypto.subtle.importKey('raw', unb64(saved.k), 'AES-GCM', false, ['encrypt', 'decrypt'])};
   log = store.get('chatLog-' + room.tag, {});
   unread = store.get('chatUnread-' + room.tag, {});
+  lb = store.get('lb-' + room.tag, {});
   conv = ALL;
 }
 
@@ -1583,8 +1627,9 @@ function connect() {
     onopen() {
       retry = 0;
       diag.set(host, 'verbunden');
-      c.sub(['p/+', ALL, 'dm/' + me.id, 'hello', 'typing/+', 'read/+'].map(t => base + t));
+      c.sub(['p/+', ALL, 'dm/' + me.id, 'hello', 'typing/+', 'read/+', 'hs/+'].map(t => base + t));
       announce();
+      broadcastScores();
       // Ask everyone to re-announce, in case the broker does not keep retained presence messages.
       publish('hello', {hello: me.id}).catch(() => {});
       renderPeople();
@@ -1654,13 +1699,30 @@ async function incoming(t, payload) {
   const r = room;
   if (!r || !t.startsWith(ROOT + r.tag + '/')) return;
   const sub = t.slice(ROOT.length + r.tag.length + 1);
+  if (sub.startsWith('hs/')) {
+    const id = sub.slice(3);
+    if (id === me.id || !validId(id)) return;
+    const hsBox = await unseal(r.key, JSON.parse(payload));
+    const body = await verify(hsBox).catch(() => null);
+    if (!body || body.from !== id || body.kind !== 'hs' || typeof body.score !== 'number') return;
+    const game = String(body.game);
+    if (!GAME_NAMES[game]) return;
+    const g = lb[game] || (lb[game] = {});
+    const prev = g[id];
+    if (!prev || body.score > prev.score) {
+      g[id] = {name: cleanName(body.name), score: body.score, ts: Date.now()};
+      if (room) store.set('lb-' + room.tag, lb);
+      if (!$('clb').hidden) renderLb();
+    }
+    return;
+  }
   if (sub.startsWith('p/') && !payload) {
     const id = sub.slice(2);
     if (people.delete(id)) { renderPeople(); if (id === conv) renderMsgs(); }
     return;
   }
   const box = await unseal(r.key, JSON.parse(payload));
-  if (sub === 'hello') { if (box.hello !== me.id) announce(); return; }
+  if (sub === 'hello') { if (box.hello !== me.id) { announce(); broadcastScores(); } return; }
   if (sub.startsWith('typing/')) {
     const id = sub.slice(7);
     if (id === me.id || !validId(id)) return;
@@ -1696,6 +1758,7 @@ async function incoming(t, payload) {
   } else if (sub === 'dm/' + me.id) {
     if (!validId(box.from) || box.from === me.id) return;
     const dm = await unseal(await dmKey(box.from), box.box);
+    if (dm.kind === 'mp') { handleMp(box.from, dm); return; }
     if (room === r && dm.to === me.id && dm.kind === 'del') { applyDelete(box.from, box.from, dm.id); return; }
     if (room !== r || dm.to !== me.id || typeof dm.text !== 'string' || !dm.text.trim()) return;
     const m = {id: String(dm.id || '').slice(0, 40), from: box.from, name: cleanName(dm.name) || nameOf(box.from), text: dm.text.slice(0, MAXLEN), ts: Date.now()};
@@ -1832,6 +1895,255 @@ function clearReply() {
 }
 $('crclose').addEventListener('click', clearReply);
 
+/* Leaderboard */
+function reportScore(game, score) {
+  if (!score || !room || !me.name) return;
+  lb = store.get('lb-' + room.tag, lb);
+  const g = lb[game] || (lb[game] = {});
+  const prev = g[me.id];
+  if (prev && prev.score >= score) return;
+  g[me.id] = {name: me.name, score, ts: Date.now()};
+  store.set('lb-' + room.tag, lb);
+  if (mq) signed({kind: 'hs', game, score, name: me.name}).then(b => publish('hs/' + me.id, b)).catch(() => {});
+  if (!$('clb').hidden) renderLb();
+}
+function broadcastScores() {
+  if (!mq || !room || !me.name) return;
+  for (const [game, players] of Object.entries(lb)) {
+    const mine = players[me.id];
+    if (mine && mine.score > 0) signed({kind: 'hs', game, score: mine.score, name: me.name}).then(b => publish('hs/' + me.id, b)).catch(() => {});
+  }
+}
+function toggleLb() {
+  const p = $('clb');
+  p.hidden = !p.hidden;
+  if (!p.hidden) renderLb();
+}
+function renderLb() {
+  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'ttt', 'c4'];
+  const avail = allGames.filter(g => lb[g] && Object.keys(lb[g]).length);
+  if (!avail.includes(lbGame)) lbGame = avail[0] || 'snake';
+  $('clbtabs').replaceChildren(...avail.map(g =>
+    el('span', {class: 'clbtab' + (g === lbGame ? ' on' : ''), text: GAME_NAMES[g], onclick: () => { lbGame = g; renderLb(); }})
+  ));
+  const entries = Object.values(lb[lbGame] || {}).sort((a, b) => b.score - a.score);
+  if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Scores für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
+  const medals = ['gold', 'silver', 'bronze'];
+  const mpGames = ['ttt', 'c4'];
+  $('clbbody').replaceChildren(el('table', {class: 'clbtable'},
+    el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : 'Score'}))),
+    el('tbody', {}, ...entries.map((e, i) => el('tr', {},
+      el('td', {class: 'rank ' + (medals[i] || ''), text: String(i + 1)}),
+      el('td', {text: e.name + (e.name === me.name ? ' (du)' : '')}),
+      el('td', {text: lbGame === 'wordle' ? (7 - e.score) + '/6' : String(e.score)})
+    )))
+  ));
+}
+$('clbbtn').addEventListener('click', toggleLb);
+$('clbclose').addEventListener('click', () => { $('clb').hidden = true; });
+
+/* Multiplayer */
+const MP_MARKS_TTT = ['', '✕', '○'];
+const MP_MARKS_C4 = ['', 'c4-r', 'c4-y'];
+function checkTtt(board) {
+  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  for (const line of lines) {
+    const [a, b, c] = line;
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return {winner: board[a], cells: line};
+  }
+  return board.every(v => v) ? {winner: 0, cells: []} : null;
+}
+function checkC4(board) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
+    if (!board[r][c]) continue;
+    for (const [dr, dc] of dirs) {
+      const cells = [];
+      for (let i = 0; i < 4; i++) {
+        const nr = r + dr * i, nc = c + dc * i;
+        if (nr < 0 || nr >= 6 || nc < 0 || nc >= 7 || board[nr][nc] !== board[r][c]) break;
+        cells.push([nr, nc]);
+      }
+      if (cells.length === 4) return {winner: board[r][c], cells};
+    }
+  }
+  return board.every(row => row.every(v => v)) ? {winner: 0, cells: []} : null;
+}
+function dropC4(board, col) {
+  for (let r = 5; r >= 0; r--) if (!board[r][col]) return r;
+  return -1;
+}
+function startMp(gid, game, opponent, opName, myMark) {
+  const board = game === 'ttt' ? Array(9).fill(0) : Array.from({length: 6}, () => Array(7).fill(0));
+  mpGame = {gid, game, opponent, opName, board, myMark, turn: 1, over: false, winner: 0, winCells: null};
+  mpInvites = mpInvites.filter(i => i.from !== opponent);
+  showMpBoard();
+}
+function showMpBoard() {
+  if (!mpGame) return;
+  $('cmsgs').hidden = true;
+  $('ctyping').hidden = true;
+  $('cform').style.display = 'none';
+  const b = $('cmpboard');
+  b.hidden = false;
+  renderMpBoard();
+}
+function hideMpBoard() {
+  $('cmpboard').hidden = true;
+  $('cmsgs').hidden = false;
+  $('ctyping').hidden = false;
+  $('cform').style.display = '';
+  renderMsgs();
+}
+function renderMpBoard() {
+  if (!mpGame) return;
+  const g = mpGame, myTurn = g.turn === g.myMark;
+  const gameName = GAME_NAMES[g.game];
+  const opLabel = g.opName;
+  if (g.over) {
+    $('cmpstatus').textContent = g.winner === 0 ? 'Unentschieden!' : g.winner === g.myMark ? 'Du hast gewonnen!' : opLabel + ' hat gewonnen!';
+  } else {
+    $('cmpstatus').textContent = gameName + ' vs ' + opLabel + (myTurn ? ' — Du bist dran' : ' — ' + opLabel + ' ist dran');
+  }
+  if (g.game === 'ttt') renderTttBoard();
+  else renderC4Board();
+  const res = $('cmpresult');
+  res.hidden = false;
+  if (g.over) {
+    res.replaceChildren(el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; hideMpBoard(); }}));
+  } else {
+    res.replaceChildren(el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
+  }
+}
+function renderTttBoard() {
+  const g = mpGame, marks = MP_MARKS_TTT;
+  $('cmpgrid').className = 'ttt-grid';
+  $('cmpgrid').replaceChildren(...g.board.map((v, i) => {
+    const win = g.winCells && g.winCells.includes(i);
+    const cls = ['x', 'o'];
+    return el('div', {class: 'ttt-cell' + (v ? ' ' + cls[v - 1] : '') + (win ? ' win' : ''), text: marks[v], onclick: () => playTtt(i)});
+  }));
+}
+function renderC4Board() {
+  const g = mpGame;
+  $('cmpgrid').className = 'c4-grid';
+  const cells = [];
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
+    const v = g.board[r][c];
+    const win = g.winCells && g.winCells.some(([wr, wc]) => wr === r && wc === c);
+    cells.push(el('div', {class: 'c4-cell' + (v ? ' ' + MP_MARKS_C4[v] : '') + (win ? ' win' : ''), onclick: () => playC4(c)}));
+  }
+  $('cmpgrid').replaceChildren(...cells);
+}
+function playTtt(i) {
+  const g = mpGame;
+  if (!g || g.over || g.turn !== g.myMark || g.board[i]) return;
+  g.board[i] = g.myMark;
+  g.turn = 3 - g.turn;
+  const result = checkTtt(g.board);
+  if (result) { g.over = true; g.winner = result.winner; g.winCells = result.cells; finishMp(); }
+  sendMpMove({pos: i});
+  renderMpBoard();
+}
+function playC4(col) {
+  const g = mpGame;
+  if (!g || g.over || g.turn !== g.myMark) return;
+  const row = dropC4(g.board, col);
+  if (row < 0) return;
+  g.board[row][col] = g.myMark;
+  g.turn = 3 - g.turn;
+  const result = checkC4(g.board);
+  if (result) { g.over = true; g.winner = result.winner; g.winCells = result.cells; finishMp(); }
+  sendMpMove({col});
+  renderMpBoard();
+}
+function finishMp() {
+  if (!mpGame) return;
+  const g = mpGame;
+  if (g.winner === g.myMark) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
+  const gameName = GAME_NAMES[g.game];
+  const resultText = g.winner === 0 ? gameName + ': Unentschieden!' : g.winner === g.myMark ? gameName + ': Du hast gewonnen!' : gameName + ': ' + g.opName + ' hat gewonnen!';
+  addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: resultText, ts: Date.now()});
+}
+async function sendMpMsg(to, payload) {
+  await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {...payload, to, kind: 'mp'})});
+}
+function sendMpMove(data) {
+  if (!mpGame || !mq) return;
+  sendMpMsg(mpGame.opponent, {type: 'move', gid: mpGame.gid, ...data}).catch(() => {});
+}
+function inviteMp(game) {
+  if (conv === ALL || !people.has(conv) || !mq) return;
+  const gid = me.id + Date.now().toString(36);
+  sendMpMsg(conv, {type: 'invite', game, gid, name: me.name}).catch(() => {});
+  addMsg(conv, {id: 'inv-' + gid, from: 'system', name: '', text: GAME_NAMES[game] + ': Einladung an ' + nameOf(conv) + ' gesendet…', ts: Date.now()});
+  mpInvites.push({gid, game, from: conv, name: nameOf(conv), ts: Date.now(), mine: true});
+}
+function acceptMp(inv) {
+  sendMpMsg(inv.from, {type: 'accept', gid: inv.gid, game: inv.game, name: me.name}).catch(() => {});
+  mpInvites = mpInvites.filter(i => i.gid !== inv.gid);
+  conv = inv.from;
+  startMp(inv.gid, inv.game, inv.from, inv.name, 2);
+}
+function declineMp(inv) {
+  sendMpMsg(inv.from, {type: 'decline', gid: inv.gid}).catch(() => {});
+  mpInvites = mpInvites.filter(i => i.gid !== inv.gid);
+  if (conv === inv.from) renderMsgs();
+}
+function resignMp() {
+  if (!mpGame || mpGame.over) return;
+  mpGame.over = true;
+  mpGame.winner = 3 - mpGame.myMark;
+  sendMpMsg(mpGame.opponent, {type: 'resign', gid: mpGame.gid}).catch(() => {});
+  finishMp();
+  renderMpBoard();
+}
+function handleMp(from, dm) {
+  if (dm.type === 'invite') {
+    if (!cleanName(dm.name) || !dm.gid || !GAME_NAMES[dm.game]) return;
+    mpInvites.push({gid: dm.gid, game: dm.game, from, name: cleanName(dm.name), ts: Date.now()});
+    if (conv === from) renderMsgs();
+    if (!unread[from]) unread[from] = 0;
+    unread[from]++;
+    renderBadge();
+    renderPeople();
+  } else if (dm.type === 'accept') {
+    const inv = mpInvites.find(i => i.gid === dm.gid && i.mine);
+    if (inv) {
+      mpInvites = mpInvites.filter(i => i.gid !== dm.gid);
+      conv = from;
+      startMp(dm.gid, inv.game, from, cleanName(dm.name) || nameOf(from), 1);
+    }
+  } else if (dm.type === 'decline') {
+    mpInvites = mpInvites.filter(i => i.gid !== dm.gid);
+    addMsg(from, {id: 'dec-' + dm.gid, from: 'system', name: '', text: nameOf(from) + ' hat die Einladung abgelehnt.', ts: Date.now()});
+  } else if (dm.type === 'move') {
+    if (!mpGame || mpGame.gid !== dm.gid || mpGame.over) return;
+    const g = mpGame, opMark = 3 - g.myMark;
+    if (g.game === 'ttt' && typeof dm.pos === 'number' && dm.pos >= 0 && dm.pos < 9 && !g.board[dm.pos]) {
+      g.board[dm.pos] = opMark;
+      g.turn = 3 - g.turn;
+      const result = checkTtt(g.board);
+      if (result) { g.over = true; g.winner = result.winner; g.winCells = result.cells; finishMp(); }
+    } else if (g.game === 'c4' && typeof dm.col === 'number' && dm.col >= 0 && dm.col < 7) {
+      const row = dropC4(g.board, dm.col);
+      if (row >= 0) {
+        g.board[row][dm.col] = opMark;
+        g.turn = 3 - g.turn;
+        const result = checkC4(g.board);
+        if (result) { g.over = true; g.winner = result.winner; g.winCells = result.cells; finishMp(); }
+      }
+    } else if (g.game === 'c4') return;
+    renderMpBoard();
+  } else if (dm.type === 'resign') {
+    if (!mpGame || mpGame.gid !== dm.gid) return;
+    mpGame.over = true;
+    mpGame.winner = mpGame.myMark;
+    finishMp();
+    renderMpBoard();
+  }
+}
+
 function nameOf(id) {
   if (id === ALL) return 'Alle';
   if (people.has(id)) return people.get(id).name;
@@ -1900,6 +2212,13 @@ function renderMsgs() {
     })
     : [el('div', {class: 'csys', text: 'Noch keine Nachrichten. ' +
         (conv === ALL ? 'Alles hier ist Ende-zu-Ende-verschlüsselt.' : 'Diesen Chat könnt nur ihr zwei lesen.')})]));
+  const invites = mpInvites.filter(i => i.from === c && !i.mine);
+  invites.forEach(inv => {
+    cmsgs.appendChild(el('div', {class: 'cmpinvite'},
+      el('span', {text: inv.name + ' möchte ' + GAME_NAMES[inv.game] + ' spielen'}),
+      el('button', {class: 'mpaccept', text: 'Annehmen', onclick: () => acceptMp(inv)}),
+      el('button', {text: 'Ablehnen', onclick: () => declineMp(inv)})));
+  });
   cmsgs.scrollTop = cmsgs.scrollHeight;
   updateComposer();
   renderTyping();
@@ -1911,6 +2230,7 @@ function updateComposer() {
   cin.disabled = !mq || offline;
   cin.placeholder = !mq ? 'Keine Verbindung' : offline ? nameOf(conv) + ' ist offline' : 'Nachricht schreiben';
   $('cemojiBtn').disabled = $('cgifBtn').disabled = cin.disabled;
+  $('cmpbtn').hidden = conv === ALL || !people.has(conv) || !mq || !!mpGame;
   if (cin.disabled) closePops();
 }
 
@@ -2032,7 +2352,7 @@ function gifImg(key, src, text) {
   return gifEls.get(key);
 }
 
-const pops = {cemojiBtn: $('cemoji'), cgifBtn: $('cgif')};
+const pops = {cemojiBtn: $('cemoji'), cgifBtn: $('cgif'), cmpbtn: $('cmppop')};
 function closePops() {
   for (const [btn, pop] of Object.entries(pops)) { pop.hidden = true; $(btn).setAttribute('aria-expanded', 'false'); }
 }
@@ -2054,6 +2374,9 @@ $('cemoji').append(...EMOJIS.map(x => el('button', {class: 'cemo', type: 'button
   cin.setSelectionRange(a + x.length, a + x.length);
 }})));
 $('cemojiBtn').addEventListener('click', () => togglePop('cemojiBtn'));
+$('cmpbtn').addEventListener('click', () => togglePop('cmpbtn'));
+$('cmpTtt').addEventListener('click', () => { closePops(); inviteMp('ttt'); });
+$('cmpC4').addEventListener('click', () => { closePops(); inviteMp('c4'); });
 
 // GIF search runs through the GIPHY API. GIPHY keys are meant to sit in client code; the only risk of a
 // public key is someone else using up its hourly limit. Search terms go to GIPHY unencrypted.
