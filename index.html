@@ -255,6 +255,26 @@ tbody tr.sel td { background: var(--select); }
 .c4-r { background: #e74c3c !important; border-color: #c0392b; }
 .c4-y { background: #f1c40f !important; border-color: #d4a017; }
 .c4-cell.win, .ttt-cell.win { box-shadow: 0 0 0 2px #2ecc71; }
+.cmpboard.drawing { justify-content: flex-start; align-items: stretch; padding: 6px 10px; gap: 4px; }
+.cmpboard.drawing .cmpstatus { text-align: center; }
+.cmpboard.drawing .cmpresult { justify-content: center; }
+.dr-wrap { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.dr-word { font: 600 16px/20px Consolas, monospace; letter-spacing: 3px; min-height: 20px; text-align: center; white-space: pre; }
+.dr-word small { font: 11px Segoe UI, sans-serif; letter-spacing: 0; color: var(--muted); margin-left: 6px; }
+.dr-stage { flex: 1; min-height: 120px; width: 100%; position: relative; display: flex; align-items: center; justify-content: center; }
+.dr-canvas { background: #fff; border: 1px solid var(--grid-line); border-radius: 4px; touch-action: none; display: block; }
+.dr-canvas.can { cursor: crosshair; }
+.dr-over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgba(255,255,255,.88); font-size: 13px; text-align: center; padding: 8px; }
+.dr-over b { font-size: 18px; }
+.dr-choices { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.dr-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; justify-content: center; width: 100%; }
+.dr-color { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #9aa5b5; cursor: pointer; padding: 0; }
+.dr-color.on { box-shadow: 0 0 0 2px var(--check); }
+.dr-row .vbtn.on { background: #d6e4f7; border-color: var(--check); }
+.dr-row input { flex: 1; min-width: 120px; }
+.dr-log { font-size: 11px; color: var(--muted); min-height: 14px; width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dr-log .ok { color: #27ae60; font-weight: 600; }
+.dr-log .near { color: #e67e22; font-weight: 600; }
 .cmpinvite { background: #eef2f8; border: 1px solid #cdd8e8; border-radius: 8px; padding: 8px 12px; margin: 4px 0; display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
 .cmpinvite button { padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; border: 1px solid var(--grid-line); background: var(--paper); }
 .cmpinvite .mpaccept { background: var(--check); color: #fff; border-color: var(--check); }
@@ -461,7 +481,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
-            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button></div>
+            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Montagsmaler</button></div>
             <div class="creply" id="creply" hidden><span class="crname" id="crname"></span><span class="crtext" id="crtext"></span><button class="crclose" id="crclose" type="button" title="Abbrechen">&times;</button></div>
             <form class="cform" id="cform">
               <button class="vbtn ctool" id="cemojiBtn" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">&#9786;</button>
@@ -1461,7 +1481,7 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt'};
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Montagsmaler'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -1980,8 +2000,9 @@ function dropC4(board, col) {
 }
 function mpRunning() { return !!mpGame && !mpGame.over; }
 function startMp(gid, game, opponent, opName, myMark) {
-  const board = game === 'ttt' ? Array(9).fill(0) : Array.from({length: 6}, () => Array(7).fill(0));
+  const board = game === 'ttt' ? Array(9).fill(0) : game === 'c4' ? Array.from({length: 6}, () => Array(7).fill(0)) : null;
   mpGame = {gid, game, opponent, opName, board, myMark, turn: 1, moves: 0, over: false, winner: 0, winCells: null};
+  if (game === 'draw') drNewRound(mpGame, 1);
   mpInvites = mpInvites.filter(i => i.from !== opponent && !i.mine);
   conv = opponent;
   renderChat();
@@ -1998,6 +2019,8 @@ function syncMpView() {
 }
 function renderMpBoard() {
   if (!mpGame) return;
+  $('cmpboard').classList.toggle('drawing', mpGame.game === 'draw');
+  if (mpGame.game === 'draw') { renderDraw(); return; }
   const g = mpGame, myTurn = g.turn === g.myMark;
   const opLabel = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
   if (g.over) {
@@ -2016,6 +2039,7 @@ function renderMpBoard() {
 function renderTttBoard() {
   const g = mpGame, cls = ['', ' x', ' o'];
   $('cmpgrid').className = 'ttt-grid';
+  $('cmpgrid').dataset.gid = '';
   $('cmpgrid').replaceChildren(...g.board.map((v, i) => {
     const win = g.winCells && g.winCells.includes(i);
     return el('div', {class: 'ttt-cell' + cls[v] + (win ? ' win' : ''), text: MP_MARKS_TTT[v], onclick: () => playMove({pos: i})});
@@ -2024,6 +2048,7 @@ function renderTttBoard() {
 function renderC4Board() {
   const g = mpGame;
   $('cmpgrid').className = 'c4-grid';
+  $('cmpgrid').dataset.gid = '';
   const cells = [];
   for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
     const v = g.board[r][c];
@@ -2059,6 +2084,7 @@ function playMove(m) {
 function finishMp() {
   const g = mpGame;
   if (!g) return;
+  if (g.game === 'draw') { clearTimeout(g.timer); addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: 'Montagsmaler beendet.', ts: Date.now()}); return; }
   if (g.winner === g.myMark) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
   const gameName = GAME_NAMES[g.game];
   const resultText = g.winner === 0 ? gameName + ': Unentschieden!' : g.winner === g.myMark ? gameName + ': Du hast gewonnen!' : gameName + ': ' + g.opName + ' hat gewonnen!';
@@ -2102,7 +2128,7 @@ function resignMp() {
   if (!g || g.over) return;
   g.over = true;
   g.winner = 3 - g.myMark;
-  sendReliable(g.opponent, {type: 'resign', gid: g.gid, n: g.moves + 1});
+  sendReliable(g.opponent, {type: 'resign', gid: g.gid, n: g.game === 'draw' ? 1e9 : g.moves + 1});
   finishMp();
   renderMpBoard();
 }
@@ -2115,7 +2141,7 @@ function bumpUnread(id) {
 function handleMp(from, dm) {
   const g = mpGame, gid = String(dm.gid || '');
   if (!gid) return;
-  if (['accept', 'move', 'resign'].includes(dm.type) && Number.isInteger(dm.n)) sendMpMsg(from, {type: 'ack', gid, n: dm.n}).catch(() => {});
+  if (['accept', 'move', 'resign', 'dstate'].includes(dm.type) && Number.isInteger(dm.n)) sendMpMsg(from, {type: 'ack', gid, n: dm.n}).catch(() => {});
   if (dm.type === 'invite') {
     if (!cleanName(dm.name) || !GAME_NAMES[dm.game] || mpInvites.some(i => i.gid === gid)) return;
     mpInvites.push({gid, game: dm.game, from, name: cleanName(dm.name), ts: Date.now()});
@@ -2138,8 +2164,10 @@ function handleMp(from, dm) {
     if (!mpInvites.some(i => i.gid === gid && i.mine && i.from === from)) return;
     mpInvites = mpInvites.filter(i => i.gid !== gid);
     addMsg(from, {id: 'dec-' + gid, from: 'system', name: '', text: nameOf(from) + ' hat die Einladung abgelehnt.', ts: Date.now()});
+  } else if (DRAW_TYPES.has(dm.type)) {
+    if (g && g.gid === gid && g.opponent === from && g.game === 'draw' && !g.over) handleDraw(g, dm);
   } else if (dm.type === 'move') {
-    if (!g || g.gid !== gid || g.opponent !== from || g.over || dm.n !== g.moves + 1 || g.turn === g.myMark) return;
+    if (!g || g.game === 'draw' || g.gid !== gid || g.opponent !== from || g.over || dm.n !== g.moves + 1 || g.turn === g.myMark) return;
     if (!applyMove(g, 3 - g.myMark, dm)) return;
     bumpUnread(from);
     if (conv === from) renderMpBoard();
@@ -2151,6 +2179,335 @@ function handleMp(from, dm) {
     bumpUnread(from);
     if (conv === from) renderMpBoard();
   }
+}
+
+/* Montagsmaler */
+const DR_W = 800, DR_H = 500, DR_MAXPTS = 16000;
+const DR_COLORS = ['#222222', '#7f8c8d', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#8e5a2b', '#ff8fc8'];
+const DR_SIZES = [3, 8, 18];
+const DRAW_TYPES = new Set(['dstate', 'dpts', 'dsync', 'dsyncreq', 'dclear', 'dguess']);
+const DR_WORDS = ('Haus Baum Auto Katze Hund Sonne Mond Stern Blume Fisch Vogel Pferd Kuh Schwein Maus Elefant Giraffe Schlange ' +
+  'Schildkröte Pinguin Hase Bär Löwe Affe Spinne Biene Schmetterling Schnecke Krokodil Hai Wal Eule Ente Frosch Igel ' +
+  'Apfel Banane Birne Erdbeere Kirsche Ananas Zitrone Karotte Pilz Brot Pizza Burger Pommes Eis Kuchen Torte Brezel Wurst Ei Käse ' +
+  'Kaffee Tasse Flasche Glas Gabel Messer Löffel Teller Topf Pfanne Kühlschrank Herd Toaster ' +
+  'Tisch Stuhl Bett Sofa Lampe Uhr Fenster Tür Treppe Schlüssel Schloss Spiegel Badewanne Dusche Toilette Zahnbürste ' +
+  'Fernseher Computer Laptop Handy Tastatur Kopfhörer Kamera Drucker Batterie Glühbirne Steckdose ' +
+  'Fahrrad Motorrad Bus Zug Flugzeug Schiff Boot Rakete Hubschrauber Traktor Lkw Gabelstapler Ampel Brücke Tunnel Straße Tankstelle ' +
+  'Paket Karton Palette Container Lager Regal Leiter Hammer Schraube Säge Zange Bohrmaschine Schubkarre ' +
+  'Berg Vulkan Insel Strand Wüste Wald Fluss See Wasserfall Regenbogen Wolke Blitz Regen Schnee Schneemann Tornado ' +
+  'Ball Fußball Tor Tennis Bowling Angel Zelt Lagerfeuer Rucksack Koffer Brille Hut Mütze Schal Handschuh Schuh Socke Hose Krone ' +
+  'Gitarre Klavier Trommel Trompete Geige Mikrofon Buch Brief Stift Schere Kleber Lineal Kalender Geschenk Ballon Kerze ' +
+  'Weihnachtsbaum Osterei Kürbis Gespenst Drache Einhorn Roboter Pirat Ritter König Zauberer Hexe Meerjungfrau Alien Ufo Mumie ' +
+  'Burg Leuchtturm Windmühle Kirche Pyramide Iglu Zaun Brunnen Anker Kompass Schatzkiste Fallschirm Seil Kette Herz Diamant Ring ' +
+  'Arzt Polizist Feuerwehr Koch Bauer Astronaut Taucher Clown Baby Oma Skelett Zahn Auge Nase Ohr Hand Fuß Gehirn ' +
+  'Sanduhr Wecker Thermometer Regenschirm Waschmaschine Staubsauger Besen Eimer Mülleimer Briefkasten Postbote Zeitung Ticket Geld ' +
+  'Schaukel Rutsche Karussell Achterbahn Trampolin Skateboard Schlitten Ski Kran Bagger Feuerlöscher Satellit Planet').split(' ');
+
+function drAmDrawer(g) { return (g.r % 2 === 1 ? 1 : 2) === g.myMark; }
+function drNorm(t) {
+  return t.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]/g, '');
+}
+function drDist(a, b) {
+  const d = Array.from({length: b.length + 1}, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = d[0];
+    d[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const t = d[j];
+      d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = t;
+    }
+  }
+  return d[b.length];
+}
+function drPick3() {
+  const out = new Set();
+  while (out.size < 3) out.add(DR_WORDS[Math.floor(Math.random() * DR_WORDS.length)]);
+  return [...out];
+}
+function drNewRound(g, r) {
+  clearTimeout(g.timer);
+  Object.assign(g, {r, word: null, done: false, by: null, strokes: [], log: [], hints: [], near: false, syncAt: 0, timer: 0, focused: false});
+  g.choices = drAmDrawer(g) ? drPick3() : null;
+}
+// Each side sends its whole round state, so a newer state can always replace a lost older one.
+function drSendState(g) {
+  sendReliable(g.opponent, {type: 'dstate', gid: g.gid, n: g.r * 10 + (g.word ? 1 : 0) + (g.done ? 2 : 0), r: g.r, word: g.word, done: g.done, by: g.by});
+}
+function drSend(g, p) { if (mq) sendMpMsg(g.opponent, {gid: g.gid, r: g.r, ...p}).catch(() => {}); }
+function drReveal(g, by) {
+  g.done = true;
+  g.by = by;
+  clearTimeout(g.timer);
+  g.timer = setTimeout(() => {
+    if (mpGame !== g || g.over || !g.done) return;
+    drNewRound(g, g.r + 1);
+    if (conv === g.opponent) renderMpBoard();
+  }, 4000);
+}
+function drChoose(w) {
+  const g = mpGame;
+  if (!g || g.over || !drAmDrawer(g) || g.word || !g.choices || !g.choices.includes(w)) return;
+  g.word = w;
+  g.choices = null;
+  g.strokes = [];
+  drSendState(g);
+  renderDraw();
+}
+function drGiveUp() {
+  const g = mpGame;
+  if (!g || g.over || !g.word || g.done) return;
+  drReveal(g, 'skip');
+  drSendState(g);
+  renderDraw();
+}
+function drGuess() {
+  const g = mpGame, inp = $('drin');
+  const text = inp.value.trim().slice(0, 40);
+  inp.value = '';
+  if (!g || g.over || !text || !g.word || g.done || drAmDrawer(g)) return;
+  const a = drNorm(text), b = drNorm(g.word), ok = a === b;
+  const near = !ok && b.length > 3 && drDist(a, b) <= (b.length >= 8 ? 2 : 1);
+  g.log.push({me: true, text, ok, near});
+  drSend(g, {type: 'dguess', text, ok, near});
+  if (ok) { drReveal(g, 'guess'); drSendState(g); }
+  renderDraw();
+}
+function drHint() {
+  const g = mpGame;
+  if (!g || !g.word || g.done) return;
+  const open = [...g.word].map((ch, i) => i).filter(i => /[a-zäöüß]/i.test(g.word[i]) && !g.hints.includes(i));
+  if (open.length <= 1) return;
+  g.hints.push(open[Math.floor(Math.random() * open.length)]);
+  renderDraw();
+}
+function drClear() {
+  const g = mpGame;
+  if (!g || !drAmDrawer(g) || !g.word || g.done) return;
+  g.strokes = [];
+  drRedraw();
+  drSend(g, {type: 'dclear'});
+  g.syncAt = Date.now() + 1500;
+}
+function drStrokes(list) {
+  if (!Array.isArray(list)) return null;
+  const out = [];
+  let total = 0;
+  for (const st of list.slice(0, 2000)) {
+    const s = drStroke(st && st.c, st && st.w, st && st.p);
+    if (!s) return null;
+    total += s.p.length;
+    if (total > DR_MAXPTS) break;
+    out.push(s);
+  }
+  return out;
+}
+function drStroke(c, w, p) {
+  if (typeof c !== 'string' || !/^#[0-9a-f]{6}$/i.test(c) || !Number.isFinite(w) || w < 1 || w > 40 || !Array.isArray(p) || p.length % 2) return null;
+  return {c, w, p: p.map((v, i) => Math.max(0, Math.min(i % 2 ? DR_H : DR_W, Math.round(+v) || 0)))};
+}
+function drReqSync(g) {
+  if (Date.now() - (g.reqAt || 0) < 1000) return;
+  g.reqAt = Date.now();
+  drSend(g, {type: 'dsyncreq'});
+}
+function handleDraw(g, dm) {
+  if (dm.type === 'dstate') {
+    const r = dm.r, word = typeof dm.word === 'string' && dm.word.trim() ? dm.word.slice(0, 40) : null;
+    if (!Number.isInteger(r) || r < g.r || r > g.r + 50) return;
+    if (r > g.r) drNewRound(g, r);
+    if (word && !g.word) { g.word = word; g.choices = null; if (!drAmDrawer(g)) drReqSync(g); }
+    if (dm.done && !g.done && g.word) drReveal(g, dm.by === 'guess' ? 'guess' : 'skip');
+    if (!drAmDrawer(g) || dm.done) bumpUnread(g.opponent);
+    if (conv === g.opponent) renderMpBoard();
+    return;
+  }
+  if (dm.r !== g.r || !g.word || g.done) return;
+  const drawer = drAmDrawer(g);
+  if (dm.type === 'dsyncreq') {
+    if (drawer) g.syncAt = Date.now();
+  } else if (dm.type === 'dguess') {
+    if (drawer && typeof dm.text === 'string') {
+      g.log.push({me: false, text: dm.text.slice(0, 40), ok: !!dm.ok, near: !!dm.near});
+      if (conv === g.opponent) renderDraw();
+    }
+  } else if (drawer) {
+    return;
+  } else if (dm.type === 'dclear') {
+    g.strokes = [];
+    drRedraw();
+  } else if (dm.type === 'dsync') {
+    const list = drStrokes(dm.strokes);
+    if (list) { g.strokes = list; drRedraw(); }
+  } else if (dm.type === 'dpts') {
+    const s = dm.s, i = dm.i, st = drStroke(dm.c, dm.w, dm.p);
+    if (!Number.isInteger(s) || !Number.isInteger(i) || s < 0 || i < 0 || !st) return;
+    if (s > g.strokes.length || (s === g.strokes.length && i !== 0)) { drReqSync(g); return; }
+    if (s === g.strokes.length) g.strokes.push({c: st.c, w: st.w, p: []});
+    const cur = g.strokes[s];
+    if (i > cur.p.length) { drReqSync(g); return; }
+    cur.p.length = i;
+    cur.p.push(...st.p);
+    drRedraw();
+  }
+}
+setInterval(() => {
+  const g = mpGame;
+  if (!g || g.game !== 'draw' || g.over || !g.word || g.done || !drAmDrawer(g) || !mq) return;
+  g.strokes.forEach((st, s) => {
+    const from = st.sent || 0;
+    if (st.p.length <= from) return;
+    drSend(g, {type: 'dpts', s, c: st.c, w: st.w, i: from, p: st.p.slice(from)});
+    st.sent = st.p.length;
+  });
+  if (g.syncAt && Date.now() >= g.syncAt) {
+    g.syncAt = 0;
+    drSend(g, {type: 'dsync', strokes: g.strokes.map(({c, w, p}) => ({c, w, p}))});
+  }
+}, 90);
+
+let drPen = {c: DR_COLORS[0], w: DR_SIZES[1]}, drCur = null;
+function drCanvas() { return $('drcanvas'); }
+function drDrawStroke(ctx, st) {
+  const p = st.p;
+  if (p.length < 2) return;
+  ctx.strokeStyle = st.c;
+  ctx.lineWidth = st.w;
+  ctx.beginPath();
+  ctx.moveTo(p[0], p[1]);
+  if (p.length === 2) ctx.lineTo(p[0] + 0.1, p[1]);
+  for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
+  ctx.stroke();
+}
+function drRedraw() {
+  const cv = drCanvas(), g = mpGame;
+  if (!cv || !g || g.game !== 'draw') return;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, DR_W, DR_H);
+  ctx.lineCap = ctx.lineJoin = 'round';
+  for (const st of g.strokes) drDrawStroke(ctx, st);
+}
+function drFit() {
+  const st = $('drstage'), cv = drCanvas();
+  if (!st || !cv) return;
+  const w = Math.max(80, Math.min(st.clientWidth, st.clientHeight * DR_W / DR_H));
+  cv.style.width = w + 'px';
+  cv.style.height = w * DR_H / DR_W + 'px';
+}
+const drResize = new ResizeObserver(drFit);
+function drPos(e) {
+  const r = drCanvas().getBoundingClientRect();
+  return [Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * DR_W),
+          Math.round(Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)) * DR_H)];
+}
+function drCanPaint() { const g = mpGame; return g && g.game === 'draw' && !g.over && g.word && !g.done && drAmDrawer(g); }
+function drPoints(g) { return g.strokes.reduce((n, st) => n + st.p.length, 0); }
+
+function buildDraw(g) {
+  const grid = $('cmpgrid');
+  grid.className = 'dr-wrap';
+  grid.dataset.gid = g.gid;
+  const cv = el('canvas', {class: 'dr-canvas', id: 'drcanvas', width: DR_W, height: DR_H});
+  cv.addEventListener('pointerdown', e => {
+    if (!drCanPaint() || drPoints(mpGame) > DR_MAXPTS) return;
+    e.preventDefault();
+    cv.setPointerCapture(e.pointerId);
+    drCur = {c: drPen.c, w: drPen.w, p: drPos(e)};
+    mpGame.strokes.push(drCur);
+    drRedraw();
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!drCur || !drCanPaint()) return;
+    const [x, y] = drPos(e), p = drCur.p;
+    if (Math.abs(x - p[p.length - 2]) + Math.abs(y - p[p.length - 1]) < 3 || drPoints(mpGame) > DR_MAXPTS) return;
+    const ctx = cv.getContext('2d');
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.strokeStyle = drCur.c;
+    ctx.lineWidth = drCur.w;
+    ctx.beginPath();
+    ctx.moveTo(p[p.length - 2], p[p.length - 1]);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    p.push(x, y);
+  });
+  const end = () => { if (drCur && mpGame) mpGame.syncAt = Date.now() + 1500; drCur = null; };
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
+  const stage = el('div', {class: 'dr-stage', id: 'drstage'}, cv, el('div', {class: 'dr-over', id: 'drover', hidden: true}));
+  const colors = DR_COLORS.map(c => el('button', {class: 'dr-color', type: 'button', title: 'Farbe', 'data-c': c, style: 'background:' + c,
+    onclick: () => { drPen.c = c; renderDraw(); }}));
+  const sizes = DR_SIZES.map((w, i) => el('button', {class: 'vbtn', type: 'button', 'data-w': w, text: ['dünn', 'mittel', 'dick'][i],
+    onclick: () => { drPen.w = w; renderDraw(); }}));
+  const tools = el('div', {class: 'dr-row', id: 'drtools'}, ...colors, ...sizes,
+    el('button', {class: 'vbtn', type: 'button', id: 'drerase', text: 'Radierer', onclick: () => { drPen.c = '#ffffff'; drPen.w = 24; renderDraw(); }}),
+    el('button', {class: 'vbtn', type: 'button', text: 'Alles löschen', onclick: drClear}),
+    el('button', {class: 'vbtn', type: 'button', text: 'Überspringen', onclick: drGiveUp}));
+  const input = el('input', {class: 'vlinkin', id: 'drin', type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '40', placeholder: 'Dein Tipp…',
+    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); drGuess(); } }});
+  const guess = el('div', {class: 'dr-row', id: 'drguess'}, input,
+    el('button', {class: 'vbtn', type: 'button', text: 'Raten', onclick: drGuess}),
+    el('button', {class: 'vbtn', type: 'button', text: 'Tipp', title: 'Einen Buchstaben aufdecken', onclick: drHint}),
+    el('button', {class: 'vbtn', type: 'button', text: 'Auflösen', onclick: drGiveUp}));
+  grid.replaceChildren(el('div', {class: 'dr-word', id: 'drword'}), stage, tools, guess, el('div', {class: 'dr-log', id: 'drlog'}));
+  drResize.disconnect();
+  drResize.observe(stage);
+  requestAnimationFrame(drFit);
+}
+
+function renderDraw() {
+  const g = mpGame;
+  if (!g || g.game !== 'draw') return;
+  if ($('cmpgrid').dataset.gid !== g.gid || !drCanvas()) buildDraw(g);
+  const drawer = drAmDrawer(g), op = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
+  $('cmpstatus').textContent = g.over ? 'Montagsmaler beendet'
+    : g.done ? (g.by === 'guess' ? (drawer ? g.opName + ' hat es erraten!' : 'Richtig erraten!') : 'Aufgelöst') + ' Gleich geht\'s weiter…'
+    : !g.word ? (drawer ? 'Du bist dran: Wähle ein Wort zum Malen' : op + ' wählt ein Wort…')
+    : drawer ? 'Du malst – ' + op + ' rät' : op + ' malt – rate das Wort!';
+
+  const word = $('drword');
+  if (!g.word) word.replaceChildren();
+  else if (drawer || g.done || g.over) word.replaceChildren(g.word);
+  else word.replaceChildren([...g.word].map((ch, i) => /[a-zäöüß]/i.test(ch) && !g.hints.includes(i) ? '_' : ch).join(' '),
+    el('small', {text: '(' + [...g.word].filter(ch => /[a-zäöüß]/i.test(ch)).length + ')'}));
+
+  const over = $('drover');
+  if (g.over) {
+    over.hidden = false;
+    over.replaceChildren(el('div', {text: 'Spiel beendet'}));
+  } else if (!g.word && drawer && g.choices) {
+    over.hidden = false;
+    over.replaceChildren(el('div', {text: 'Was willst du malen?'}),
+      el('div', {class: 'dr-choices'}, ...g.choices.map(w => el('button', {class: 'vbtn', type: 'button', text: w, onclick: () => drChoose(w)}))));
+  } else if (!g.word) {
+    over.hidden = false;
+    over.replaceChildren(el('div', {text: g.opName + ' wählt ein Wort…'}));
+  } else if (g.done) {
+    over.hidden = false;
+    over.replaceChildren(el('div', {text: g.by === 'guess' ? (drawer ? g.opName + ' hat es erraten!' : 'Richtig!') : 'Das Wort war:'}), el('b', {text: g.word}));
+  } else {
+    over.hidden = true;
+  }
+
+  const painting = !g.over && !!g.word && !g.done;
+  $('drtools').hidden = !(drawer && painting);
+  $('drguess').hidden = drawer || !painting;
+  drCanvas().classList.toggle('can', drawer && painting);
+  if (!drawer && painting && !g.focused && conv === g.opponent && chatVisible()) { g.focused = true; $('drin').focus(); }
+  $('drtools').querySelectorAll('.dr-color').forEach(b => b.classList.toggle('on', b.dataset.c === drPen.c));
+  $('drtools').querySelectorAll('[data-w]').forEach(b => b.classList.toggle('on', +b.dataset.w === drPen.w && drPen.c !== '#ffffff'));
+  $('drerase').classList.toggle('on', drPen.c === '#ffffff');
+
+  const last = g.log.slice(-6);
+  $('drlog').replaceChildren(...last.flatMap((l, i) => [i ? ' · ' : '',
+    el('span', {class: l.ok ? 'ok' : l.near ? 'near' : '', text: (l.me ? '' : g.opName + ': ') + l.text + (l.near ? ' (knapp!)' : '')})]));
+  drRedraw();
+
+  const res = $('cmpresult');
+  res.hidden = false;
+  res.replaceChildren(g.over
+    ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
+    : el('button', {class: 'vbtn', text: 'Beenden', onclick: resignMp}));
 }
 
 function nameOf(id) {
@@ -2388,6 +2745,7 @@ $('cemojiBtn').addEventListener('click', () => togglePop('cemojiBtn'));
 $('cmpbtn').addEventListener('click', () => togglePop('cmpbtn'));
 $('cmpTtt').addEventListener('click', () => { closePops(); inviteMp('ttt'); });
 $('cmpC4').addEventListener('click', () => { closePops(); inviteMp('c4'); });
+$('cmpDraw').addEventListener('click', () => { closePops(); inviteMp('draw'); });
 
 // GIF search runs through the GIPHY API. GIPHY keys are meant to sit in client code; the only risk of a
 // public key is someone else using up its hourly limit. Search terms go to GIPHY unencrypted.
