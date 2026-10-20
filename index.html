@@ -205,6 +205,12 @@ tbody tr.sel td { background: var(--select); }
 .cmsg.gif .ctime { padding-right: 4px; }
 .cmsg.big { border-color: transparent; background: none; font-size: 30px; line-height: 1.15; }
 .cmsg.big .ctime { font-size: 10px; }
+.cmsg.deleted { color: var(--muted); font-style: italic; }
+.cmsg.deleted.me { background: var(--paper); border-color: var(--grid-line); }
+.cdel { display: none; margin-right: 8px; padding: 0; border: 0; background: none; color: var(--flag); font: inherit; font-style: normal; cursor: pointer; }
+.cmsg:hover .cdel, .cdel:focus-visible, .cdel[data-armed] { display: inline; }
+.cdel[data-armed] { font-weight: 600; }
+@media (hover: none) { .cdel { display: inline; } }
 .cin:disabled { background: var(--desk); }
 .cnameform { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: var(--paper); }
 .cnameform label { font-weight: 600; }
@@ -1377,7 +1383,7 @@ const BROKERS = [
   {url: 'wss://broker.emqx.io:8084/mqtt'}
 ];
 const ROOT = 'dv-2563318804-chat/';
-const ALL = 'all', MAXLEN = 500, STALE = 6 * 60000;
+const ALL = 'all', MAXLEN = 500, STALE = 6 * 60000, DELETE_WINDOW = 5 * 60000;
 const chatEl = $('chat'), cpeople = $('cpeople'), cmsgs = $('cmsgs'), cin = $('cin'), cstat = $('cstat');
 const ctitle = $('ctitle'), cnameform = $('cnameform'), cnamein = $('cnamein'), croomin = $('croomin'), cerr = $('cerr');
 const mailCount = $('mailCount');
@@ -1627,11 +1633,13 @@ async function incoming(t, payload) {
     if (body.from === conv) renderMsgs();
   } else if (sub === ALL) {
     const body = await verify(box);
+    if (body && room === r && body.kind === 'del') { applyDelete(ALL, body.from, body.id); return; }
     if (!body || room !== r || body.kind !== 'msg' || typeof body.text !== 'string' || !body.text.trim()) return;
     addMsg(ALL, {id: String(body.id || '').slice(0, 40), from: body.from, name: cleanName(body.name) || 'Unbekannt', text: body.text.slice(0, MAXLEN), ts: Date.now()});
   } else if (sub === 'dm/' + me.id) {
     if (!validId(box.from) || box.from === me.id) return;
     const m = await unseal(await dmKey(box.from), box.box);
+    if (room === r && m.to === me.id && m.kind === 'del') { applyDelete(box.from, box.from, m.id); return; }
     if (room !== r || m.to !== me.id || typeof m.text !== 'string' || !m.text.trim()) return;
     addMsg(box.from, {id: String(m.id || '').slice(0, 40), from: box.from, name: cleanName(m.name) || nameOf(box.from), text: m.text.slice(0, MAXLEN), ts: Date.now()});
   }
@@ -1654,6 +1662,50 @@ function addMsg(c, m) {
   saveChat();
   renderPeople();
   if (c === conv) renderMsgs();
+}
+
+// Receivers enforce the time limit too (against their own receive time, plus a minute for delays),
+// so a modified client can't take back old messages or anyone else's.
+function applyDelete(c, from, id) {
+  const m = id && (log[c] || []).find(x => x.id === id && x.from === from);
+  if (!m || m.deleted || Date.now() - m.ts > DELETE_WINDOW + 60000) return;
+  if (unread[c] && --unread[c] <= 0) delete unread[c];
+  markDeleted(c, m);
+}
+
+function markDeleted(c, m) {
+  m.deleted = true;
+  m.text = '';
+  saveChat();
+  renderPeople();
+  if (c === conv) renderMsgs();
+}
+
+async function deleteMsg(c, m) {
+  if (m.from !== me.id || m.deleted || Date.now() - m.ts > DELETE_WINDOW || !mq) return;
+  markDeleted(c, m);
+  try {
+    if (c === ALL) await publish(ALL, await signed({kind: 'del', id: m.id}));
+    else await publish('dm/' + c, {from: me.id, box: await seal(await dmKey(c), {kind: 'del', id: m.id, to: c})});
+  } catch (e) {}
+}
+
+function deleteButton(c, m) {
+  if (m.from !== me.id || m.deleted || !mq || Date.now() - m.ts >= DELETE_WINDOW) return null;
+  const b = el('button', {class: 'cdel', type: 'button', text: 'Löschen', title: 'Für alle löschen', 'data-exp': m.ts + DELETE_WINDOW});
+  let disarm = 0;
+  b.addEventListener('click', () => {
+    if (Date.now() >= m.ts + DELETE_WINDOW) { b.remove(); return; }
+    if (!b.dataset.armed) {
+      b.dataset.armed = '1';
+      b.textContent = 'Wirklich löschen?';
+      disarm = setTimeout(() => { delete b.dataset.armed; b.textContent = 'Löschen'; }, 4000);
+      return;
+    }
+    clearTimeout(disarm);
+    deleteMsg(c, m);
+  });
+  return b;
 }
 
 function nameOf(id) {
@@ -1702,12 +1754,15 @@ function fmtTime(ts) {
 function renderMsgs() {
   ctitle.textContent = nameOf(conv) + (conv !== ALL && !people.has(conv) ? ' (offline)' : '');
   const list = log[conv] || [];
+  const c = conv;
   cmsgs.replaceChildren(...(list.length ? list.map(m => {
-      const gif = gifUrl(m.text), kind = gif ? ' gif' : BIG_EMOJI.test(m.text) ? ' big' : '';
-      return el('div', {class: 'cmsg' + (m.from === me.id ? ' me' : '') + kind},
-        conv === ALL && m.from !== me.id ? el('div', {class: 'cfrom', text: m.name}) : null,
-        gif ? gifImg(m.id + gif, gif, m.text) : el('div', {text: m.text}),
-        el('div', {class: 'ctime', text: fmtTime(m.ts)}));
+      const mine = m.from === me.id, gif = !m.deleted && gifUrl(m.text);
+      const kind = m.deleted ? ' deleted' : gif ? ' gif' : BIG_EMOJI.test(m.text) ? ' big' : '';
+      return el('div', {class: 'cmsg' + (mine ? ' me' : '') + kind},
+        c === ALL && !mine ? el('div', {class: 'cfrom', text: m.name}) : null,
+        m.deleted ? el('div', {text: mine ? 'Du hast diese Nachricht gelöscht' : 'Diese Nachricht wurde gelöscht'})
+          : gif ? gifImg(m.id + gif, gif, m.text) : el('div', {text: m.text}),
+        el('div', {class: 'ctime'}, deleteButton(c, m), fmtTime(m.ts)));
     })
     : [el('div', {class: 'csys', text: 'Noch keine Nachrichten. ' +
         (conv === ALL ? 'Alles hier ist Ende-zu-Ende-verschlüsselt.' : 'Diesen Chat könnt nur ihr zwei lesen.')})]));
@@ -1958,6 +2013,7 @@ document.addEventListener('visibilitychange', () => { if (chatVisible() && unrea
 setInterval(() => {
   let changed = false;
   for (const [id, p] of people) if (Date.now() - p.seen > STALE) { people.delete(id); changed = true; }
+  cmsgs.querySelectorAll('.cdel').forEach(b => { if (Date.now() >= +b.dataset.exp) b.remove(); });
   if (changed) renderChat();
 }, 30000);
 window.addEventListener('pagehide', disconnect);
