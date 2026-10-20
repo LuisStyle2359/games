@@ -1462,7 +1462,7 @@ let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
 const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt'};
-let mpGame = null, mpInvites = [];
+let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
   const enc = new TextEncoder(), dec = new TextDecoder();
@@ -1567,6 +1567,9 @@ async function useRoom(saved) {
   log = store.get('chatLog-' + room.tag, {});
   unread = store.get('chatUnread-' + room.tag, {});
   lb = store.get('lb-' + room.tag, {});
+  mpGame = null;
+  mpInvites = [];
+  mpOutbox = [];
   conv = ALL;
 }
 
@@ -1704,13 +1707,13 @@ async function incoming(t, payload) {
     if (id === me.id || !validId(id)) return;
     const hsBox = await unseal(r.key, JSON.parse(payload));
     const body = await verify(hsBox).catch(() => null);
-    if (!body || body.from !== id || body.kind !== 'hs' || typeof body.score !== 'number') return;
-    const game = String(body.game);
-    if (!GAME_NAMES[game]) return;
+    if (!body || room !== r || body.from !== id || body.kind !== 'hs' || !Number.isFinite(body.score) || body.score <= 0 || body.score > 1e9) return;
+    const game = String(body.game), name = cleanName(body.name);
+    if (!GAME_NAMES[game] || !name) return;
     const g = lb[game] || (lb[game] = {});
     const prev = g[id];
-    if (!prev || body.score > prev.score) {
-      g[id] = {name: cleanName(body.name), score: body.score, ts: Date.now()};
+    if (!prev || body.score > prev.score || prev.name !== name) {
+      g[id] = {name, score: prev ? Math.max(prev.score, body.score) : body.score, ts: Date.now()};
       if (room) store.set('lb-' + room.tag, lb);
       if (!$('clb').hidden) renderLb();
     }
@@ -1758,7 +1761,7 @@ async function incoming(t, payload) {
   } else if (sub === 'dm/' + me.id) {
     if (!validId(box.from) || box.from === me.id) return;
     const dm = await unseal(await dmKey(box.from), box.box);
-    if (dm.kind === 'mp') { handleMp(box.from, dm); return; }
+    if (dm.kind === 'mp') { if (room === r && dm.to === me.id) handleMp(box.from, dm); return; }
     if (room === r && dm.to === me.id && dm.kind === 'del') { applyDelete(box.from, box.from, dm.id); return; }
     if (room !== r || dm.to !== me.id || typeof dm.text !== 'string' || !dm.text.trim()) return;
     const m = {id: String(dm.id || '').slice(0, 40), from: box.from, name: cleanName(dm.name) || nameOf(box.from), text: dm.text.slice(0, MAXLEN), ts: Date.now()};
@@ -1926,7 +1929,9 @@ function renderLb() {
   $('clbtabs').replaceChildren(...avail.map(g =>
     el('span', {class: 'clbtab' + (g === lbGame ? ' on' : ''), text: GAME_NAMES[g], onclick: () => { lbGame = g; renderLb(); }})
   ));
-  const entries = Object.values(lb[lbGame] || {}).sort((a, b) => b.score - a.score);
+  const entries = Object.entries(lb[lbGame] || {})
+    .map(([id, e]) => ({...e, name: id === me.id ? me.name + ' (du)' : e.name}))
+    .sort((a, b) => b.score - a.score);
   if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Scores für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
   const medals = ['gold', 'silver', 'bronze'];
   const mpGames = ['ttt', 'c4'];
@@ -1934,7 +1939,7 @@ function renderLb() {
     el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : 'Score'}))),
     el('tbody', {}, ...entries.map((e, i) => el('tr', {},
       el('td', {class: 'rank ' + (medals[i] || ''), text: String(i + 1)}),
-      el('td', {text: e.name + (e.name === me.name ? ' (du)' : '')}),
+      el('td', {text: e.name}),
       el('td', {text: lbGame === 'wordle' ? (7 - e.score) + '/6' : String(e.score)})
     )))
   ));
@@ -1973,55 +1978,47 @@ function dropC4(board, col) {
   for (let r = 5; r >= 0; r--) if (!board[r][col]) return r;
   return -1;
 }
+function mpRunning() { return !!mpGame && !mpGame.over; }
 function startMp(gid, game, opponent, opName, myMark) {
   const board = game === 'ttt' ? Array(9).fill(0) : Array.from({length: 6}, () => Array(7).fill(0));
-  mpGame = {gid, game, opponent, opName, board, myMark, turn: 1, over: false, winner: 0, winCells: null};
-  mpInvites = mpInvites.filter(i => i.from !== opponent);
-  showMpBoard();
+  mpGame = {gid, game, opponent, opName, board, myMark, turn: 1, moves: 0, over: false, winner: 0, winCells: null};
+  mpInvites = mpInvites.filter(i => i.from !== opponent && !i.mine);
+  conv = opponent;
+  renderChat();
 }
-function showMpBoard() {
-  if (!mpGame) return;
-  $('cmsgs').hidden = true;
-  $('ctyping').hidden = true;
-  $('cform').style.display = 'none';
-  const b = $('cmpboard');
-  b.hidden = false;
-  renderMpBoard();
-}
-function hideMpBoard() {
-  $('cmpboard').hidden = true;
-  $('cmsgs').hidden = false;
-  $('ctyping').hidden = false;
-  $('cform').style.display = '';
-  renderMsgs();
+// The board takes the place of the message list while the opponent's conversation is open.
+function syncMpView() {
+  if (mpGame && mpGame.over && conv !== mpGame.opponent) mpGame = null;
+  const on = !!mpGame && conv === mpGame.opponent;
+  cmsgs.hidden = on;
+  ctypingEl.hidden = on;
+  $('cform').style.display = on ? 'none' : '';
+  $('cmpboard').hidden = !on;
+  if (on) { closePops(); if (replyTo) clearReply(); renderMpBoard(); }
 }
 function renderMpBoard() {
   if (!mpGame) return;
   const g = mpGame, myTurn = g.turn === g.myMark;
-  const gameName = GAME_NAMES[g.game];
-  const opLabel = g.opName;
+  const opLabel = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
   if (g.over) {
-    $('cmpstatus').textContent = g.winner === 0 ? 'Unentschieden!' : g.winner === g.myMark ? 'Du hast gewonnen!' : opLabel + ' hat gewonnen!';
+    $('cmpstatus').textContent = g.winner === 0 ? 'Unentschieden!' : g.winner === g.myMark ? 'Du hast gewonnen!' : g.opName + ' hat gewonnen!';
   } else {
-    $('cmpstatus').textContent = gameName + ' vs ' + opLabel + (myTurn ? ' — Du bist dran' : ' — ' + opLabel + ' ist dran');
+    $('cmpstatus').textContent = GAME_NAMES[g.game] + ' vs ' + opLabel + (myTurn ? ' — Du bist dran' : ' — ' + g.opName + ' ist dran');
   }
   if (g.game === 'ttt') renderTttBoard();
   else renderC4Board();
   const res = $('cmpresult');
   res.hidden = false;
-  if (g.over) {
-    res.replaceChildren(el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; hideMpBoard(); }}));
-  } else {
-    res.replaceChildren(el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
-  }
+  res.replaceChildren(g.over
+    ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
+    : el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
 }
 function renderTttBoard() {
-  const g = mpGame, marks = MP_MARKS_TTT;
+  const g = mpGame, cls = ['', ' x', ' o'];
   $('cmpgrid').className = 'ttt-grid';
   $('cmpgrid').replaceChildren(...g.board.map((v, i) => {
     const win = g.winCells && g.winCells.includes(i);
-    const cls = ['x', 'o'];
-    return el('div', {class: 'ttt-cell' + (v ? ' ' + cls[v - 1] : '') + (win ? ' win' : ''), text: marks[v], onclick: () => playTtt(i)});
+    return el('div', {class: 'ttt-cell' + cls[v] + (win ? ' win' : ''), text: MP_MARKS_TTT[v], onclick: () => playMove({pos: i})});
   }));
 }
 function renderC4Board() {
@@ -2031,35 +2028,37 @@ function renderC4Board() {
   for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
     const v = g.board[r][c];
     const win = g.winCells && g.winCells.some(([wr, wc]) => wr === r && wc === c);
-    cells.push(el('div', {class: 'c4-cell' + (v ? ' ' + MP_MARKS_C4[v] : '') + (win ? ' win' : ''), onclick: () => playC4(c)}));
+    cells.push(el('div', {class: 'c4-cell' + (v ? ' ' + MP_MARKS_C4[v] : '') + (win ? ' win' : ''), onclick: () => playMove({col: c})}));
   }
   $('cmpgrid').replaceChildren(...cells);
 }
-function playTtt(i) {
-  const g = mpGame;
-  if (!g || g.over || g.turn !== g.myMark || g.board[i]) return;
-  g.board[i] = g.myMark;
-  g.turn = 3 - g.turn;
-  const result = checkTtt(g.board);
-  if (result) { g.over = true; g.winner = result.winner; g.winCells = result.cells; finishMp(); }
-  sendMpMove({pos: i});
-  renderMpBoard();
+function applyMove(g, mark, m) {
+  if (g.game === 'ttt') {
+    const i = m.pos;
+    if (!Number.isInteger(i) || i < 0 || i > 8 || g.board[i]) return false;
+    g.board[i] = mark;
+  } else {
+    const c = m.col;
+    if (!Number.isInteger(c) || c < 0 || c > 6) return false;
+    const r = dropC4(g.board, c);
+    if (r < 0) return false;
+    g.board[r][c] = mark;
+  }
+  g.moves++;
+  g.turn = 3 - mark;
+  const res = g.game === 'ttt' ? checkTtt(g.board) : checkC4(g.board);
+  if (res) { g.over = true; g.winner = res.winner; g.winCells = res.cells; finishMp(); }
+  return true;
 }
-function playC4(col) {
+function playMove(m) {
   const g = mpGame;
-  if (!g || g.over || g.turn !== g.myMark) return;
-  const row = dropC4(g.board, col);
-  if (row < 0) return;
-  g.board[row][col] = g.myMark;
-  g.turn = 3 - g.turn;
-  const result = checkC4(g.board);
-  if (result) { g.over = true; g.winner = result.winner; g.winCells = result.cells; finishMp(); }
-  sendMpMove({col});
+  if (!g || g.over || g.turn !== g.myMark || !mq || !applyMove(g, g.myMark, m)) return;
+  sendReliable(g.opponent, {type: 'move', gid: g.gid, n: g.moves, ...(g.game === 'ttt' ? {pos: m.pos} : {col: m.col})});
   renderMpBoard();
 }
 function finishMp() {
-  if (!mpGame) return;
   const g = mpGame;
+  if (!g) return;
   if (g.winner === g.myMark) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
   const gameName = GAME_NAMES[g.game];
   const resultText = g.winner === 0 ? gameName + ': Unentschieden!' : g.winner === g.myMark ? gameName + ': Du hast gewonnen!' : gameName + ': ' + g.opName + ' hat gewonnen!';
@@ -2068,21 +2067,29 @@ function finishMp() {
 async function sendMpMsg(to, payload) {
   await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {...payload, to, kind: 'mp'})});
 }
-function sendMpMove(data) {
-  if (!mpGame || !mq) return;
-  sendMpMsg(mpGame.opponent, {type: 'move', gid: mpGame.gid, ...data}).catch(() => {});
+// MQTT drops messages while a connection is down, so game messages are resent until acknowledged;
+// otherwise one lost move leaves both players waiting for each other forever.
+function sendReliable(to, p) {
+  mpOutbox = mpOutbox.filter(o => o.p.gid !== p.gid);
+  const o = {to, p, tries: 0};
+  mpOutbox.push(o);
+  sendMpMsg(to, p).catch(() => {});
 }
+setInterval(() => {
+  mpOutbox = mpOutbox.filter(o => ++o.tries <= 75);
+  if (mq) for (const o of mpOutbox) sendMpMsg(o.to, o.p).catch(() => {});
+}, 4000);
 function inviteMp(game) {
-  if (conv === ALL || !people.has(conv) || !mq) return;
+  if (conv === ALL || !people.has(conv) || !mq || mpRunning()) return;
+  closePops();
   const gid = me.id + Date.now().toString(36);
   sendMpMsg(conv, {type: 'invite', game, gid, name: me.name}).catch(() => {});
   addMsg(conv, {id: 'inv-' + gid, from: 'system', name: '', text: GAME_NAMES[game] + ': Einladung an ' + nameOf(conv) + ' gesendet…', ts: Date.now()});
   mpInvites.push({gid, game, from: conv, name: nameOf(conv), ts: Date.now(), mine: true});
 }
 function acceptMp(inv) {
-  sendMpMsg(inv.from, {type: 'accept', gid: inv.gid, game: inv.game, name: me.name}).catch(() => {});
-  mpInvites = mpInvites.filter(i => i.gid !== inv.gid);
-  conv = inv.from;
+  if (mpRunning() || !mq || !people.has(inv.from)) return;
+  sendReliable(inv.from, {type: 'accept', gid: inv.gid, n: 0, name: me.name});
   startMp(inv.gid, inv.game, inv.from, inv.name, 2);
 }
 function declineMp(inv) {
@@ -2091,56 +2098,58 @@ function declineMp(inv) {
   if (conv === inv.from) renderMsgs();
 }
 function resignMp() {
-  if (!mpGame || mpGame.over) return;
-  mpGame.over = true;
-  mpGame.winner = 3 - mpGame.myMark;
-  sendMpMsg(mpGame.opponent, {type: 'resign', gid: mpGame.gid}).catch(() => {});
+  const g = mpGame;
+  if (!g || g.over) return;
+  g.over = true;
+  g.winner = 3 - g.myMark;
+  sendReliable(g.opponent, {type: 'resign', gid: g.gid, n: g.moves + 1});
   finishMp();
   renderMpBoard();
 }
+function bumpUnread(id) {
+  if (chatVisible() && conv === id) return;
+  unread[id] = (unread[id] || 0) + 1;
+  saveChat();
+  renderPeople();
+}
 function handleMp(from, dm) {
+  const g = mpGame, gid = String(dm.gid || '');
+  if (!gid) return;
+  if (['accept', 'move', 'resign'].includes(dm.type) && Number.isInteger(dm.n)) sendMpMsg(from, {type: 'ack', gid, n: dm.n}).catch(() => {});
   if (dm.type === 'invite') {
-    if (!cleanName(dm.name) || !dm.gid || !GAME_NAMES[dm.game]) return;
-    mpInvites.push({gid: dm.gid, game: dm.game, from, name: cleanName(dm.name), ts: Date.now()});
+    if (!cleanName(dm.name) || !GAME_NAMES[dm.game] || mpInvites.some(i => i.gid === gid)) return;
+    mpInvites.push({gid, game: dm.game, from, name: cleanName(dm.name), ts: Date.now()});
+    bumpUnread(from);
     if (conv === from) renderMsgs();
-    if (!unread[from]) unread[from] = 0;
-    unread[from]++;
-    renderBadge();
-    renderPeople();
+  } else if (dm.type === 'ack') {
+    mpOutbox = mpOutbox.filter(o => !(o.to === from && o.p.gid === gid && o.p.n <= dm.n));
   } else if (dm.type === 'accept') {
-    const inv = mpInvites.find(i => i.gid === dm.gid && i.mine);
-    if (inv) {
-      mpInvites = mpInvites.filter(i => i.gid !== dm.gid);
-      conv = from;
-      startMp(dm.gid, inv.game, from, cleanName(dm.name) || nameOf(from), 1);
-    }
+    if (g && g.gid === gid) return;
+    const inv = mpInvites.find(i => i.gid === gid && i.mine && i.from === from);
+    if (!inv || mpRunning()) { sendMpMsg(from, {type: 'busy', gid}).catch(() => {}); return; }
+    startMp(gid, inv.game, from, cleanName(dm.name) || nameOf(from), 1);
+    bumpUnread(from);
+  } else if (dm.type === 'busy') {
+    if (!g || g.gid !== gid || g.opponent !== from || g.moves) return;
+    mpGame = null;
+    mpOutbox = mpOutbox.filter(o => o.p.gid !== gid);
+    addMsg(from, {id: 'busy-' + gid, from: 'system', name: '', text: nameOf(from) + ' spielt gerade schon – Spiel abgebrochen.', ts: Date.now()});
   } else if (dm.type === 'decline') {
-    mpInvites = mpInvites.filter(i => i.gid !== dm.gid);
-    addMsg(from, {id: 'dec-' + dm.gid, from: 'system', name: '', text: nameOf(from) + ' hat die Einladung abgelehnt.', ts: Date.now()});
+    if (!mpInvites.some(i => i.gid === gid && i.mine && i.from === from)) return;
+    mpInvites = mpInvites.filter(i => i.gid !== gid);
+    addMsg(from, {id: 'dec-' + gid, from: 'system', name: '', text: nameOf(from) + ' hat die Einladung abgelehnt.', ts: Date.now()});
   } else if (dm.type === 'move') {
-    if (!mpGame || mpGame.gid !== dm.gid || mpGame.over) return;
-    const g = mpGame, opMark = 3 - g.myMark;
-    if (g.game === 'ttt' && typeof dm.pos === 'number' && dm.pos >= 0 && dm.pos < 9 && !g.board[dm.pos]) {
-      g.board[dm.pos] = opMark;
-      g.turn = 3 - g.turn;
-      const result = checkTtt(g.board);
-      if (result) { g.over = true; g.winner = result.winner; g.winCells = result.cells; finishMp(); }
-    } else if (g.game === 'c4' && typeof dm.col === 'number' && dm.col >= 0 && dm.col < 7) {
-      const row = dropC4(g.board, dm.col);
-      if (row >= 0) {
-        g.board[row][dm.col] = opMark;
-        g.turn = 3 - g.turn;
-        const result = checkC4(g.board);
-        if (result) { g.over = true; g.winner = result.winner; g.winCells = result.cells; finishMp(); }
-      }
-    } else if (g.game === 'c4') return;
-    renderMpBoard();
+    if (!g || g.gid !== gid || g.opponent !== from || g.over || dm.n !== g.moves + 1 || g.turn === g.myMark) return;
+    if (!applyMove(g, 3 - g.myMark, dm)) return;
+    bumpUnread(from);
+    if (conv === from) renderMpBoard();
   } else if (dm.type === 'resign') {
-    if (!mpGame || mpGame.gid !== dm.gid) return;
-    mpGame.over = true;
-    mpGame.winner = mpGame.myMark;
+    if (!g || g.gid !== gid || g.opponent !== from || g.over) return;
+    g.over = true;
+    g.winner = g.myMark;
     finishMp();
-    renderMpBoard();
+    bumpUnread(from);
+    if (conv === from) renderMpBoard();
   }
 }
 
@@ -2194,6 +2203,7 @@ function renderMsgs() {
   const list = log[conv] || [];
   const c = conv;
   cmsgs.replaceChildren(...(list.length ? list.map(m => {
+      if (m.from === 'system') return el('div', {class: 'csys', text: m.text + ' · ' + fmtTime(m.ts)});
       const mine = m.from === me.id, gif = !m.deleted && gifUrl(m.text);
       const kind = m.deleted ? ' deleted' : gif ? ' gif' : BIG_EMOJI.test(m.text) ? ' big' : '';
       const quote = !m.deleted && m.re ? el('div', {class: 'cquote', onclick: () => {
@@ -2212,14 +2222,15 @@ function renderMsgs() {
     })
     : [el('div', {class: 'csys', text: 'Noch keine Nachrichten. ' +
         (conv === ALL ? 'Alles hier ist Ende-zu-Ende-verschlüsselt.' : 'Diesen Chat könnt nur ihr zwei lesen.')})]));
-  const invites = mpInvites.filter(i => i.from === c && !i.mine);
-  invites.forEach(inv => {
+  mpInvites = mpInvites.filter(i => Date.now() - i.ts < 600000);
+  if (people.has(c)) mpInvites.filter(i => i.from === c && !i.mine).forEach(inv => {
     cmsgs.appendChild(el('div', {class: 'cmpinvite'},
       el('span', {text: inv.name + ' möchte ' + GAME_NAMES[inv.game] + ' spielen'}),
-      el('button', {class: 'mpaccept', text: 'Annehmen', onclick: () => acceptMp(inv)}),
+      el('button', {class: 'mpaccept', text: 'Annehmen', disabled: mpRunning() || !mq, title: mpRunning() ? 'Erst das laufende Spiel beenden' : '', onclick: () => acceptMp(inv)}),
       el('button', {text: 'Ablehnen', onclick: () => declineMp(inv)})));
   });
   cmsgs.scrollTop = cmsgs.scrollHeight;
+  syncMpView();
   updateComposer();
   renderTyping();
   if (chatVisible() && c !== ALL) sendReadAck(c);
@@ -2230,7 +2241,7 @@ function updateComposer() {
   cin.disabled = !mq || offline;
   cin.placeholder = !mq ? 'Keine Verbindung' : offline ? nameOf(conv) + ' ist offline' : 'Nachricht schreiben';
   $('cemojiBtn').disabled = $('cgifBtn').disabled = cin.disabled;
-  $('cmpbtn').hidden = conv === ALL || !people.has(conv) || !mq || !!mpGame;
+  $('cmpbtn').hidden = conv === ALL || !people.has(conv) || !mq || mpRunning();
   if (cin.disabled) closePops();
 }
 
