@@ -212,6 +212,23 @@ tbody tr.sel td { background: var(--select); }
 .cdel[data-armed] { font-weight: 600; }
 @media (hover: none) { .cdel { display: inline; } }
 .cin:disabled { background: var(--desk); }
+.ctyping { flex: none; padding: 2px 12px; color: var(--muted); font-size: 11px; font-style: italic; min-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ccheck { display: inline-block; margin-left: 3px; font-size: 10px; letter-spacing: -1px; }
+.ccheck.sent { color: var(--muted); }
+.ccheck.read { color: var(--check); }
+.creply { display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 8px 4px 12px; background: #eef2f8; border-left: 3px solid var(--check); font-size: 11px; }
+.creply .crtext { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.creply .crname { color: var(--check); font-weight: 600; margin-right: 4px; }
+.creply .crclose { padding: 0 4px; border: 0; background: none; color: var(--muted); font-size: 14px; cursor: pointer; }
+.cmsg .cquote { padding: 3px 6px; margin-bottom: 3px; background: rgba(0,0,0,0.04); border-left: 2px solid var(--check); border-radius: 2px; font-size: 11px; cursor: pointer; }
+.cmsg.me .cquote { background: rgba(0,0,0,0.05); }
+.cquote .crname { color: var(--check); font-weight: 600; display: block; font-size: 10px; }
+.cquote .crtext { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.cmsg .creplyBtn { display: none; position: absolute; top: -1px; padding: 0 3px; border: 1px solid var(--grid-line); border-radius: 3px; background: var(--paper); color: var(--muted); font-size: 10px; cursor: pointer; line-height: 16px; }
+.cmsg:not(.me) .creplyBtn { right: -1px; }
+.cmsg.me .creplyBtn { left: -1px; }
+.cmsg:hover .creplyBtn { display: block; }
+.cmsg { position: relative; }
 .cnameform { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: var(--paper); }
 .cnameform label { font-weight: 600; }
 .cfields { display: grid; gap: 4px; width: min(100%, 280px); }
@@ -401,6 +418,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
             <div class="chead" id="ctitle"></div>
             <div class="cdiag" id="cdiag" hidden></div>
             <div class="cmsgs" id="cmsgs" aria-live="polite"></div>
+            <div class="ctyping" id="ctyping"></div>
             <div class="cpop" id="cemoji" hidden role="dialog" aria-label="Emoji"></div>
             <div class="cpop" id="cgif" hidden role="dialog" aria-label="GIF senden">
               <div class="crow"><input class="vlinkin" id="cgifin" type="text" autocomplete="off" spellcheck="false" aria-label="GIFs suchen"><button class="vbtn" id="cgifsend" type="button" hidden>Senden</button></div>
@@ -408,6 +426,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
+            <div class="creply" id="creply" hidden><span class="crname" id="crname"></span><span class="crtext" id="crtext"></span><button class="crclose" id="crclose" type="button" title="Abbrechen">&times;</button></div>
             <form class="cform" id="cform">
               <button class="vbtn ctool" id="cemojiBtn" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">&#9786;</button>
               <button class="vbtn ctool" id="cgifBtn" type="button" title="GIF senden" aria-label="GIF senden" aria-expanded="false">GIF</button>
@@ -1397,6 +1416,10 @@ if (!validId(me.id)) { me.id = (Math.random().toString(36).slice(2, 10) + Date.n
 try { localStorage.removeItem('chatLog'); localStorage.removeItem('chatUnread'); } catch (e) {}
 const people = new Map(), peers = new Map(), pins = store.get('chatPins', {});
 let log = {}, unread = {}, room = null, ident = null, conv = ALL, mq = null, brokerIdx = 0, retry = 0;
+const typing = new Map();
+let typingTimer = 0, lastTypingSent = 0;
+let replyTo = null;
+const readState = {};
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
   const enc = new TextEncoder(), dec = new TextDecoder();
@@ -1560,7 +1583,7 @@ function connect() {
     onopen() {
       retry = 0;
       diag.set(host, 'verbunden');
-      c.sub(['p/+', ALL, 'dm/' + me.id, 'hello'].map(t => base + t));
+      c.sub(['p/+', ALL, 'dm/' + me.id, 'hello', 'typing/+', 'read/+'].map(t => base + t));
       announce();
       // Ask everyone to re-announce, in case the broker does not keep retained presence messages.
       publish('hello', {hello: me.id}).catch(() => {});
@@ -1625,6 +1648,25 @@ async function incoming(t, payload) {
   }
   const box = await unseal(r.key, JSON.parse(payload));
   if (sub === 'hello') { if (box.hello !== me.id) announce(); return; }
+  if (sub.startsWith('typing/')) {
+    const id = sub.slice(7);
+    if (id === me.id || !validId(id)) return;
+    const body = await verify(box).catch(() => null);
+    if (!body || body.from !== id || body.kind !== 'typing') return;
+    const target = body.to || ALL;
+    if (target !== ALL && target !== me.id) return;
+    typing.set(id, {name: cleanName(body.name), ts: Date.now(), to: target});
+    renderTyping();
+    return;
+  }
+  if (sub.startsWith('read/')) {
+    const id = sub.slice(5);
+    if (id === me.id || !validId(id)) return;
+    const body = await verify(box).catch(() => null);
+    if (!body || body.from !== id || body.kind !== 'readack') return;
+    applyReadAck(body.from, body.c || ALL, body.until);
+    return;
+  }
   if (sub.startsWith('p/')) {
     const body = await verify(box);
     if (!body || room !== r || body.kind !== 'p' || body.from !== sub.slice(2) || !cleanName(body.name) || !(Date.now() - body.t < STALE)) return;
@@ -1635,13 +1677,17 @@ async function incoming(t, payload) {
     const body = await verify(box);
     if (body && room === r && body.kind === 'del') { applyDelete(ALL, body.from, body.id); return; }
     if (!body || room !== r || body.kind !== 'msg' || typeof body.text !== 'string' || !body.text.trim()) return;
-    addMsg(ALL, {id: String(body.id || '').slice(0, 40), from: body.from, name: cleanName(body.name) || 'Unbekannt', text: body.text.slice(0, MAXLEN), ts: Date.now()});
+    const m = {id: String(body.id || '').slice(0, 40), from: body.from, name: cleanName(body.name) || 'Unbekannt', text: body.text.slice(0, MAXLEN), ts: Date.now()};
+    if (body.re) m.re = {id: String(body.re.id || '').slice(0, 40), name: String(body.re.name || '').slice(0, 24), text: String(body.re.text || '').slice(0, 100)};
+    addMsg(ALL, m);
   } else if (sub === 'dm/' + me.id) {
     if (!validId(box.from) || box.from === me.id) return;
-    const m = await unseal(await dmKey(box.from), box.box);
-    if (room === r && m.to === me.id && m.kind === 'del') { applyDelete(box.from, box.from, m.id); return; }
-    if (room !== r || m.to !== me.id || typeof m.text !== 'string' || !m.text.trim()) return;
-    addMsg(box.from, {id: String(m.id || '').slice(0, 40), from: box.from, name: cleanName(m.name) || nameOf(box.from), text: m.text.slice(0, MAXLEN), ts: Date.now()});
+    const dm = await unseal(await dmKey(box.from), box.box);
+    if (room === r && dm.to === me.id && dm.kind === 'del') { applyDelete(box.from, box.from, dm.id); return; }
+    if (room !== r || dm.to !== me.id || typeof dm.text !== 'string' || !dm.text.trim()) return;
+    const m = {id: String(dm.id || '').slice(0, 40), from: box.from, name: cleanName(dm.name) || nameOf(box.from), text: dm.text.slice(0, MAXLEN), ts: Date.now()};
+    if (dm.re) m.re = {id: String(dm.re.id || '').slice(0, 40), name: String(dm.re.name || '').slice(0, 24), text: String(dm.re.text || '').slice(0, 100)};
+    addMsg(box.from, m);
   }
 }
 
@@ -1708,6 +1754,71 @@ function deleteButton(c, m) {
   return b;
 }
 
+/* Typing indicator */
+const ctypingEl = $('ctyping');
+function sendTyping() {
+  const now = Date.now();
+  if (now - lastTypingSent < 2500 || !mq || !room || cin.disabled) return;
+  lastTypingSent = now;
+  const to = conv;
+  signed({kind: 'typing', to: to === ALL ? undefined : to}).then(b => publish('typing/' + me.id, b)).catch(() => {});
+}
+function renderTyping() {
+  const now = Date.now();
+  const names = [];
+  for (const [id, t] of typing) {
+    if (now - t.ts > 4000) { typing.delete(id); continue; }
+    if (t.to === ALL && conv === ALL) names.push(t.name);
+    else if (t.to === me.id && conv === id) names.push(t.name);
+    else if (t.to === ALL && conv !== ALL) continue;
+  }
+  ctypingEl.textContent = names.length === 0 ? ''
+    : names.length === 1 ? names[0] + ' schreibt…'
+    : names.slice(0, 3).join(', ') + ' schreiben…';
+}
+setInterval(renderTyping, 2000);
+
+/* Read receipts */
+function sendReadAck(c) {
+  if (!mq || !room || c === ALL) return;
+  const list = log[c] || [];
+  const lastFromThem = [...list].reverse().find(m => m.from !== me.id && !m.deleted);
+  if (!lastFromThem) return;
+  const key = c + ':' + lastFromThem.ts;
+  if (readState[key]) return;
+  readState[key] = true;
+  signed({kind: 'readack', c, until: lastFromThem.ts}).then(b => publish('read/' + me.id, b)).catch(() => {});
+}
+
+function applyReadAck(from, c, until) {
+  const target = c === ALL ? ALL : (from === me.id ? c : from);
+  const list = log[target] || [];
+  let changed = false;
+  for (const m of list) {
+    if (m.from === me.id && m.ts <= until && !m.readBy) {
+      m.readBy = m.readBy || [];
+      if (!m.readBy.includes(from)) { m.readBy.push(from); changed = true; }
+    }
+  }
+  if (changed) { saveChat(); if (conv === target) renderMsgs(); }
+}
+
+/* Reply / Quote */
+const creplyEl = $('creply'), crname = $('crname'), crtext = $('crtext');
+function setReply(m) {
+  if (!m || m.deleted) { clearReply(); return; }
+  replyTo = {id: m.id, name: m.from === me.id ? me.name : (m.name || nameOf(m.from)), text: m.text};
+  crname.textContent = replyTo.name;
+  crtext.textContent = gifUrl(replyTo.text) ? 'GIF' : replyTo.text;
+  creplyEl.hidden = false;
+  cin.focus();
+}
+function clearReply() {
+  replyTo = null;
+  creplyEl.hidden = true;
+}
+$('crclose').addEventListener('click', clearReply);
+
 function nameOf(id) {
   if (id === ALL) return 'Alle';
   if (people.has(id)) return people.get(id).name;
@@ -1722,11 +1833,13 @@ function renderBadge() {
 
 function selectConv(id) {
   closePops();
+  clearReply();
   conv = id;
   delete unread[id];
   saveChat();
   renderChat();
   if (!cin.disabled) cin.focus();
+  if (chatVisible() && id !== ALL) sendReadAck(id);
 }
 
 function renderPeople() {
@@ -1758,16 +1871,26 @@ function renderMsgs() {
   cmsgs.replaceChildren(...(list.length ? list.map(m => {
       const mine = m.from === me.id, gif = !m.deleted && gifUrl(m.text);
       const kind = m.deleted ? ' deleted' : gif ? ' gif' : BIG_EMOJI.test(m.text) ? ' big' : '';
-      return el('div', {class: 'cmsg' + (mine ? ' me' : '') + kind},
+      const quote = !m.deleted && m.re ? el('div', {class: 'cquote', onclick: () => {
+        const t = cmsgs.querySelector('[data-mid="' + CSS.escape(m.re.id) + '"]');
+        if (t) { t.style.background = '#fff3cd'; setTimeout(() => t.style.background = '', 1200); t.scrollIntoView({block: 'center'}); }
+      }}, el('span', {class: 'crname', text: m.re.name}), el('span', {class: 'crtext', text: gifUrl(m.re.text) ? 'GIF' : m.re.text})) : null;
+      const checks = mine && !m.deleted && c !== ALL ? el('span', {class: 'ccheck ' + (m.readBy && m.readBy.length ? 'read' : 'sent'), text: m.readBy && m.readBy.length ? '✓✓' : '✓'}) : null;
+      const replyBtn = !m.deleted && mq ? el('button', {class: 'creplyBtn', type: 'button', text: '↩', title: 'Antworten', onclick: e => { e.stopPropagation(); setReply(m); }}) : null;
+      return el('div', {class: 'cmsg' + (mine ? ' me' : '') + kind, 'data-mid': m.id},
+        replyBtn,
+        quote,
         c === ALL && !mine ? el('div', {class: 'cfrom', text: m.name}) : null,
         m.deleted ? el('div', {text: mine ? 'Du hast diese Nachricht gelöscht' : 'Diese Nachricht wurde gelöscht'})
           : gif ? gifImg(m.id + gif, gif, m.text) : el('div', {text: m.text}),
-        el('div', {class: 'ctime'}, deleteButton(c, m), fmtTime(m.ts)));
+        el('div', {class: 'ctime'}, deleteButton(c, m), fmtTime(m.ts), checks));
     })
     : [el('div', {class: 'csys', text: 'Noch keine Nachrichten. ' +
         (conv === ALL ? 'Alles hier ist Ende-zu-Ende-verschlüsselt.' : 'Diesen Chat könnt nur ihr zwei lesen.')})]));
   cmsgs.scrollTop = cmsgs.scrollHeight;
   updateComposer();
+  renderTyping();
+  if (chatVisible() && c !== ALL) sendReadAck(c);
 }
 
 function updateComposer() {
@@ -1802,6 +1925,7 @@ function openChat() {
   saveChat();
   renderChat();
   (cnameform.hidden ? cin : cnamein.value ? croomin : cnamein).focus();
+  if (chatVisible() && conv !== ALL) sendReadAck(conv);
 }
 
 cnameform.addEventListener('submit', async e => {
@@ -1839,6 +1963,7 @@ $('crename').addEventListener('click', () => {
   cnamein.focus();
   cnamein.select();
 });
+cin.addEventListener('input', sendTyping);
 $('cform').addEventListener('submit', e => {
   e.preventDefault();
   const text = cin.value.trim();
@@ -1851,10 +1976,14 @@ $('cform').addEventListener('submit', e => {
 async function sendText(raw) {
   const text = raw.slice(0, MAXLEN), to = conv;
   const id = me.id + Date.now().toString(36);
-  addMsg(to, {id, from: me.id, name: me.name, text, ts: Date.now()});
+  const re = replyTo ? {id: replyTo.id, name: replyTo.name, text: String(replyTo.text).slice(0, 100)} : undefined;
+  const m = {id, from: me.id, name: me.name, text, ts: Date.now()};
+  if (re) m.re = re;
+  clearReply();
+  addMsg(to, m);
   try {
-    if (to === ALL) await publish(ALL, await signed({kind: 'msg', id, text}));
-    else await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {id, to, name: me.name, text})});
+    if (to === ALL) await publish(ALL, await signed({kind: 'msg', id, text, re}));
+    else await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {id, to, name: me.name, text, re})});
   } catch (err) {}
 }
 
@@ -2009,7 +2138,7 @@ cgifin.addEventListener('keydown', e => {
 });
 cgifsend.addEventListener('click', () => sendGif());
 $('ribbonMail').addEventListener('click', () => showPreview(chatRow));
-document.addEventListener('visibilitychange', () => { if (chatVisible() && unread[conv]) openChat(); });
+document.addEventListener('visibilitychange', () => { if (chatVisible()) { if (unread[conv]) openChat(); if (conv !== ALL) sendReadAck(conv); } });
 setInterval(() => {
   let changed = false;
   for (const [id, p] of people) if (Date.now() - p.seen > STALE) { people.delete(id); changed = true; }
