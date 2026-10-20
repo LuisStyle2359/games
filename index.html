@@ -1415,7 +1415,7 @@ if (!validId(me.id)) { me.id = (Math.random().toString(36).slice(2, 10) + Date.n
 // Chats from before end-to-end encryption were stored in plain text.
 try { localStorage.removeItem('chatLog'); localStorage.removeItem('chatUnread'); } catch (e) {}
 const people = new Map(), peers = new Map(), pins = store.get('chatPins', {});
-let log = {}, unread = {}, room = null, ident = null, conv = ALL, mq = null, brokerIdx = 0, retry = 0;
+let log = {}, unread = {}, room = null, ident = null, conv = ALL, mq = null, brokerIdx = 0, retry = 0, retryTimer = 0;
 const typing = new Map();
 let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
@@ -1601,7 +1601,7 @@ function connect() {
       if (!wasOpen) brokerIdx = (brokerIdx + 1) % BROKERS.length;
       setStatus('Offline');
       renderChat();
-      setTimeout(connect, wasOpen ? 1000 : Math.min(20000, 500 * 2 ** Math.floor(retry++ / BROKERS.length)));
+      retryTimer = setTimeout(connect, wasOpen ? 1000 : Math.min(20000, 500 * 2 ** Math.floor(retry++ / BROKERS.length)));
     }
   });
   mq = c;
@@ -1616,6 +1616,19 @@ function disconnect() {
   people.clear();
   setStatus('Offline');
 }
+
+// Browsers stretch timers in background tabs, so a scheduled retry can lag by minutes. Start over
+// with the first broker (the one that works at the office) as soon as someone looks at the app again.
+function reconnectNow() {
+  if (mq || !me.name || !room || !ident) return;
+  clearTimeout(retryTimer);
+  retry = 0;
+  brokerIdx = 0;
+  connect();
+}
+window.addEventListener('online', reconnectNow);
+window.addEventListener('focus', reconnectNow);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reconnectNow(); });
 
 const diag = new Map();
 const DIAG = {
@@ -1921,6 +1934,7 @@ function renderChat() {
 }
 
 function openChat() {
+  reconnectNow();
   delete unread[conv];
   saveChat();
   renderChat();
