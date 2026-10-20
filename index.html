@@ -191,6 +191,12 @@ tbody tr.sel td { background: var(--select); }
 #cgif .crow { margin-top: 0; }
 #cgif .vlinkin { flex: 1; max-width: none; }
 .cgifprev { display: grid; place-items: center; margin-top: 8px; }
+#cgif { width: min(calc(100% - 16px), 430px); }
+.cgifgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 4px; max-height: 230px; margin-top: 8px; overflow: auto; }
+.cgifgrid:empty { display: none; }
+.cgifitem { height: 78px; padding: 0; overflow: hidden; border: 1px solid transparent; background: var(--page-grid); cursor: pointer; }
+.cgifitem:hover, .cgifitem:focus-visible { border-color: var(--check); outline: none; }
+.cgifitem img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .cgifprev:empty { display: none; }
 .cgifprev img { max-width: 100%; max-height: 150px; }
 #cgif .cnote { max-width: none; margin-top: 6px; text-align: left; }
@@ -391,9 +397,10 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
             <div class="cmsgs" id="cmsgs" aria-live="polite"></div>
             <div class="cpop" id="cemoji" hidden role="dialog" aria-label="Emoji"></div>
             <div class="cpop" id="cgif" hidden role="dialog" aria-label="GIF senden">
-              <div class="crow"><input class="vlinkin" id="cgifin" type="text" placeholder="GIF-Link von Giphy oder Tenor einfügen" autocomplete="off" spellcheck="false" aria-label="GIF-Link"><button class="vbtn" id="cgifsend" type="button" disabled>Senden</button></div>
+              <div class="crow"><input class="vlinkin" id="cgifin" type="text" autocomplete="off" spellcheck="false" aria-label="GIFs suchen"><button class="vbtn" id="cgifsend" type="button" hidden>Senden</button></div>
+              <div class="cgifgrid" id="cgifgrid"></div>
               <div class="cgifprev" id="cgifprev"></div>
-              <p class="cnote" id="cgifnote">Auf giphy.com oder tenor.com ein GIF öffnen, Rechtsklick aufs Bild, „Bildadresse kopieren“ und hier einfügen.</p>
+              <p class="cnote" id="cgifnote"></p>
             </div>
             <form class="cform" id="cform">
               <button class="vbtn ctool" id="cemojiBtn" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">&#9786;</button>
@@ -1813,7 +1820,7 @@ function gifUrl(s) {
   if (/^(media\d*|i)\.giphy\.com$/.test(h)) m = path.match(/^\/media\/(?:v1\.[^/]+\/)?([A-Za-z0-9]+)\//) || path.match(/^\/([A-Za-z0-9]+)\.(?:gif|webp)$/);
   else if (h === 'giphy.com' || h === 'www.giphy.com') m = path.match(/^\/(?:gifs|stickers)\/(?:[\w-]*-)?([A-Za-z0-9]+)\/?$/);
   else if (/^(media\d*|c)\.tenor\.com$/.test(h) && /^\/[\w./-]+\.(?:gif|webp)$/i.test(path)) return 'https://' + h + path;
-  return m ? `https://media.giphy.com/media/${m[1]}/giphy.gif` : null;
+  return m ? `https://media.giphy.com/media/${m[1]}/200.gif` : null;
 }
 
 // Messages are re-rendered often; reusing the <img> keeps GIFs from restarting and flickering.
@@ -1850,32 +1857,102 @@ $('cemoji').append(...EMOJIS.map(x => el('button', {class: 'cemo', type: 'button
 }})));
 $('cemojiBtn').addEventListener('click', () => togglePop('cemojiBtn'));
 
-const cgifin = $('cgifin'), cgifprev = $('cgifprev'), cgifsend = $('cgifsend'), cgifnote = $('cgifnote');
-const GIF_HINT = cgifnote.textContent;
-function previewGif() {
-  const g = gifUrl(cgifin.value), v = cgifin.value.trim();
-  cgifsend.disabled = !g;
-  cgifprev.replaceChildren(...(g ? [el('img', {src: g, alt: 'Vorschau', referrerpolicy: 'no-referrer'})] : []));
-  cgifnote.textContent = v && !g
-    ? (/tenor\.com\/view\//.test(v) ? 'Das ist die Tenor-Seite. Rechtsklick aufs GIF und „Bildadresse kopieren“ nehmen.' : 'Nur Links von Giphy oder Tenor.')
-    : GIF_HINT;
+// GIF search runs through the GIPHY API. GIPHY keys are meant to sit in client code; the only risk of a
+// public key is someone else using up its hourly limit. Search terms go to GIPHY unencrypted.
+const GIPHY_KEY = '';
+const cgifin = $('cgifin'), cgifgrid = $('cgifgrid'), cgifprev = $('cgifprev'), cgifsend = $('cgifsend'), cgifnote = $('cgifnote');
+const gifCache = new Map();
+let gifTimer = 0, gifQuery = null;
+cgifin.placeholder = GIPHY_KEY ? 'GIFs suchen oder Link einfügen' : 'GIF-Link von Giphy oder Tenor einfügen';
+
+function giphyResults(data) {
+  return (Array.isArray(data) ? data : []).map(g => {
+    const img = g && g.images && (g.images.fixed_width_small || g.images.fixed_width);
+    if (!img || !/^[A-Za-z0-9]+$/.test(g.id)) return null;
+    let u;
+    try { u = new URL(img.url); } catch (e) { return null; }
+    if (u.protocol !== 'https:' || !/^(media\d*|i)\.giphy\.com$/.test(u.hostname)) return null;
+    return {id: g.id, thumb: u.href, title: String(g.title || 'GIF').slice(0, 100)};
+  }).filter(Boolean);
 }
-function sendGif() {
-  const g = gifUrl(cgifin.value);
+
+function searchGifs(q) {
+  if (!gifCache.has(q)) {
+    const params = new URLSearchParams({api_key: GIPHY_KEY, limit: '24', rating: 'pg-13'});
+    if (q) { params.set('q', q); params.set('lang', 'de'); }
+    const req = fetch(`https://api.giphy.com/v1/gifs/${q ? 'search' : 'trending'}?${params}`)
+      .then(r => { if (!r.ok) throw new Error(r.status === 429 ? 'limit' : 'http'); return r.json(); })
+      .then(d => giphyResults(d.data));
+    req.catch(() => gifCache.delete(q));
+    gifCache.set(q, req);
+  }
+  return gifCache.get(q);
+}
+
+function showGifResults(q) {
+  gifQuery = q;
+  cgifnote.textContent = 'Lade…';
+  searchGifs(q).then(list => {
+    if (gifQuery !== q) return;
+    cgifgrid.replaceChildren(...list.map(g => el('button', {class: 'cgifitem', type: 'button', title: g.title,
+      onclick: () => sendGif(`https://media.giphy.com/media/${g.id}/200.gif`)},
+      el('img', {src: g.thumb, alt: g.title, loading: 'lazy', referrerpolicy: 'no-referrer'}))));
+    cgifgrid.scrollTop = 0;
+    cgifnote.textContent = list.length ? (q ? '' : 'Gerade beliebt · ') + 'Powered by GIPHY' : 'Nichts gefunden.';
+  }, err => {
+    if (gifQuery !== q) return;
+    cgifgrid.replaceChildren();
+    cgifnote.textContent = err.message === 'limit'
+      ? 'Zu viele Suchen gerade. In ein paar Minuten nochmal versuchen.'
+      : 'GIF-Suche gerade nicht erreichbar. Ein GIF-Link geht trotzdem.';
+  });
+}
+
+function onGifInput() {
+  const v = cgifin.value.trim(), g = gifUrl(v);
+  clearTimeout(gifTimer);
+  cgifsend.hidden = !g;
+  cgifprev.replaceChildren(...(g ? [el('img', {src: g, alt: 'Vorschau', referrerpolicy: 'no-referrer'})] : []));
+  if (g || /^https?:/i.test(v)) {
+    gifQuery = null;
+    cgifgrid.replaceChildren();
+    cgifnote.textContent = g ? '' : /tenor\.com\/view\//.test(v)
+      ? 'Das ist die Tenor-Seite. Rechtsklick aufs GIF und „Bildadresse kopieren“ nehmen.'
+      : 'Nur Links von Giphy oder Tenor.';
+    return;
+  }
+  if (!GIPHY_KEY) {
+    cgifgrid.replaceChildren();
+    cgifnote.textContent = 'Die GIF-Suche ist noch nicht eingerichtet. Auf giphy.com oder tenor.com ein GIF öffnen, Rechtsklick aufs Bild, „Bildadresse kopieren“ und hier einfügen.';
+    return;
+  }
+  if (gifQuery === v) return;
+  gifTimer = setTimeout(() => showGifResults(v), v ? 400 : 0);
+}
+
+function sendGif(g) {
+  g = g || gifUrl(cgifin.value);
   if (!g || cin.disabled) return;
   closePops();
   cgifin.value = '';
-  previewGif();
   sendText(g);
   cin.focus();
 }
 $('cgifBtn').addEventListener('click', () => {
   togglePop('cgifBtn');
-  if (!pops.cgifBtn.hidden) cgifin.focus();
+  if (pops.cgifBtn.hidden) return;
+  cgifin.focus();
+  onGifInput();
 });
-cgifin.addEventListener('input', previewGif);
-cgifin.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendGif(); } });
-cgifsend.addEventListener('click', sendGif);
+cgifin.addEventListener('input', onGifInput);
+cgifin.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const v = cgifin.value.trim();
+  if (gifUrl(v)) sendGif();
+  else if (GIPHY_KEY && !/^https?:/i.test(v)) { clearTimeout(gifTimer); showGifResults(v); }
+});
+cgifsend.addEventListener('click', () => sendGif());
 $('ribbonMail').addEventListener('click', () => showPreview(chatRow));
 document.addEventListener('visibilitychange', () => { if (chatVisible() && unread[conv]) openChat(); });
 setInterval(() => {
