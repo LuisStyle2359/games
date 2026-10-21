@@ -481,7 +481,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
-            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Montagsmaler</button></div>
+            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button></div>
             <div class="creply" id="creply" hidden><span class="crname" id="crname"></span><span class="crtext" id="crtext"></span><button class="crclose" id="crclose" type="button" title="Abbrechen">&times;</button></div>
             <form class="cform" id="cform">
               <button class="vbtn ctool" id="cemojiBtn" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">&#9786;</button>
@@ -1481,7 +1481,7 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Montagsmaler'};
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -2084,7 +2084,7 @@ function playMove(m) {
 function finishMp() {
   const g = mpGame;
   if (!g) return;
-  if (g.game === 'draw') { clearTimeout(g.timer); addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: 'Montagsmaler beendet.', ts: Date.now()}); return; }
+  if (g.game === 'draw') { clearTimeout(g.timer); addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: 'Malen & Raten beendet.', ts: Date.now()}); return; }
   if (g.winner === g.myMark) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
   const gameName = GAME_NAMES[g.game];
   const resultText = g.winner === 0 ? gameName + ': Unentschieden!' : g.winner === g.myMark ? gameName + ': Du hast gewonnen!' : gameName + ': ' + g.opName + ' hat gewonnen!';
@@ -2181,7 +2181,7 @@ function handleMp(from, dm) {
   }
 }
 
-/* Montagsmaler */
+/* Malen & Raten */
 const DR_W = 800, DR_H = 500, DR_MAXPTS = 16000;
 const DR_COLORS = ['#222222', '#7f8c8d', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#8e5a2b', '#ff8fc8'];
 const DR_SIZES = [3, 8, 18];
@@ -2460,7 +2460,7 @@ function renderDraw() {
   if (!g || g.game !== 'draw') return;
   if ($('cmpgrid').dataset.gid !== g.gid || !drCanvas()) buildDraw(g);
   const drawer = drAmDrawer(g), op = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
-  $('cmpstatus').textContent = g.over ? 'Montagsmaler beendet'
+  $('cmpstatus').textContent = g.over ? 'Malen & Raten beendet'
     : g.done ? (g.by === 'guess' ? (drawer ? g.opName + ' hat es erraten!' : 'Richtig erraten!') : 'Aufgelöst') + ' Gleich geht\'s weiter…'
     : !g.word ? (drawer ? 'Du bist dran: Wähle ein Wort zum Malen' : op + ' wählt ein Wort…')
     : drawer ? 'Du malst – ' + op + ' rät' : op + ' malt – rate das Wort!';
