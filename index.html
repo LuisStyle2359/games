@@ -229,6 +229,24 @@ tbody tr.sel td { background: var(--select); }
 .cmsg.me .creplyBtn { left: -1px; }
 .cmsg:hover .creplyBtn { display: block; }
 .cmsg { position: relative; }
+.csys.cevt { margin: 2px 0; }
+.creacts { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; white-space: normal; }
+.creact { padding: 0 5px; border: 1px solid var(--grid-line); border-radius: 10px; background: var(--paper); font: inherit; font-size: 11px; line-height: 18px; cursor: pointer; }
+.creact.mine { border-color: var(--check); background: #e6effa; }
+.creactbar { display: flex; gap: 2px; margin-top: 4px; padding: 2px; border: 1px solid var(--grid-line); border-radius: 14px; background: var(--paper); box-shadow: 0 2px 6px rgba(0,0,0,.12); white-space: normal; width: max-content; }
+.creactbar button { padding: 0 3px; border: 0; border-radius: 50%; background: none; font-size: 17px; line-height: 24px; cursor: pointer; }
+.creactbar button:hover, .creactbar button.on { background: #dbe8f7; }
+.cmsg .creactBtn { display: none; position: absolute; top: -1px; padding: 0 3px; border: 1px solid var(--grid-line); border-radius: 3px; background: var(--paper); color: var(--muted); font-size: 10px; cursor: pointer; line-height: 16px; }
+.cmsg:not(.me) .creactBtn { right: 20px; }
+.cmsg.me .creactBtn { left: 20px; }
+.cmsg:hover .creactBtn { display: block; }
+.cimg { display: block; max-width: 100%; border-radius: 4px; cursor: zoom-in; background: #e9edf2; object-fit: contain; }
+.cimgwait { padding: 4px 2px; color: var(--muted); font-style: italic; }
+.cimgbar { display: flex; align-items: center; gap: 8px; flex: none; padding: 4px 8px 4px 12px; background: #eef2f8; border-left: 3px solid var(--check); font-size: 11px; }
+.cimgbar img { max-height: 48px; max-width: 90px; border-radius: 3px; border: 1px solid var(--grid-line); }
+.cimgbar span { flex: 1; }
+.cimgview { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 10px; background: rgba(20,24,30,.82); cursor: zoom-out; }
+.cimgview img { max-width: 100%; max-height: 100%; box-shadow: 0 4px 20px rgba(0,0,0,.4); background: #fff; }
 .clb { position: absolute; inset: 0; background: var(--paper); z-index: 20; display: flex; flex-direction: column; }
 .clbtabs { display: flex; gap: 0; border-bottom: 1px solid var(--grid-line); padding: 0 8px; flex: none; overflow-x: auto; }
 .clbtab { padding: 6px 10px; font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
@@ -482,6 +500,8 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <p class="cnote" id="cgifnote"></p>
             </div>
             <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button></div>
+            <div class="cimgbar" id="cimgbar" hidden><img id="cimgthumb" alt=""><span id="cimginfo">Bild senden?</span><button class="vbtn" id="cimgsend" type="button">Senden</button><button class="vbtn" id="cimgcancel" type="button">Abbrechen</button></div>
+            <div class="cimgview" id="cimgview" hidden></div>
             <div class="creply" id="creply" hidden><span class="crname" id="crname"></span><span class="crtext" id="crtext"></span><button class="crclose" id="crclose" type="button" title="Abbrechen">&times;</button></div>
             <form class="cform" id="cform">
               <button class="vbtn ctool" id="cemojiBtn" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">&#9786;</button>
@@ -1774,6 +1794,10 @@ async function incoming(t, payload) {
   } else if (sub === ALL) {
     const body = await verify(box);
     if (body && room === r && body.kind === 'del') { applyDelete(ALL, body.from, body.id); return; }
+    if (body && room === r && body.kind === 'react') { applyReact(ALL, body.from, String(body.owner || ''), body.id, body.e); return; }
+    if (body && room === r && body.kind === 'img') { imgMeta(ALL, body.from, cleanName(body.name) || 'Unbekannt', body); return; }
+    if (body && room === r && body.kind === 'imgc') { imgChunk(ALL, body.from, body); return; }
+    if (body && room === r && body.kind === 'imgreq') { if (body.owner === me.id && Array.isArray(body.miss)) resendImg(ALL, String(body.id || ''), body.miss, !!body.meta); return; }
     if (!body || room !== r || body.kind !== 'msg' || typeof body.text !== 'string' || !body.text.trim()) return;
     const m = {id: String(body.id || '').slice(0, 40), from: body.from, name: cleanName(body.name) || 'Unbekannt', text: body.text.slice(0, MAXLEN), ts: Date.now()};
     if (body.re) m.re = {id: String(body.re.id || '').slice(0, 40), name: String(body.re.name || '').slice(0, 24), text: String(body.re.text || '').slice(0, 100)};
@@ -1783,6 +1807,10 @@ async function incoming(t, payload) {
     const dm = await unseal(await dmKey(box.from), box.box);
     if (dm.kind === 'mp') { if (room === r && dm.to === me.id) handleMp(box.from, dm); return; }
     if (room === r && dm.to === me.id && dm.kind === 'del') { applyDelete(box.from, box.from, dm.id); return; }
+    if (room === r && dm.to === me.id && dm.kind === 'react') { applyReact(box.from, box.from, String(dm.owner || ''), dm.id, dm.e); return; }
+    if (room === r && dm.to === me.id && dm.kind === 'img') { imgMeta(box.from, box.from, cleanName(dm.name) || nameOf(box.from), dm); return; }
+    if (room === r && dm.to === me.id && dm.kind === 'imgc') { imgChunk(box.from, box.from, dm); return; }
+    if (room === r && dm.to === me.id && dm.kind === 'imgreq') { if (Array.isArray(dm.miss)) resendImg(box.from, String(dm.id || ''), dm.miss, !!dm.meta); return; }
     if (room !== r || dm.to !== me.id || typeof dm.text !== 'string' || !dm.text.trim()) return;
     const m = {id: String(dm.id || '').slice(0, 40), from: box.from, name: cleanName(dm.name) || nameOf(box.from), text: dm.text.slice(0, MAXLEN), ts: Date.now()};
     if (dm.re) m.re = {id: String(dm.re.id || '').slice(0, 40), name: String(dm.re.name || '').slice(0, 24), text: String(dm.re.text || '').slice(0, 100)};
@@ -1802,7 +1830,7 @@ function addMsg(c, m) {
   const list = log[c] || (log[c] = []);
   if (m.id && list.some(x => x.id === m.id)) return;
   list.push(m);
-  if (list.length > 200) list.splice(0, list.length - 200);
+  if (list.length > 200) list.splice(0, list.length - 200).forEach(x => { if (x.img) forgetImg(x); });
   if (m.from !== me.id && !(chatVisible() && conv === c)) unread[c] = (unread[c] || 0) + 1;
   saveChat();
   renderPeople();
@@ -1821,6 +1849,8 @@ function applyDelete(c, from, id) {
 function markDeleted(c, m) {
   m.deleted = true;
   m.text = '';
+  if (m.img) { forgetImg(m); m.img = null; }
+  delete m.reacts;
   saveChat();
   renderPeople();
   if (c === conv) renderMsgs();
@@ -1906,7 +1936,7 @@ function applyReadAck(from, c, until) {
 const creplyEl = $('creply'), crname = $('crname'), crtext = $('crtext');
 function setReply(m) {
   if (!m || m.deleted) { clearReply(); return; }
-  replyTo = {id: m.id, name: m.from === me.id ? me.name : (m.name || nameOf(m.from)), text: m.text};
+  replyTo = {id: m.id, name: m.from === me.id ? me.name : (m.name || nameOf(m.from)), text: m.img ? '📷 Bild' : m.text};
   crname.textContent = replyTo.name;
   crtext.textContent = gifUrl(replyTo.text) ? 'GIF' : replyTo.text;
   creplyEl.hidden = false;
@@ -2525,6 +2555,8 @@ function renderBadge() {
 function selectConv(id) {
   closePops();
   clearReply();
+  showImgBar(null);
+  openReact = null;
   conv = id;
   delete unread[id];
   saveChat();
@@ -2560,22 +2592,25 @@ function renderMsgs() {
   const list = log[conv] || [];
   const c = conv;
   cmsgs.replaceChildren(...(list.length ? list.map(m => {
-      if (m.from === 'system') return el('div', {class: 'csys', text: m.text + ' · ' + fmtTime(m.ts)});
+      if (m.from === 'system') return el('div', {class: 'csys cevt', text: m.text + ' · ' + fmtTime(m.ts)});
       const mine = m.from === me.id, gif = !m.deleted && gifUrl(m.text);
-      const kind = m.deleted ? ' deleted' : gif ? ' gif' : BIG_EMOJI.test(m.text) ? ' big' : '';
+      const kind = m.deleted ? ' deleted' : gif || m.img ? ' gif' : BIG_EMOJI.test(m.text) ? ' big' : '';
       const quote = !m.deleted && m.re ? el('div', {class: 'cquote', onclick: () => {
         const t = cmsgs.querySelector('[data-mid="' + CSS.escape(m.re.id) + '"]');
         if (t) { t.style.background = '#fff3cd'; setTimeout(() => t.style.background = '', 1200); t.scrollIntoView({block: 'center'}); }
       }}, el('span', {class: 'crname', text: m.re.name}), el('span', {class: 'crtext', text: gifUrl(m.re.text) ? 'GIF' : m.re.text})) : null;
       const checks = mine && !m.deleted && c !== ALL ? el('span', {class: 'ccheck ' + (m.readBy && m.readBy.length ? 'read' : 'sent'), text: m.readBy && m.readBy.length ? '✓✓' : '✓'}) : null;
       const replyBtn = !m.deleted && mq ? el('button', {class: 'creplyBtn', type: 'button', text: '↩', title: 'Antworten', onclick: e => { e.stopPropagation(); setReply(m); }}) : null;
-      return el('div', {class: 'cmsg' + (mine ? ' me' : '') + kind, 'data-mid': m.id},
+      const reactBtn = !m.deleted && mq ? el('button', {class: 'creactBtn', type: 'button', text: '☺', title: 'Reagieren', onclick: e => { e.stopPropagation(); toggleReactBar(c, m); }}) : null;
+      return el('div', {class: 'cmsg' + (mine ? ' me' : '') + kind, 'data-mid': m.id, onclick: e => toggleReactBar(c, m, e)},
         replyBtn,
+        reactBtn,
         quote,
         c === ALL && !mine ? el('div', {class: 'cfrom', text: m.name}) : null,
         m.deleted ? el('div', {text: mine ? 'Du hast diese Nachricht gelöscht' : 'Diese Nachricht wurde gelöscht'})
-          : gif ? gifImg(m.id + gif, gif, m.text) : el('div', {text: m.text}),
-        el('div', {class: 'ctime'}, deleteButton(c, m), fmtTime(m.ts), checks));
+          : m.img ? imgView(c, m) : gif ? gifImg(m.id + gif, gif, m.text) : el('div', {text: m.text}),
+        el('div', {class: 'ctime'}, deleteButton(c, m), fmtTime(m.ts), checks),
+        ...reactViews(c, m));
     })
     : [el('div', {class: 'csys', text: 'Noch keine Nachrichten. ' +
         (conv === ALL ? 'Alles hier ist Ende-zu-Ende-verschlüsselt.' : 'Diesen Chat könnt nur ihr zwei lesen.')})]));
@@ -2688,6 +2723,256 @@ async function sendText(raw) {
     else await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {id, to, name: me.name, text, re})});
   } catch (err) {}
 }
+
+/* Reactions: one per person and message, sent signed and encrypted like the message itself. */
+const REACTS = ['👍', '😂', '❤️', '😮', '😢', '🔥'];
+let openReact = null;
+function msgKey(c, m) { return c + '|' + m.from + '|' + m.id; }
+function sendReact(c, m, e) {
+  if (!mq || m.deleted || m.from === 'system' || !m.id) return;
+  const mine = (m.reacts || {})[me.id];
+  const next = mine === e ? '' : e;
+  applyReact(c, me.id, m.from, m.id, next);
+  openReact = null;
+  if (c === conv) renderMsgs();
+  (async () => {
+    if (c === ALL) await publish(ALL, await signed({kind: 'react', id: m.id, owner: m.from, e: next}));
+    else await publish('dm/' + c, {from: me.id, box: await seal(await dmKey(c), {kind: 'react', id: m.id, owner: m.from, e: next, to: c})});
+  })().catch(() => {});
+}
+function applyReact(c, from, owner, id, e) {
+  if (typeof id !== 'string' || (e !== '' && !REACTS.includes(e))) return;
+  const m = (log[c] || []).find(x => x.id === id && x.from === owner);
+  if (!m || m.deleted || m.from === 'system') return;
+  m.reacts = m.reacts || {};
+  if (e) m.reacts[from] = e; else delete m.reacts[from];
+  if (!Object.keys(m.reacts).length) delete m.reacts;
+  saveChat();
+  if (c === conv) renderMsgs();
+}
+function reactViews(c, m) {
+  if (m.deleted || !m.id) return [];
+  const out = [];
+  const groups = new Map();
+  for (const [uid, e] of Object.entries(m.reacts || {})) {
+    if (!groups.has(e)) groups.set(e, []);
+    groups.get(e).push(uid);
+  }
+  if (groups.size) out.push(el('div', {class: 'creacts'}, ...REACTS.filter(e => groups.has(e)).map(e => {
+    const ids = groups.get(e);
+    return el('button', {class: 'creact' + (ids.includes(me.id) ? ' mine' : ''), type: 'button', text: e + ' ' + ids.length,
+      title: ids.map(id => id === me.id ? 'Du' : nameOf(id)).join(', '), disabled: !mq,
+      onclick: ev => { ev.stopPropagation(); sendReact(c, m, e); }});
+  })));
+  if (openReact === msgKey(c, m) && mq) {
+    const mine = (m.reacts || {})[me.id];
+    out.push(el('div', {class: 'creactbar'}, ...REACTS.map(e => el('button', {type: 'button', class: mine === e ? 'on' : '', text: e, title: e,
+      onclick: ev => { ev.stopPropagation(); sendReact(c, m, e); }}))));
+  }
+  return out;
+}
+function toggleReactBar(c, m, ev) {
+  if (ev && (ev.target.closest('button, a, img, .cquote') || String(window.getSelection())) ) return;
+  if (m.deleted || !mq || m.from === 'system') return;
+  const k = msgKey(c, m);
+  openReact = openReact === k ? null : k;
+  renderMsgs();
+}
+document.addEventListener('pointerdown', e => {
+  if (openReact && !e.target.closest('.cmsg')) { openReact = null; renderMsgs(); }
+});
+
+/* Pasted images: shrunk to JPEG, sent in encrypted chunks (public brokers dislike big messages)
+   and kept in IndexedDB, since localStorage is far too small for pictures. */
+const IMG_CHUNK = 30000, IMG_MAX = 900000, IMG_MAXCHUNKS = Math.ceil(IMG_MAX / IMG_CHUNK);
+const imgCache = new Map(), imgEls = new Map(), imgParts = new Map();
+let imgDbP = null, pendingImg = null;
+function imgDb() {
+  if (!imgDbP) imgDbP = new Promise((res, rej) => {
+    const r = indexedDB.open('dv-chat-img', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('img');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return imgDbP;
+}
+async function idbPut(k, v) { try { (await imgDb()).transaction('img', 'readwrite').objectStore('img').put(v, k); } catch (e) {} }
+async function idbDel(k) { try { (await imgDb()).transaction('img', 'readwrite').objectStore('img').delete(k); } catch (e) {} }
+async function idbGet(k) {
+  try {
+    const db = await imgDb();
+    return await new Promise(res => { const q = db.transaction('img').objectStore('img').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); });
+  } catch (e) { return null; }
+}
+async function imgData(key) {
+  if (imgCache.has(key)) return imgCache.get(key);
+  const d = await idbGet(key);
+  if (d) imgCache.set(key, d);
+  return d;
+}
+function forgetImg(m) {
+  const key = m.from + '|' + m.id;
+  imgCache.delete(key);
+  imgEls.delete(key);
+  idbDel(key);
+}
+
+async function shrinkImage(file) {
+  const bmp = await createImageBitmap(file);
+  let scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  for (let tries = 0; tries < 8; tries++) {
+    const w = Math.max(1, Math.round(bmp.width * scale)), h = Math.max(1, Math.round(bmp.height * scale));
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bmp, 0, 0, w, h);
+    for (const q of [0.85, 0.7, 0.55]) {
+      const d = cv.toDataURL('image/jpeg', q);
+      if (d.length <= IMG_MAX) { bmp.close && bmp.close(); return {data: d, w, h}; }
+    }
+    scale *= 0.7;
+  }
+  throw new Error('too big');
+}
+function showImgBar(img) {
+  pendingImg = img;
+  $('cimgbar').hidden = !img;
+  if (!img) return;
+  $('cimgthumb').src = img.data;
+  $('cimginfo').textContent = 'Bild an ' + nameOf(conv) + ' senden? (' + Math.round(img.data.length * 0.75 / 1024) + ' KB)';
+  $('cimgsend').focus();
+}
+document.addEventListener('paste', async e => {
+  if (!chatVisible() || cin.disabled || !cnameform.hidden || $('cform').style.display === 'none') return;
+  const item = [...(e.clipboardData ? e.clipboardData.items : [])].find(i => i.kind === 'file' && /^image\//.test(i.type));
+  if (!item) return;
+  e.preventDefault();
+  const file = item.getAsFile();
+  if (!file) return;
+  try { showImgBar(await shrinkImage(file)); }
+  catch (err) { $('cimgbar').hidden = false; pendingImg = null; $('cimgthumb').removeAttribute('src'); $('cimginfo').textContent = 'Das Bild konnte nicht gelesen werden.'; }
+});
+$('cimgcancel').addEventListener('click', () => { showImgBar(null); cin.focus(); });
+$('cimgsend').addEventListener('click', () => { const img = pendingImg; showImgBar(null); if (img) sendImage(img); cin.focus(); });
+
+async function sendImage(img) {
+  const to = conv;
+  if (!mq || cin.disabled) return;
+  const id = me.id + Date.now().toString(36), key = me.id + '|' + id;
+  const chunks = [];
+  for (let i = 0; i < img.data.length; i += IMG_CHUNK) chunks.push(img.data.slice(i, i + IMG_CHUNK));
+  const re = replyTo ? {id: replyTo.id, name: replyTo.name, text: String(replyTo.text).slice(0, 100)} : undefined;
+  const m = {id, from: me.id, name: me.name, text: '', img: {w: img.w, h: img.h, n: chunks.length, ok: true}, ts: Date.now()};
+  if (re) m.re = re;
+  clearReply();
+  imgCache.set(key, img.data);
+  idbPut(key, img.data);
+  addMsg(to, m);
+  try {
+    await sendImgMeta(to, m);
+    for (let i = 0; i < chunks.length; i++) await sendImgChunk(to, id, i, chunks[i]);
+  } catch (err) {}
+}
+async function sendImgMeta(to, m) {
+  const meta = {kind: 'img', id: m.id, w: m.img.w, h: m.img.h, n: m.img.n, re: m.re};
+  if (to === ALL) await publish(ALL, await signed(meta));
+  else await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {...meta, to, name: me.name})});
+}
+async function sendImgChunk(to, id, i, d) {
+  if (to === ALL) await publish(ALL, await signed({kind: 'imgc', id, i, d}));
+  else await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {kind: 'imgc', id, i, d, to})});
+}
+async function resendImg(to, id, miss, meta) {
+  const m = (log[to] || []).find(x => x.id === id && x.from === me.id && x.img);
+  const data = m && !m.deleted && await imgData(me.id + '|' + id);
+  if (!data) return;
+  if (meta) await sendImgMeta(to, m).catch(() => {});
+  for (const i of miss.slice(0, IMG_MAXCHUNKS)) {
+    if (Number.isInteger(i) && i >= 0 && i * IMG_CHUNK < data.length) await sendImgChunk(to, id, i, data.slice(i * IMG_CHUNK, (i + 1) * IMG_CHUNK)).catch(() => {});
+  }
+}
+
+function imgMeta(c, from, name, d) {
+  const id = String(d.id || '').slice(0, 40), n = d.n, w = d.w, h = d.h;
+  if (!id || !Number.isInteger(n) || n < 1 || n > IMG_MAXCHUNKS || !Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 4000 || h > 4000) return;
+  const m = {id, from, name, text: '', img: {w, h, n}, ts: Date.now()};
+  if (d.re) m.re = {id: String(d.re.id || '').slice(0, 40), name: String(d.re.name || '').slice(0, 24), text: String(d.re.text || '').slice(0, 100)};
+  addMsg(c, m);
+  const key = from + '|' + id;
+  if (!imgParts.has(key)) imgParts.set(key, {c, parts: [], ts: Date.now(), asked: 0});
+  assembleImg(c, from, id);
+}
+function imgChunk(c, from, d) {
+  const id = String(d.id || '').slice(0, 40), i = d.i;
+  if (!id || !Number.isInteger(i) || i < 0 || i >= IMG_MAXCHUNKS || typeof d.d !== 'string' || d.d.length > IMG_CHUNK) return;
+  const key = from + '|' + id;
+  const p = imgParts.get(key) || {c, parts: [], ts: Date.now(), asked: 0};
+  p.parts[i] = d.d;
+  imgParts.set(key, p);
+  assembleImg(c, from, id);
+}
+function assembleImg(c, from, id) {
+  const key = from + '|' + id, p = imgParts.get(key);
+  const m = (log[c] || []).find(x => x.id === id && x.from === from && x.img);
+  if (!p || !m || m.deleted || m.img.ok) return;
+  for (let i = 0; i < m.img.n; i++) if (typeof p.parts[i] !== 'string') return;
+  imgParts.delete(key);
+  const data = p.parts.slice(0, m.img.n).join('');
+  if (data.length > IMG_MAX || !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(data)) m.img.fail = true;
+  else { imgCache.set(key, data); idbPut(key, data); m.img.ok = true; }
+  saveChat();
+  if (c === conv) renderMsgs();
+}
+// Missing chunks (or a missing announcement) are asked for again a couple of times before giving up.
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, p] of imgParts) {
+    const [from, id] = [key.slice(0, key.indexOf('|')), key.slice(key.indexOf('|') + 1)];
+    const m = (log[p.c] || []).find(x => x.id === id && x.from === from && x.img);
+    const age = now - p.ts;
+    if (age > 60000) {
+      imgParts.delete(key);
+      if (m && !m.img.ok) { m.img.fail = true; saveChat(); if (p.c === conv) renderMsgs(); }
+      continue;
+    }
+    if (!mq || age < 6000 + p.asked * 12000 || p.asked >= 3) continue;
+    p.asked++;
+    const n = m ? m.img.n : p.parts.length;
+    const miss = [];
+    for (let i = 0; i < n; i++) if (typeof p.parts[i] !== 'string') miss.push(i);
+    const req = {kind: 'imgreq', id, owner: from, miss, meta: !m};
+    (async () => {
+      if (p.c === ALL) await publish(ALL, await signed(req));
+      else await publish('dm/' + from, {from: me.id, box: await seal(await dmKey(from), {...req, to: from})});
+    })().catch(() => {});
+  }
+}, 3000);
+
+function imgView(c, m) {
+  if (m.img.fail) return el('div', {class: 'cimgwait', text: '📷 Bild konnte nicht empfangen werden'});
+  if (!m.img.ok) return el('div', {class: 'cimgwait', text: '📷 Bild wird geladen…'});
+  const key = m.from + '|' + m.id;
+  if (!imgEls.has(key)) {
+    const k = Math.min(1, 240 / m.img.w, 200 / m.img.h);
+    const img = el('img', {class: 'cimg', alt: 'Bild', style: `width:${Math.round(m.img.w * k)}px;height:${Math.round(m.img.h * k)}px`});
+    img.addEventListener('click', () => openImg(img.src));
+    imgData(key).then(d => {
+      if (d) { img.src = d; img.addEventListener('load', () => { cmsgs.scrollTop = cmsgs.scrollHeight; }, {once: true}); }
+      else img.replaceWith(el('div', {class: 'cimgwait', text: '📷 Bild nicht mehr gespeichert'}));
+    });
+    imgEls.set(key, img);
+  }
+  return imgEls.get(key);
+}
+function openImg(src) {
+  if (!src) return;
+  const v = $('cimgview');
+  v.replaceChildren(el('img', {src, alt: 'Bild'}));
+  v.hidden = false;
+}
+$('cimgview').addEventListener('click', () => { $('cimgview').hidden = true; $('cimgview').replaceChildren(); });
 
 /* Emojis and GIFs. GIFs travel as an ordinary (encrypted) link and are only displayed from Giphy and
    Tenor, so a link can't make everyone's browser load an image from someone's own server. */
