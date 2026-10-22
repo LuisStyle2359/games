@@ -1693,8 +1693,10 @@ async function publish(t, obj, retain) {
   if (mq === c && room === r) c.pub(ROOT + r.tag + '/' + t, payload, retain);
 }
 
+// Raised whenever chat features change, so people with an old copy of the page can be told to reload.
+const APP_VERSION = 7;
 function announce() {
-  if (mq && room) signed({kind: 'p', t: Date.now()}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
+  if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
 
 function connect() {
@@ -1827,7 +1829,9 @@ async function incoming(t, payload) {
   if (sub.startsWith('p/')) {
     const body = await verify(box);
     if (!body || room !== r || body.kind !== 'p' || body.from !== sub.slice(2) || !cleanName(body.name) || !(Date.now() - body.t < STALE)) return;
-    people.set(body.from, {name: cleanName(body.name), seen: Date.now()});
+    const v = Number.isInteger(body.v) ? body.v : 0;
+    people.set(body.from, {name: cleanName(body.name), seen: Date.now(), v});
+    if (v > APP_VERSION && v < 1000) addMsg(ALL, {id: 'upd-' + v, from: 'system', name: '', text: 'Es gibt eine neuere Version dieser Seite – bitte mit Strg+F5 neu laden, damit alle Spiele funktionieren.', ts: Date.now()});
     renderPeople();
     if (body.from === conv) renderMsgs();
   } else if (sub === ALL) {
@@ -2190,6 +2194,7 @@ function inviteMp(game) {
   const gid = me.id + Date.now().toString(36);
   sendMpMsg(conv, {type: 'invite', game, gid, name: me.name}).catch(() => {});
   addMsg(conv, {id: 'inv-' + gid, from: 'system', name: '', text: GAME_NAMES[game] + ': Einladung an ' + nameOf(conv) + ' gesendet…', ts: Date.now()});
+  if ((people.get(conv).v || 0) < APP_VERSION) addMsg(conv, {id: 'old-' + gid, from: 'system', name: '', text: 'Hinweis: ' + nameOf(conv) + ' hat noch eine ältere Version der Seite offen. Kommt die Einladung nicht an, muss ' + nameOf(conv) + ' die Seite mit Strg+F5 neu laden.', ts: Date.now()});
   mpInvites.push({gid, game, from: conv, name: nameOf(conv), ts: Date.now(), mine: true});
 }
 function acceptMp(inv) {
