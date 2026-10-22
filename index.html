@@ -1694,7 +1694,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -2988,9 +2988,17 @@ function drDist(a, b) {
   }
   return d[b.length];
 }
+const DR_DARK = 'Sarg;Grabstein;Friedhof;Sensenmann;Guillotine;Galgen;Totenkopf;Giftflasche;Zombie;Voodoo-Puppe;Betonschuhe;Amboss;Dynamit;Bananenschale;Mausefalle;Treibsand;Kreideumriss;Leichenwagen;Testament;Spukhaus;Geisterbahn;Schwiegermutter;Montagmorgen;Steuererklärung;Elektrischer Stuhl;Haiangriff;Piranha;Blitzeinschlag;Kettensäge;Horrorclown;Bärenfalle;Henker;Gruft;Leiche im Keller;Fallendes Klavier;Nahtoderfahrung;Kater nach der Party;Abrissbirne;Mumienfluch;Wackelzahn'.split(';');
+// Entries may list other accepted spellings after '|'; the first one is shown.
+const DR_STREAMERS = 'Papaplatte;Gleggmire|Glegmire;MontanaBlack|Monte;Trymacs;Knossi;Gronkh;Unge;Rezo;HandOfBlood|Hänno;Rewinside|Rewi;Paluten;Stegi;Julien Bam|JulienBam;Elotrix;Mexify;Reved;Eligella;NoWay;Tanzverbot;Kayzahr;Inscope21;LeFloid;Dagi Bee|DagiBee;Bibi|BibisBeautyPalace;Fritz Meinecke;Simon Desue;Shurjoka;BastiGHG;Zarbex;Dner;Sidemen;MrBeast|Mr Beast;IShowSpeed|Speed;Kai Cenat;xQc;Ninja;KSI;Logan Paul'.split(';');
+function drMain(w) { return String(w).split('|')[0]; }
+function drCat(w) { return DR_STREAMERS.includes(w) ? 'Streamer' : DR_DARK.includes(w) ? 'schwarzer Humor' : ''; }
+// Two everyday words plus one streamer or dark-humour word, so the new ones come up every round.
 function drPick3() {
+  const any = list => list[Math.floor(Math.random() * list.length)];
   const out = new Set();
-  while (out.size < 3) out.add(DR_WORDS[Math.floor(Math.random() * DR_WORDS.length)]);
+  while (out.size < 2) out.add(any(DR_WORDS));
+  out.add(any(Math.random() < 0.5 ? DR_STREAMERS : DR_DARK));
   return [...out];
 }
 function drNewRound(g, r) {
@@ -3034,7 +3042,7 @@ function drGuess() {
   const text = inp.value.trim().slice(0, 40);
   inp.value = '';
   if (!g || g.over || !text || !g.word || g.done || drAmDrawer(g)) return;
-  const a = drNorm(text), b = drNorm(g.word), ok = a === b;
+  const a = drNorm(text), b = drNorm(drMain(g.word)), ok = g.word.split('|').some(w => drNorm(w) === a);
   const near = !ok && b.length > 3 && drDist(a, b) <= (b.length >= 8 ? 2 : 1);
   g.log.push({me: true, text, ok, near});
   drSend(g, {type: 'dguess', text, ok, near});
@@ -3044,7 +3052,8 @@ function drGuess() {
 function drHint() {
   const g = mpGame;
   if (!g || !g.word || g.done) return;
-  const open = [...g.word].map((ch, i) => i).filter(i => /[a-zäöüß]/i.test(g.word[i]) && !g.hints.includes(i));
+  const w = drMain(g.word);
+  const open = [...w].map((ch, i) => i).filter(i => /[a-zäöüß]/i.test(w[i]) && !g.hints.includes(i));
   if (open.length <= 1) return;
   g.hints.push(open[Math.floor(Math.random() * open.length)]);
   renderDraw();
@@ -3081,7 +3090,7 @@ function drReqSync(g) {
 }
 function handleDraw(g, dm) {
   if (dm.type === 'dstate') {
-    const r = dm.r, word = typeof dm.word === 'string' && dm.word.trim() ? dm.word.slice(0, 40) : null;
+    const r = dm.r, word = typeof dm.word === 'string' && dm.word.trim() ? dm.word.slice(0, 80) : null;
     if (!Number.isInteger(r) || r < g.r || r > g.r + 50) return;
     if (r > g.r) drNewRound(g, r);
     if (word && !g.word) { g.word = word; g.choices = null; if (!drAmDrawer(g)) drReqSync(g); }
@@ -3234,10 +3243,11 @@ function renderDraw() {
     : drawer ? 'Du malst – ' + op + ' rät' : op + ' malt – rate das Wort!';
 
   const word = $('drword');
+  const main = g.word && drMain(g.word), cat = g.word && drCat(g.word);
   if (!g.word) word.replaceChildren();
-  else if (drawer || g.done || g.over) word.replaceChildren(g.word);
-  else word.replaceChildren([...g.word].map((ch, i) => /[a-zäöüß]/i.test(ch) && !g.hints.includes(i) ? '_' : ch).join(' '),
-    el('small', {text: '(' + [...g.word].filter(ch => /[a-zäöüß]/i.test(ch)).length + ')'}));
+  else if (drawer || g.done || g.over) word.replaceChildren(main, cat ? el('small', {text: cat}) : '');
+  else word.replaceChildren([...main].map((ch, i) => /[a-zäöüß]/i.test(ch) && !g.hints.includes(i) ? '_' : ch).join(' '),
+    el('small', {text: '(' + [...main].filter(ch => /[a-zäöüß]/i.test(ch)).length + ')' + (cat ? ' · ' + cat : '')}));
 
   const over = $('drover');
   if (g.over) {
@@ -3246,13 +3256,13 @@ function renderDraw() {
   } else if (!g.word && drawer && g.choices) {
     over.hidden = false;
     over.replaceChildren(el('div', {text: 'Was willst du malen?'}),
-      el('div', {class: 'dr-choices'}, ...g.choices.map(w => el('button', {class: 'vbtn', type: 'button', text: w, onclick: () => drChoose(w)}))));
+      el('div', {class: 'dr-choices'}, ...g.choices.map(w => el('button', {class: 'vbtn', type: 'button', text: drMain(w) + (drCat(w) ? ' (' + drCat(w) + ')' : ''), onclick: () => drChoose(w)}))));
   } else if (!g.word) {
     over.hidden = false;
     over.replaceChildren(el('div', {text: g.opName + ' wählt ein Wort…'}));
   } else if (g.done) {
     over.hidden = false;
-    over.replaceChildren(el('div', {text: g.by === 'guess' ? (drawer ? g.opName + ' hat es erraten!' : 'Richtig!') : 'Das Wort war:'}), el('b', {text: g.word}));
+    over.replaceChildren(el('div', {text: g.by === 'guess' ? (drawer ? g.opName + ' hat es erraten!' : 'Richtig!') : 'Das Wort war:'}), el('b', {text: drMain(g.word)}));
   } else {
     over.hidden = true;
   }
