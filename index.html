@@ -293,6 +293,44 @@ tbody tr.sel td { background: var(--select); }
 .dr-log { font-size: 11px; color: var(--muted); min-height: 14px; width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dr-log .ok { color: #27ae60; font-weight: 600; }
 .dr-log .near { color: #e67e22; font-weight: 600; }
+.rx-wrap, .em-wrap, .uno-wrap { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.rx-score { font-weight: 600; font-size: 13px; white-space: pre; }
+.rx-box { flex: 1; min-height: 110px; width: 100%; max-width: 560px; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 8px; font-size: 24px; font-weight: 700; color: #fff; background: #7f8c8d; cursor: pointer; user-select: none; text-align: center; touch-action: manipulation; }
+.rx-box.ready { background: #c0392b; }
+.rx-box.go { background: #27ae60; font-size: 40px; }
+.rx-box.done { background: #2c3e50; }
+.rx-box.wait, .rx-box.idle { font-size: 18px; }
+.rx-box.over { background: #8e44ad; }
+.rx-last { font-size: 12px; min-height: 16px; color: var(--muted); text-align: center; }
+.em-title { font-size: 13px; font-weight: 600; min-height: 18px; text-align: center; white-space: pre-wrap; }
+.em-clue { font-size: 32px; line-height: 1.25; min-height: 40px; text-align: center; overflow-wrap: anywhere; }
+.em-pal { display: flex; flex-wrap: wrap; gap: 1px; max-height: 74px; overflow-y: auto; width: 100%; padding: 2px; border: 1px solid var(--grid-line); border-radius: 4px; background: var(--paper); }
+.em-pal button { padding: 1px 2px; border: 0; border-radius: 3px; background: none; font-size: 18px; cursor: pointer; }
+.em-pal button:hover { background: #dbe8f7; }
+.uno-players { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; align-items: center; font-size: 11px; }
+.uno-player { padding: 1px 7px; border: 1px solid var(--grid-line); border-radius: 10px; background: var(--paper); }
+.uno-player.on { border-color: var(--check); background: #dbe8f7; font-weight: 600; }
+.uno-dir { font-size: 15px; color: var(--muted); }
+.uno-table { display: flex; align-items: center; gap: 14px; }
+.uno-wish { font-size: 12px; }
+.uno-log { min-height: 14px; color: var(--muted); font-size: 11px; text-align: center; }
+.uno-hand { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; width: 100%; max-height: 116px; overflow-y: auto; padding-top: 6px; }
+.uc { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 50px; padding: 0; border: 2px solid #fff; border-radius: 5px; box-shadow: 0 0 0 1px rgba(0,0,0,.25); color: #fff; font: 700 15px/1 "Segoe UI", sans-serif; text-shadow: 0 1px 2px rgba(0,0,0,.5); cursor: pointer; }
+.uc.r { background: #e74c3c; }
+.uc.y { background: #f1c40f; }
+.uc.g { background: #27ae60; }
+.uc.b { background: #2e86de; }
+.uc.w { background: conic-gradient(#e74c3c 0 25%, #f1c40f 0 50%, #27ae60 0 75%, #2e86de 0); }
+.uc.big { width: 46px; height: 68px; font-size: 20px; cursor: default; }
+.uc.back { background: #2c3e50; font-size: 11px; cursor: pointer; }
+.uc.back:disabled { opacity: .55; cursor: default; }
+.dr-row .uc { width: 26px; height: 26px; }
+.uno-hand .uc { cursor: default; transition: transform .1s; }
+.uno-hand .uc.can { cursor: pointer; transform: translateY(-5px); box-shadow: 0 0 0 2px #2ecc71; }
+.uno-hand .uc.drawn { box-shadow: 0 0 0 3px #f39c12; }
+.uno-hand .uc.dim { opacity: .5; }
+.uno-color { display: inline-block; width: 12px; height: 12px; margin-right: 4px; border-radius: 50%; vertical-align: middle; }
+.unobtn { color: #c0392b; font-weight: 700; }
 .cmpinvite { background: #eef2f8; border: 1px solid #cdd8e8; border-radius: 8px; padding: 8px 12px; margin: 4px 0; display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
 .cmpinvite button { padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; border: 1px solid var(--grid-line); background: var(--paper); }
 .cmpinvite .mpaccept { background: var(--check); color: #fff; border-color: var(--check); }
@@ -499,7 +537,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
-            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button></div>
+            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button></div>
             <div class="cimgbar" id="cimgbar" hidden><img id="cimgthumb" alt=""><span id="cimginfo">Bild senden?</span><button class="vbtn" id="cimgsend" type="button">Senden</button><button class="vbtn" id="cimgcancel" type="button">Abbrechen</button></div>
             <div class="cimgview" id="cimgview" hidden></div>
             <div class="creply" id="creply" hidden><span class="crname" id="crname"></span><span class="crtext" id="crtext"></span><button class="crclose" id="crclose" type="button" title="Abbrechen">&times;</button></div>
@@ -1501,7 +1539,7 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten'};
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -1610,6 +1648,7 @@ async function useRoom(saved) {
   mpGame = null;
   mpInvites = [];
   mpOutbox = [];
+  mpTables.clear();
   conv = ALL;
 }
 
@@ -1794,6 +1833,7 @@ async function incoming(t, payload) {
   } else if (sub === ALL) {
     const body = await verify(box);
     if (body && room === r && body.kind === 'del') { applyDelete(ALL, body.from, body.id); return; }
+    if (body && room === r && body.kind === 'uopen') { unoTableSeen(body); return; }
     if (body && room === r && body.kind === 'react') { applyReact(ALL, body.from, String(body.owner || ''), body.id, body.e); return; }
     if (body && room === r && body.kind === 'img') { imgMeta(ALL, body.from, cleanName(body.name) || 'Unbekannt', body); return; }
     if (body && room === r && body.kind === 'imgc') { imgChunk(ALL, body.from, body); return; }
@@ -1973,7 +2013,7 @@ function toggleLb() {
   if (!p.hidden) renderLb();
 }
 function renderLb() {
-  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'ttt', 'c4'];
+  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'ttt', 'c4', 'uno', 'react'];
   const avail = allGames.filter(g => lb[g] && Object.keys(lb[g]).length);
   if (!avail.includes(lbGame)) lbGame = avail[0] || 'snake';
   $('clbtabs').replaceChildren(...avail.map(g =>
@@ -1984,7 +2024,7 @@ function renderLb() {
     .sort((a, b) => b.score - a.score);
   if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Scores für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
   const medals = ['gold', 'silver', 'bronze'];
-  const mpGames = ['ttt', 'c4'];
+  const mpGames = ['ttt', 'c4', 'uno', 'react'];
   $('clbbody').replaceChildren(el('table', {class: 'clbtable'},
     el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : 'Score'}))),
     el('tbody', {}, ...entries.map((e, i) => el('tr', {},
@@ -2033,14 +2073,18 @@ function startMp(gid, game, opponent, opName, myMark) {
   const board = game === 'ttt' ? Array(9).fill(0) : game === 'c4' ? Array.from({length: 6}, () => Array(7).fill(0)) : null;
   mpGame = {gid, game, opponent, opName, board, myMark, turn: 1, moves: 0, over: false, winner: 0, winCells: null};
   if (game === 'draw') drNewRound(mpGame, 1);
+  else if (game === 'emoji') emNewRound(mpGame, 1);
+  else if (game === 'react') rxInit(mpGame);
+  else if (game === 'uno') unoStartDuo(mpGame);
   mpInvites = mpInvites.filter(i => i.from !== opponent && !i.mine);
   conv = opponent;
   renderChat();
 }
 // The board takes the place of the message list while the opponent's conversation is open.
+function mpConv(g) { return g.conv || g.opponent; }
 function syncMpView() {
-  if (mpGame && mpGame.over && conv !== mpGame.opponent) mpGame = null;
-  const on = !!mpGame && conv === mpGame.opponent;
+  if (mpGame && mpGame.over && conv !== mpConv(mpGame)) mpGame = null;
+  const on = !!mpGame && conv === mpConv(mpGame);
   cmsgs.hidden = on;
   ctypingEl.hidden = on;
   $('cform').style.display = on ? 'none' : '';
@@ -2049,8 +2093,11 @@ function syncMpView() {
 }
 function renderMpBoard() {
   if (!mpGame) return;
-  $('cmpboard').classList.toggle('drawing', mpGame.game === 'draw');
+  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno'].includes(mpGame.game));
   if (mpGame.game === 'draw') { renderDraw(); return; }
+  if (mpGame.game === 'emoji') { renderEmoji(); return; }
+  if (mpGame.game === 'react') { renderReact(); return; }
+  if (mpGame.game === 'uno') { renderUno(); return; }
   const g = mpGame, myTurn = g.turn === g.myMark;
   const opLabel = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
   if (g.over) {
@@ -2114,6 +2161,8 @@ function playMove(m) {
 function finishMp() {
   const g = mpGame;
   if (!g) return;
+  if (g.game === 'uno') { finishUno(g); return; }
+  if (g.game === 'emoji') { clearTimeout(g.em.timer); addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: 'Emoji-Raten beendet.', ts: Date.now()}); return; }
   if (g.game === 'draw') { clearTimeout(g.timer); addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: 'Malen & Raten beendet.', ts: Date.now()}); return; }
   if (g.winner === g.myMark) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
   const gameName = GAME_NAMES[g.game];
@@ -2126,7 +2175,7 @@ async function sendMpMsg(to, payload) {
 // MQTT drops messages while a connection is down, so game messages are resent until acknowledged;
 // otherwise one lost move leaves both players waiting for each other forever.
 function sendReliable(to, p) {
-  mpOutbox = mpOutbox.filter(o => o.p.gid !== p.gid);
+  mpOutbox = mpOutbox.filter(o => !(o.to === to && o.p.gid === p.gid && o.p.n === p.n));
   const o = {to, p, tries: 0};
   mpOutbox.push(o);
   sendMpMsg(to, p).catch(() => {});
@@ -2156,9 +2205,10 @@ function declineMp(inv) {
 function resignMp() {
   const g = mpGame;
   if (!g || g.over) return;
+  if (g.game === 'uno') { if (g.isHost) unoClose(g); else unoLeave(g); return; }
   g.over = true;
   g.winner = 3 - g.myMark;
-  sendReliable(g.opponent, {type: 'resign', gid: g.gid, n: g.game === 'draw' ? 1e9 : g.moves + 1});
+  sendReliable(g.opponent, {type: 'resign', gid: g.gid, n: ['ttt', 'c4'].includes(g.game) ? g.moves + 1 : 1e9});
   finishMp();
   renderMpBoard();
 }
@@ -2171,14 +2221,14 @@ function bumpUnread(id) {
 function handleMp(from, dm) {
   const g = mpGame, gid = String(dm.gid || '');
   if (!gid) return;
-  if (['accept', 'move', 'resign', 'dstate'].includes(dm.type) && Number.isInteger(dm.n)) sendMpMsg(from, {type: 'ack', gid, n: dm.n}).catch(() => {});
+  if (dm.type !== 'ack' && Number.isInteger(dm.n)) sendMpMsg(from, {type: 'ack', gid, n: dm.n}).catch(() => {});
   if (dm.type === 'invite') {
     if (!cleanName(dm.name) || !GAME_NAMES[dm.game] || mpInvites.some(i => i.gid === gid)) return;
     mpInvites.push({gid, game: dm.game, from, name: cleanName(dm.name), ts: Date.now()});
     bumpUnread(from);
     if (conv === from) renderMsgs();
   } else if (dm.type === 'ack') {
-    mpOutbox = mpOutbox.filter(o => !(o.to === from && o.p.gid === gid && o.p.n <= dm.n));
+    mpOutbox = mpOutbox.filter(o => !(o.to === from && o.p.gid === gid && o.p.n === dm.n));
   } else if (dm.type === 'accept') {
     if (g && g.gid === gid) return;
     const inv = mpInvites.find(i => i.gid === gid && i.mine && i.from === from);
@@ -2194,21 +2244,704 @@ function handleMp(from, dm) {
     if (!mpInvites.some(i => i.gid === gid && i.mine && i.from === from)) return;
     mpInvites = mpInvites.filter(i => i.gid !== gid);
     addMsg(from, {id: 'dec-' + gid, from: 'system', name: '', text: nameOf(from) + ' hat die Einladung abgelehnt.', ts: Date.now()});
+  } else if (RX_TYPES.has(dm.type)) {
+    if (g && g.gid === gid && g.opponent === from && g.game === 'react' && !g.over) handleReact(g, dm);
+  } else if (EM_TYPES.has(dm.type)) {
+    if (g && g.gid === gid && g.opponent === from && g.game === 'emoji' && !g.over) handleEmoji(g, dm);
+  } else if (UNO_TYPES.has(dm.type)) {
+    handleUno(from, gid, dm);
   } else if (DRAW_TYPES.has(dm.type)) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'draw' && !g.over) handleDraw(g, dm);
   } else if (dm.type === 'move') {
-    if (!g || g.game === 'draw' || g.gid !== gid || g.opponent !== from || g.over || dm.n !== g.moves + 1 || g.turn === g.myMark) return;
+    if (!g || !['ttt', 'c4'].includes(g.game) || g.gid !== gid || g.opponent !== from || g.over || dm.n !== g.moves + 1 || g.turn === g.myMark) return;
     if (!applyMove(g, 3 - g.myMark, dm)) return;
     bumpUnread(from);
     if (conv === from) renderMpBoard();
   } else if (dm.type === 'resign') {
-    if (!g || g.gid !== gid || g.opponent !== from || g.over) return;
+    if (!g || g.gid !== gid || g.opponent !== from || g.over || g.game === 'uno') return;
     g.over = true;
     g.winner = g.myMark;
     finishMp();
     bumpUnread(from);
     if (conv === from) renderMpBoard();
   }
+}
+
+/* Reaktions-Duell: each side measures its own reaction locally, so network delay doesn't matter. */
+const RX_WIN = 3, RX_SLOW = 2000;
+const RX_TYPES = new Set(['rgo', 'rres']);
+function rxInit(g) {
+  g.rx = {r: 0, phase: 'idle', pending: null, my: {}, their: {}, scored: {}, wins: [0, 0], last: '', timer: 0, goAt: 0};
+  if (g.myMark === 1) rxNextRound(g);
+}
+function rxNextRound(g) {
+  const rx = g.rx, r = rx.r + 1, delay = Math.round(1500 + Math.random() * 3000);
+  rx.pending = {r, delay};
+  sendReliable(g.opponent, {type: 'rgo', gid: g.gid, n: r * 10 + 1, r, delay});
+}
+// A round only starts once its player is looking at the board, so nobody loses for being in another chat.
+function rxMaybeStart(g) {
+  const rx = g.rx, p = rx.pending;
+  if (!p || g.over || conv !== g.opponent || !chatVisible()) return;
+  rx.pending = null;
+  rx.r = p.r;
+  rx.phase = 'ready';
+  clearTimeout(rx.timer);
+  rx.timer = setTimeout(() => {
+    if (mpGame !== g || rx.r !== p.r || rx.phase !== 'ready') return;
+    rx.phase = 'go';
+    rx.goAt = performance.now();
+    renderReact();
+    rx.timer = setTimeout(() => { if (mpGame === g && rx.r === p.r && rx.phase === 'go') rxResult(g, RX_SLOW); }, RX_SLOW);
+  }, p.delay);
+}
+function rxHit() {
+  const g = mpGame;
+  if (!g || g.game !== 'react' || g.over) return;
+  const rx = g.rx;
+  if (rx.phase === 'ready') rxResult(g, -1);
+  else if (rx.phase === 'go') rxResult(g, Math.max(1, Math.round(performance.now() - rx.goAt)));
+}
+function rxResult(g, t) {
+  const rx = g.rx;
+  clearTimeout(rx.timer);
+  rx.phase = 'done';
+  rx.my[rx.r] = t;
+  sendReliable(g.opponent, {type: 'rres', gid: g.gid, n: rx.r * 10 + 2 + g.myMark * 1000, r: rx.r, t});
+  rxCheck(g);
+  renderReact();
+}
+function rxFmt(t) { return t < 0 ? 'Fehlstart' : t >= RX_SLOW ? 'zu langsam' : t + ' ms'; }
+function rxCheck(g) {
+  const rx = g.rx, r = rx.r, a = rx.my[r], b = rx.their[r];
+  if (a === undefined || b === undefined || rx.scored[r]) return;
+  rx.scored[r] = true;
+  const sa = a < 0 ? Infinity : a, sb = b < 0 ? Infinity : b;
+  const who = sa < sb ? 'me' : sb < sa ? 'them' : '';
+  if (who === 'me') rx.wins[g.myMark - 1]++;
+  if (who === 'them') rx.wins[2 - g.myMark]++;
+  rx.last = 'Du: ' + rxFmt(a) + ' · ' + g.opName + ': ' + rxFmt(b) + ' → ' + (who === 'me' ? 'Punkt für dich!' : who === 'them' ? 'Punkt für ' + g.opName : 'Unentschieden');
+  const mine = rx.wins[g.myMark - 1], theirs = rx.wins[2 - g.myMark];
+  if (mine >= RX_WIN || theirs >= RX_WIN) {
+    g.over = true;
+    g.winner = mine >= RX_WIN ? g.myMark : 3 - g.myMark;
+    finishMp();
+  } else if (g.myMark === 1) {
+    setTimeout(() => { if (mpGame === g && !g.over) { rxNextRound(g); if (conv === g.opponent) renderReact(); } }, 2500);
+  }
+}
+function handleReact(g, dm) {
+  const rx = g.rx, r = dm.r;
+  if (!Number.isInteger(r) || r < 1 || r > 999) return;
+  if (dm.type === 'rgo') {
+    if (g.myMark !== 2 || r <= rx.r || (rx.pending && rx.pending.r >= r) || !Number.isFinite(dm.delay)) return;
+    rx.pending = {r, delay: Math.max(1000, Math.min(6000, dm.delay))};
+    bumpUnread(g.opponent);
+  } else if (dm.type === 'rres') {
+    if (rx.their[r] !== undefined || !Number.isFinite(dm.t)) return;
+    rx.their[r] = dm.t < 0 ? -1 : Math.min(RX_SLOW, Math.max(1, Math.round(dm.t)));
+    if (r === rx.r) rxCheck(g);
+  }
+  if (conv === g.opponent) renderMpBoard();
+}
+function renderReact() {
+  const g = mpGame;
+  if (!g || g.game !== 'react') return;
+  const grid = $('cmpgrid'), rx = g.rx;
+  if (grid.dataset.gid !== g.gid || !$('rxbox')) {
+    grid.className = 'rx-wrap';
+    grid.dataset.gid = g.gid;
+    const box = el('div', {class: 'rx-box', id: 'rxbox'});
+    box.addEventListener('pointerdown', e => { e.preventDefault(); rxHit(); });
+    grid.replaceChildren(el('div', {class: 'rx-score', id: 'rxscore'}), box, el('div', {class: 'rx-last', id: 'rxlast'}));
+  }
+  rxMaybeStart(g);
+  const mine = rx.wins[g.myMark - 1], theirs = rx.wins[2 - g.myMark];
+  $('rxscore').textContent = 'Du ' + mine + ' : ' + theirs + ' ' + g.opName + '   (bis ' + RX_WIN + ')';
+  const box = $('rxbox'), my = rx.my[rx.r];
+  const st = g.over ? 'over' : rx.pending ? 'wait' : rx.phase;
+  box.className = 'rx-box ' + st;
+  box.textContent = g.over ? (g.winner === g.myMark ? '🏆 Gewonnen!' : g.opName + ' gewinnt')
+    : st === 'wait' ? 'Bereit? Gleich geht\'s los…'
+    : st === 'ready' ? 'Warte auf Grün…'
+    : st === 'go' ? 'JETZT!'
+    : st === 'done' ? rxFmt(my) + (rx.their[rx.r] === undefined ? ' – warte auf ' + g.opName + '…' : '')
+    : 'Warte auf ' + g.opName + '…';
+  $('rxlast').textContent = rx.last;
+  $('cmpstatus').textContent = g.over ? (g.winner === g.myMark ? 'Du hast gewonnen!' : g.opName + ' hat gewonnen!')
+    : 'Reaktions-Duell vs ' + g.opName + (people.has(g.opponent) ? '' : ' (offline)') + ' — klick, sobald es grün wird!';
+  const res = $('cmpresult');
+  res.hidden = false;
+  res.replaceChildren(g.over
+    ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
+    : el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
+}
+setInterval(() => { const g = mpGame; if (g && g.game === 'react' && g.rx.pending && conv === g.opponent && chatVisible()) renderReact(); }, 500);
+
+/* Emoji-Raten */
+const EM_TYPES = new Set(['estate', 'eguess']);
+const EM_ITEMS = [
+  ['Film', 'Der König der Löwen|König der Löwen;Titanic;Harry Potter;Star Wars;Findet Nemo;Die Eiskönigin|Eiskönigin|Frozen;Spider-Man|Spiderman;Shrek;Toy Story;Fluch der Karibik;Jurassic Park;Der Herr der Ringe|Herr der Ringe;Batman;Avengers;Cars;Minions;Ice Age;Madagascar;Avatar;Barbie;Top Gun;Fast & Furious|Fast and Furious;Kevin allein zu Haus|Kevin allein zu Hause;Der weiße Hai|Der weisse Hai|Weißer Hai;Ghostbusters;Zurück in die Zukunft;Matrix;Indiana Jones;Rapunzel;Arielle die Meerjungfrau|Arielle;Die Schöne und das Biest;Aladdin;Das Dschungelbuch|Dschungelbuch;Ratatouille;Oben;Alles steht Kopf;Coco;Encanto;Vaiana;Zoomania;Kung Fu Panda;Drachenzähmen leicht gemacht;King Kong;Wall-E;Super Mario Bros;Transformers;Men in Black;James Bond;Rocky;Iron Man;Black Panther;Joker;Jumanji;Der Grinch|Grinch;Schneewittchen;Cinderella|Aschenputtel;Bambi;Dumbo;Pinocchio;Peter Pan;Hotel Transsilvanien;Die Unglaublichen;Die Monster AG|Monster AG;Mamma Mia;Die Tribute von Panem|Tribute von Panem;Godzilla;Planet der Affen;E.T.|ET;Terminator;Das Boot;Der Schuh des Manitu|Schuh des Manitu;Fack ju Göhte;Oppenheimer'],
+  ['Serie', 'Stranger Things;Squid Game;Haus des Geldes;Game of Thrones;The Walking Dead|Walking Dead;Breaking Bad;Wednesday;Peppa Wutz|Peppa Pig;Biene Maja;Paw Patrol;Die Simpsons|Simpsons;SpongeBob|Spongebob Schwammkopf;Die Sendung mit der Maus|Sendung mit der Maus;Tatort;Bauer sucht Frau;Wer wird Millionär;Pokémon|Pokemon;One Piece;Naruto;Dragon Ball;Die Schlümpfe|Schlümpfe;Bob der Baumeister;Sherlock;Friends;Lucifer;Germany\'s Next Topmodel|GNTM;Das Traumschiff|Traumschiff;Sesamstraße|Sesamstrasse'],
+  ['Song', 'Atemlos durch die Nacht|Atemlos;99 Luftballons;Let It Go;Despacito;Baby Shark;Bohemian Rhapsody;Thriller;Yellow Submarine;Highway to Hell;Purple Rain;Ice Ice Baby;Gangnam Style;Shape of You;Bad Guy;Blinding Lights;Flowers;Happy;Firework;Umbrella;We Will Rock You;Rolling in the Deep;Old Town Road;Dancing Queen;Wonderwall;Hotel California;Lemon Tree;Barbie Girl;Macarena;Who Let the Dogs Out;Eye of the Tiger;Diamonds;Roar;Toxic;Poker Face;Tage wie diese;Ein Hoch auf uns;Major Tom;Last Christmas;Jingle Bells;Alle meine Entchen;Happy Birthday;Billie Jean;Smells Like Teen Spirit;Waterloo;Griechischer Wein;Bella Ciao;Rote Lippen soll man küssen'],
+  ['Spiel', 'Minecraft;Fortnite;Tetris;Pac-Man|Pacman;Angry Birds;Among Us;Mario Kart;FIFA|EA FC;Pokémon Go|Pokemon Go;Candy Crush;Roblox;GTA|Grand Theft Auto;Zelda;Super Mario;Sonic;Clash of Clans;Mensch ärgere dich nicht;Monopoly;Schach;Uno;Jenga;Twister;Flappy Bird;Snake;Die Sims|Sims;Call of Duty;Subway Surfers;Fall Guys;Brawl Stars;Topfschlagen;Reise nach Jerusalem;Verstecken'],
+  ['Märchen', 'Rotkäppchen;Hänsel und Gretel;Dornröschen;Der Froschkönig|Froschkönig;Die Bremer Stadtmusikanten|Bremer Stadtmusikanten;Der Wolf und die sieben Geißlein|Der Wolf und die sieben Geisslein;Rumpelstilzchen;Die drei kleinen Schweinchen|Drei kleine Schweinchen;Das hässliche Entlein|Hässliche Entlein;Der gestiefelte Kater|Gestiefelte Kater;Frau Holle;Der Hase und der Igel|Hase und Igel']
+].flatMap(([c, list]) => list.split(';').map(t => ({c, t})));
+const EM_PALETTE = ('😀 😂 😍 😎 🤔 😱 😭 😡 😴 🤢 🥶 🥵 🤯 🥳 😇 😈 👻 💀 🤖 👽 🤡 💩 ' +
+  '👶 👦 👧 👨 👩 👴 👵 👮 👷 🕵️ 👸 🤴 👰 🤵 🧙 🧚 🧛 🧜 🧞 🧟 🦸 🦹 🎅 🏃 💃 🕺 🏊 🚴 🏄 ⛷️ 🥷 👪 ' +
+  '👀 👂 👃 👄 🦷 💪 👋 👍 👎 👊 ✌️ 🙏 👑 💍 👓 🕶️ 🎩 🧢 👗 👠 👟 🧤 ' +
+  '🐶 🐱 🐭 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🦆 🦅 🦉 🦇 🐺 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🕷️ 🐢 🐍 🦖 🦕 🐙 🦀 🐠 🐟 🐬 🐳 🦈 🐊 🐅 🦓 🦍 🐘 🦒 🐑 🐐 🐪 🐀 🦔 🐉 ' +
+  '🌵 🎄 🌲 🌴 🍀 🍁 🍄 🌹 🌻 🌍 🌙 ⭐ ☀️ 🌈 ☁️ ⛈️ ❄️ ☃️ 🔥 💧 🌊 🌋 🏔️ 🏝️ ' +
+  '🍎 🍌 🍇 🍓 🍉 🍋 🍒 🍍 🥥 🥕 🌽 🥔 🍞 🧀 🍗 🍔 🍟 🍕 🌭 🌮 🍝 🍣 🍦 🍩 🍪 🎂 🍫 🍭 🍯 🥛 ☕ 🍺 🍷 ' +
+  '⚽ 🏀 🏈 🎾 🎱 🏓 🥊 🏆 🥇 🎮 🎲 🧩 🎯 🎸 🎹 🥁 🎺 🎻 🎤 🎧 🎬 🎨 🎭 🎪 📺 📷 💻 📱 ☎️ 💡 🕯️ 💰 💎 🔧 🔨 ⚔️ 💣 🔪 🛡️ 🔮 💊 🧪 🔭 📚 ✉️ 📦 🎁 🎈 🎉 🧸 ⏰ ⌛ 🔑 🚪 🛏️ 🚽 🛁 🧹 ' +
+  '🚗 🚕 🚓 🚑 🚒 🚚 🚜 🏎️ 🏍️ 🚲 🚂 ✈️ 🚁 🚀 🛸 ⛵ 🚢 ⚓ 🏠 🏰 🗼 🗽 🏥 🏫 ⛪ 🎡 🎢 ' +
+  '❤️ 💔 💯 ❗ ❓ ➕ ➖ ✖️ ➡️ ⬅️ ⬆️ ⬇️ 🔄 🚫 ✅ ❌ 💤 💬 🎵 🔔 🆕 🔝 0️⃣ 1️⃣ 2️⃣ 3️⃣ 9️⃣ 🔟 🇩🇪 🇺🇸 🇬🇧 🇫🇷 🇮🇹 🇯🇵').split(' ');
+
+function emDescriber(g) { return (g.em.r % 2 === 1 ? 1 : 2) === g.myMark; }
+function emNorm(t) { return drNorm(String(t).replace(/^\s*(der|die|das|the|ein|eine)\s+/i, '')); }
+function emNames(item) { return item.t.split('|'); }
+function emGraphemes(s) {
+  return window.Intl && Intl.Segmenter ? [...new Intl.Segmenter('de', {granularity: 'grapheme'}).segment(s)].map(x => x.segment) : [...s];
+}
+// Only pictures count as a clue: letters and digits are stripped, so nobody can just type the answer.
+function emClean(s) { return emGraphemes(String(s)).filter(ch => !/^[\p{L}\p{N}]+$/u.test(ch)).join('').replace(/\s+/g, ' ').trim().slice(0, 80); }
+function emPick3() {
+  const out = [];
+  while (out.length < 3) {
+    const it = EM_ITEMS[Math.floor(Math.random() * EM_ITEMS.length)];
+    if (!out.includes(it)) out.push(it);
+  }
+  return out;
+}
+function emNewRound(g, r) {
+  clearTimeout(g.em && g.em.timer);
+  g.em = {r, item: null, clue: '', v: 0, rv: -1, done: false, by: null, log: [], hints: [], timer: 0, focused: false};
+  g.em.choices = emDescriber(g) ? emPick3() : null;
+}
+function emSendState(g) {
+  const em = g.em;
+  em.v++;
+  sendReliable(g.opponent, {type: 'estate', gid: g.gid, n: em.r * 1000 + em.v, r: em.r, v: em.v,
+    t: em.item && em.item.t, c: em.item && em.item.c, clue: em.clue, done: em.done, by: em.by});
+}
+function emReveal(g, by) {
+  const em = g.em;
+  em.done = true;
+  em.by = by;
+  clearTimeout(em.timer);
+  em.timer = setTimeout(() => {
+    if (mpGame !== g || g.over || !em.done || g.em !== em) return;
+    emNewRound(g, em.r + 1);
+    if (conv === g.opponent) renderMpBoard();
+  }, 4500);
+}
+function emChoose(it) {
+  const g = mpGame;
+  if (!g || g.over || !emDescriber(g) || g.em.item || !g.em.choices.includes(it)) return;
+  g.em.item = it;
+  g.em.choices = null;
+  emSendState(g);
+  renderEmoji();
+  const inp = $('emin');
+  if (inp) inp.focus();
+}
+function emAdd(e) {
+  const inp = $('emin');
+  if (!inp) return;
+  inp.value = emClean(inp.value + e);
+  inp.focus();
+}
+function emBack() {
+  const inp = $('emin');
+  if (!inp) return;
+  const gs = emGraphemes(inp.value.trimEnd());
+  gs.pop();
+  inp.value = gs.join('');
+  inp.focus();
+}
+function emSendClue() {
+  const g = mpGame, inp = $('emin');
+  if (!g || g.over || !emDescriber(g) || !g.em.item || g.em.done || !inp) return;
+  const clue = emClean(inp.value);
+  inp.value = clue;
+  if (!clue || clue === g.em.clue) return;
+  g.em.clue = clue;
+  emSendState(g);
+  renderEmoji();
+}
+function emGuess() {
+  const g = mpGame, inp = $('emguess');
+  if (!g || !inp) return;
+  const text = inp.value.trim().slice(0, 60);
+  inp.value = '';
+  const em = g.em;
+  if (g.over || !text || !em.item || !em.clue || em.done || emDescriber(g)) return;
+  const a = emNorm(text), names = emNames(em.item).map(emNorm);
+  const ok = names.includes(a);
+  const near = !ok && names.some(b => b.length > 3 && drDist(a, b) <= (b.length >= 8 ? 2 : 1));
+  em.log.push({me: true, text, ok, near});
+  sendMpMsg(g.opponent, {type: 'eguess', gid: g.gid, r: em.r, text, ok, near}).catch(() => {});
+  if (ok) { emReveal(g, 'guess'); emSendState(g); }
+  renderEmoji();
+}
+function emGiveUp() {
+  const g = mpGame;
+  if (!g || g.over || !g.em.item || g.em.done) return;
+  emReveal(g, 'skip');
+  emSendState(g);
+  renderEmoji();
+}
+function emHint() {
+  const g = mpGame, em = g && g.em;
+  if (!em || !em.item || em.done) return;
+  const t = emNames(em.item)[0];
+  const open = [...t].map((ch, i) => i).filter(i => /[\p{L}\p{N}]/u.test(t[i]) && !em.hints.includes(i));
+  if (open.length <= 1) return;
+  em.hints.push(open[Math.floor(Math.random() * open.length)]);
+  renderEmoji();
+}
+function handleEmoji(g, dm) {
+  const em = g.em;
+  if (dm.type === 'estate') {
+    const r = dm.r;
+    if (!Number.isInteger(r) || r < em.r || r > em.r + 50 || !Number.isInteger(dm.v)) return;
+    if (r > em.r) emNewRound(g, r);
+    const e2 = g.em;
+    if (dm.v <= e2.rv) return;
+    e2.rv = dm.v;
+    if (!e2.item && typeof dm.t === 'string' && dm.t && typeof dm.c === 'string') e2.item = {t: dm.t.slice(0, 80), c: dm.c.slice(0, 20)};
+    if (typeof dm.clue === 'string' && !emDescriber(g)) {
+      const clue = emClean(dm.clue);
+      if (clue !== e2.clue) { e2.clue = clue; bumpUnread(g.opponent); }
+    }
+    if (dm.done && !e2.done && e2.item) { emReveal(g, dm.by === 'guess' ? 'guess' : 'skip'); bumpUnread(g.opponent); }
+  } else if (dm.type === 'eguess') {
+    if (dm.r !== em.r || !emDescriber(g) || typeof dm.text !== 'string') return;
+    em.log.push({me: false, text: dm.text.slice(0, 60), ok: !!dm.ok, near: !!dm.near});
+  }
+  if (conv === g.opponent) renderMpBoard();
+}
+
+function buildEmoji(g) {
+  const grid = $('cmpgrid');
+  grid.className = 'em-wrap';
+  grid.dataset.gid = g.gid;
+  const emin = el('input', {class: 'vlinkin', id: 'emin', type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: 'Emojis hier (auch Win + .)',
+    oninput: () => { const v = emClean($('emin').value); if (v !== $('emin').value.trim()) $('emin').value = v; },
+    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); emSendClue(); } }});
+  const guess = el('input', {class: 'vlinkin', id: 'emguess', type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '60', placeholder: 'Was ist das?',
+    onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); emGuess(); } }});
+  grid.replaceChildren(
+    el('div', {class: 'em-title', id: 'emtitle'}),
+    el('div', {class: 'em-clue', id: 'emclue'}),
+    el('div', {class: 'dr-choices', id: 'emchoices'}),
+    el('div', {class: 'dr-row', id: 'emcompose'}, emin,
+      el('button', {class: 'vbtn', type: 'button', text: '⌫', title: 'Letztes Emoji löschen', onclick: emBack}),
+      el('button', {class: 'vbtn', type: 'button', text: 'Senden', onclick: emSendClue}),
+      el('button', {class: 'vbtn', type: 'button', text: 'Überspringen', onclick: emGiveUp})),
+    el('div', {class: 'em-pal', id: 'empal'}, ...EM_PALETTE.map(e => el('button', {type: 'button', text: e, onclick: () => emAdd(e)}))),
+    el('div', {class: 'dr-row', id: 'emguessrow'}, guess,
+      el('button', {class: 'vbtn', type: 'button', text: 'Raten', onclick: emGuess}),
+      el('button', {class: 'vbtn', type: 'button', text: 'Tipp', title: 'Einen Buchstaben aufdecken', onclick: emHint}),
+      el('button', {class: 'vbtn', type: 'button', text: 'Auflösen', onclick: emGiveUp})),
+    el('div', {class: 'dr-log', id: 'emlog'}));
+}
+function renderEmoji() {
+  const g = mpGame;
+  if (!g || g.game !== 'emoji') return;
+  if ($('cmpgrid').dataset.gid !== g.gid || !$('emclue')) buildEmoji(g);
+  const em = g.em, desc = emDescriber(g), op = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
+  const name = em.item && emNames(em.item)[0];
+  const playing = !g.over && em.item && !em.done;
+  $('cmpstatus').textContent = g.over ? 'Emoji-Raten beendet'
+    : em.done ? (em.by === 'guess' ? (desc ? g.opName + ' hat es erraten!' : 'Richtig erraten!') : 'Aufgelöst') + ' Gleich geht\'s weiter…'
+    : !em.item ? (desc ? 'Du bist dran: Such dir etwas aus' : op + ' sucht sich etwas aus…')
+    : desc ? (em.clue ? 'Gesendet – du kannst noch Emojis ergänzen' : 'Beschreibe es nur mit Emojis') : (em.clue ? 'Was ist das? Rate!' : op + ' überlegt sich Emojis…');
+
+  const title = $('emtitle');
+  if (!em.item) title.textContent = '';
+  else if (desc || em.done || g.over) title.textContent = em.item.c + ': ' + name;
+  else title.textContent = em.item.c + ': ' + [...name].map((ch, i) => /[\p{L}\p{N}]/u.test(ch) && !em.hints.includes(i) ? '_' : ch).join(' ') + '   (' + [...name].filter(ch => /[\p{L}\p{N}]/u.test(ch)).length + ')';
+  $('emclue').textContent = em.clue || (em.item && !desc && !em.done ? '…' : '');
+
+  const ch = $('emchoices');
+  ch.hidden = !(desc && !em.item && em.choices && !g.over);
+  if (!ch.hidden && ch.dataset.r !== String(em.r)) {
+    ch.dataset.r = em.r;
+    ch.replaceChildren(...em.choices.map(it => el('button', {class: 'vbtn', type: 'button', text: it.c + ': ' + emNames(it)[0], onclick: () => emChoose(it)})));
+  }
+  $('emcompose').hidden = $('empal').hidden = !(desc && playing);
+  $('emguessrow').hidden = desc || !playing || !em.clue;
+  if (!desc && playing && em.clue && !em.focused && conv === g.opponent && chatVisible()) { em.focused = true; $('emguess').focus(); }
+  $('emlog').replaceChildren(...em.log.slice(-6).flatMap((l, i) => [i ? ' · ' : '',
+    el('span', {class: l.ok ? 'ok' : l.near ? 'near' : '', text: (l.me ? '' : g.opName + ': ') + l.text + (l.near ? ' (knapp!)' : '')})]));
+  const res = $('cmpresult');
+  res.hidden = false;
+  res.replaceChildren(g.over
+    ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
+    : el('button', {class: 'vbtn', text: 'Beenden', onclick: resignMp}));
+}
+
+/* Uno: the host's browser shuffles, deals and checks every move; each player only ever receives their own hand. */
+const UNO_TYPES = new Set(['ujoin', 'ustate', 'uact', 'uleave', 'uclose', 'ufull']);
+const UNO_COLORS = {r: 'Rot', y: 'Gelb', g: 'Grün', b: 'Blau'};
+const UNO_HEX = {r: '#e74c3c', y: '#f1c40f', g: '#27ae60', b: '#2e86de'};
+const UNO_VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'S', 'R', '+2', 'W', '+4'];
+const UNO_MAX = 6;
+const mpTables = new Map();
+
+function unoShuffle(a) {
+  const r = new Uint32Array(a.length);
+  crypto.getRandomValues(r);
+  for (let i = a.length - 1; i > 0; i--) { const j = r[i] % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function unoDeck() {
+  const d = [];
+  let i = 0;
+  for (const c of 'rygb') {
+    d.push({i: i++, c, v: '0'});
+    for (const v of UNO_VALUES.slice(1, 13)) { d.push({i: i++, c, v}); d.push({i: i++, c, v}); }
+  }
+  for (let k = 0; k < 4; k++) { d.push({i: i++, c: 'w', v: 'W'}); d.push({i: i++, c: 'w', v: '+4'}); }
+  return unoShuffle(d);
+}
+function unoCanPlay(card, top, color) { return !!top && (card.c === 'w' || card.c === color || card.v === top.v); }
+function unoLabel(v) { return {S: '⊘', R: '⇄', W: '★'}[v] || v; }
+function unoCardName(c) {
+  if (c.c === 'w') return c.v === '+4' ? '+4' : 'Farbwahl';
+  return UNO_COLORS[c.c] + ' ' + ({S: 'Aussetzen', R: 'Richtungswechsel'}[c.v] || c.v);
+}
+function unoNext(u, s = 1) { const n = u.players.length; return ((u.turn + u.dir * s) % n + n) % n; }
+
+function unoNewHost(g, players) {
+  g.isHost = true;
+  g.u = {players: players.map(p => ({id: p.id, name: p.name})), started: false, over: false, winner: null, seq: 0,
+    hands: {}, deck: [], pile: [], color: 'r', turn: 0, dir: 1, drawn: null, uno: {}, log: '', missing: {}};
+}
+function unoStart(g) {
+  const u = g.u;
+  if (!g.isHost || u.started || u.players.length < 2) return;
+  u.deck = unoDeck();
+  for (const p of u.players) u.hands[p.id] = u.deck.splice(0, 7);
+  let top = u.deck.pop();
+  while (!/^\d$/.test(top.v)) { u.deck.unshift(top); top = u.deck.pop(); }
+  Object.assign(u, {pile: [top], color: top.c, turn: 0, dir: 1, started: true, drawn: null});
+  u.log = 'Karten sind verteilt – ' + u.players[0].name + ' fängt an.';
+  if (g.conv === ALL) unoAnnounce(g, false);
+  unoPublish(g);
+}
+function unoDraw(u, id, k) {
+  const got = [];
+  for (let n = 0; n < k; n++) {
+    if (!u.deck.length && u.pile.length > 1) { const top = u.pile.pop(); u.deck = unoShuffle(u.pile); u.pile = [top]; }
+    if (!u.deck.length) break;
+    const c = u.deck.pop();
+    u.hands[id].push(c);
+    got.push(c);
+  }
+  if (u.hands[id].length > 2) u.uno[id] = false;
+  return got;
+}
+function unoAct(g, from, a) {
+  const u = g.u;
+  if (!u.started || u.over) return false;
+  const pi = u.players.findIndex(p => p.id === from);
+  if (pi < 0) return false;
+  const hand = u.hands[from], name = u.players[pi].name;
+  if (a.a === 'uno') {
+    if (hand.length > 2 || u.uno[from]) return false;
+    u.uno[from] = true;
+    u.log = name + ' ruft UNO!';
+    return true;
+  }
+  if (pi !== u.turn || a.seq !== u.seq) return false;
+  const top = u.pile[u.pile.length - 1];
+  if (a.a === 'play') {
+    const k = hand.findIndex(c => c.i === a.i);
+    if (k < 0) return false;
+    const card = hand[k];
+    if ((u.drawn !== null && u.drawn !== card.i) || !unoCanPlay(card, top, u.color) || (card.c === 'w' && !UNO_COLORS[a.color])) return false;
+    hand.splice(k, 1);
+    u.pile.push(card);
+    u.color = card.c === 'w' ? a.color : card.c;
+    u.drawn = null;
+    let log = name + ' legt ' + unoCardName(card) + (card.c === 'w' ? ' und wünscht sich ' + UNO_COLORS[a.color] : '');
+    if (hand.length === 1 && !u.uno[from]) { unoDraw(u, from, 2); log += ' – UNO vergessen! 2 Strafkarten'; }
+    u.uno[from] = false;
+    if (!hand.length) { u.over = true; u.winner = from; u.log = log + ' – ' + name + ' gewinnt! 🎉'; return true; }
+    if (card.v === 'S') { log += ' – ' + u.players[unoNext(u)].name + ' setzt aus'; u.turn = unoNext(u, 2); }
+    else if (card.v === 'R') {
+      if (u.players.length === 2) { u.turn = unoNext(u, 2); log += ' – nochmal dran'; }
+      else { u.dir *= -1; u.turn = unoNext(u); log += ' – Richtungswechsel'; }
+    } else if (card.v === '+2' || card.v === '+4') {
+      const v = unoNext(u), k2 = card.v === '+2' ? 2 : 4;
+      unoDraw(u, u.players[v].id, k2);
+      log += ' – ' + u.players[v].name + ' zieht ' + k2 + ' und setzt aus';
+      u.turn = unoNext(u, 2);
+    } else u.turn = unoNext(u);
+    u.log = log;
+    return true;
+  }
+  if (a.a === 'draw') {
+    if (u.drawn !== null) return false;
+    const [c] = unoDraw(u, from, 1);
+    if (c && unoCanPlay(c, top, u.color)) { u.drawn = c.i; u.log = name + ' zieht eine Karte'; }
+    else { u.turn = unoNext(u); u.log = name + ' zieht eine Karte' + (c ? '' : ' (Stapel leer)') + ' und ist durch'; }
+    return true;
+  }
+  if (a.a === 'pass') {
+    if (u.drawn === null) return false;
+    u.drawn = null;
+    u.turn = unoNext(u);
+    u.log = name + ' behält die Karte';
+    return true;
+  }
+  return false;
+}
+function unoView(g, id) {
+  const u = g.u, cur = u.players[u.turn];
+  return {seq: u.seq, started: u.started, over: u.over, winner: u.winner, host: me.id,
+    players: u.players.map(p => ({id: p.id, name: p.name, n: (u.hands[p.id] || []).length})),
+    turn: u.turn, dir: u.dir, top: u.pile[u.pile.length - 1] || null, color: u.color, deckN: u.deck.length,
+    hand: u.hands[id] || [], drawn: cur && cur.id === id ? u.drawn : null, unoCalled: !!u.uno[id], log: u.log};
+}
+function unoPublish(g) {
+  const u = g.u;
+  u.seq++;
+  for (const p of u.players) if (p.id !== me.id) sendReliable(p.id, {type: 'ustate', gid: g.gid, n: u.seq, s: unoView(g, p.id)});
+  unoSetView(g, unoView(g, me.id));
+}
+function unoBusy(g) { return !!g.busy && Date.now() - g.busy < 3000; }
+function unoMyTurn(v) { return !!(v && v.started && !v.over && v.players[v.turn] && v.players[v.turn].id === me.id); }
+function unoSetView(g, v) {
+  const was = unoMyTurn(g.view);
+  g.view = v;
+  g.busy = false;
+  if (v.over && !g.over) { g.over = true; finishUno(g); }
+  else if (!was && unoMyTurn(v)) bumpUnread(g.conv);
+  if (mpGame === g && conv === g.conv) renderMpBoard();
+}
+function unoSanitize(s) {
+  const card = c => c && Number.isInteger(c.i) && /^[rygbw]$/.test(c.c) && UNO_VALUES.includes(c.v) ? {i: c.i, c: c.c, v: c.v} : null;
+  const players = (Array.isArray(s.players) ? s.players : []).slice(0, UNO_MAX).filter(p => p && validId(p.id))
+    .map(p => ({id: p.id, name: cleanName(p.name) || 'Unbekannt', n: Math.max(0, Math.min(200, p.n | 0))}));
+  return {seq: s.seq, started: !!s.started, over: !!s.over, winner: validId(s.winner) ? s.winner : null, players,
+    turn: Math.max(0, Math.min(players.length - 1, s.turn | 0)), dir: s.dir === -1 ? -1 : 1, top: card(s.top),
+    color: UNO_COLORS[s.color] ? s.color : 'r', deckN: Math.max(0, s.deckN | 0),
+    hand: (Array.isArray(s.hand) ? s.hand : []).slice(0, 200).map(card).filter(Boolean),
+    drawn: Number.isInteger(s.drawn) ? s.drawn : null, unoCalled: !!s.unoCalled, log: String(s.log || '').slice(0, 200)};
+}
+function finishUno(g) {
+  const v = g.view || {};
+  let text;
+  if (g.closed) text = g.isHost ? 'Uno: Du hast den Tisch geschlossen.' : 'Uno: Der Tisch wurde geschlossen.';
+  else if (g.left) text = 'Uno: Du hast den Tisch verlassen.';
+  else if (v.winner === me.id) { text = 'Uno: Du hast gewonnen! 🎉'; reportScore('uno', ((lb.uno || {})[me.id] || {score: 0}).score + 1); }
+  else { const w = (v.players || []).find(p => p.id === v.winner); text = 'Uno: ' + (w ? w.name : 'Jemand') + ' hat gewonnen!'; }
+  addMsg(g.conv, {id: 'mp-' + g.gid, from: 'system', name: '', text, ts: Date.now()});
+}
+
+function unoAnnounce(g, open) {
+  signed({kind: 'uopen', gid: g.gid, open, n: g.u.players.length}).then(b => publish(ALL, b)).catch(() => {});
+}
+function unoTableSeen(body) {
+  const gid = String(body.gid || '').slice(0, 40);
+  if (!gid) return;
+  if (body.open) {
+    if (!mpTables.has(gid)) bumpUnread(ALL);
+    mpTables.set(gid, {gid, host: body.from, name: cleanName(body.name) || nameOf(body.from), n: Math.max(1, Math.min(UNO_MAX, body.n | 0)), ts: Date.now()});
+  } else mpTables.delete(gid);
+  if (conv === ALL) renderMsgs();
+}
+function openUnoTable() {
+  if (!mq || mpRunning() || !room) return;
+  closePops();
+  const gid = me.id + Date.now().toString(36);
+  mpGame = {gid, game: 'uno', conv: ALL, opponent: null, opName: '', myMark: 1, over: false, annCount: 0};
+  unoNewHost(mpGame, [{id: me.id, name: me.name}]);
+  unoAnnounce(mpGame, true);
+  unoPublish(mpGame);
+  renderMsgs();
+}
+function joinUnoTable(t) {
+  if (!mq || mpRunning() || !people.has(t.host)) return;
+  mpGame = {gid: t.gid, game: 'uno', conv: ALL, opponent: t.host, opName: t.name, myMark: 2, over: false, isHost: false, hostMissing: 0,
+    view: {seq: 0, started: false, players: [], hand: [], log: ''}};
+  sendReliable(t.host, {type: 'ujoin', gid: t.gid, n: 1, name: me.name});
+  renderMsgs();
+}
+function unoStartDuo(g) {
+  g.conv = g.opponent;
+  if (g.myMark === 1) { unoNewHost(g, [{id: me.id, name: me.name}, {id: g.opponent, name: g.opName}]); unoStart(g); }
+  else { g.isHost = false; g.hostMissing = 0; g.view = {seq: 0, started: false, players: [], hand: [], log: ''}; }
+}
+function unoRemove(g, id, why) {
+  const u = g.u, k = u.players.findIndex(p => p.id === id);
+  if (k < 0 || id === me.id || u.over) return;
+  const p = u.players[k];
+  u.players.splice(k, 1);
+  delete u.missing[id];
+  if (u.started) {
+    u.deck.unshift(...(u.hands[id] || []));
+    delete u.hands[id];
+    if (k < u.turn) u.turn--;
+    else if (k === u.turn) { u.drawn = null; if (u.dir < 0) u.turn--; }
+    u.turn = (u.turn % u.players.length + u.players.length) % u.players.length;
+    u.log = p.name + why;
+    if (u.players.length < 2) { u.over = true; u.winner = u.players[0].id; u.log += ' – ' + u.players[0].name + ' gewinnt!'; }
+  } else if (g.conv === ALL) unoAnnounce(g, true);
+  unoPublish(g);
+}
+function unoClose(g) {
+  for (const p of g.u.players) if (p.id !== me.id) sendReliable(p.id, {type: 'uclose', gid: g.gid, n: 1e9});
+  if (g.conv === ALL && !g.u.started) unoAnnounce(g, false);
+  g.u.over = true;
+  g.over = true;
+  g.closed = true;
+  finishUno(g);
+  if (conv === g.conv) renderMpBoard();
+}
+function unoLeave(g) {
+  sendReliable(g.opponent, {type: 'uleave', gid: g.gid, n: 1e9});
+  g.over = true;
+  g.left = true;
+  finishUno(g);
+  if (conv === g.conv) renderMpBoard();
+}
+function unoDo(a) {
+  const g = mpGame;
+  if (!g || g.game !== 'uno' || g.over || !g.view || !g.view.started || !mq) return;
+  if (a.a !== 'uno' && unoBusy(g)) return;
+  const act = {...a, seq: g.view.seq};
+  if (g.isHost) { if (unoAct(g, me.id, act)) unoPublish(g); return; }
+  if (a.a !== 'uno') { g.busy = Date.now(); setTimeout(() => { if (mpGame === g && conv === g.conv) renderMpBoard(); }, 3100); }
+  g.actN = (g.actN || 0) + 1;
+  sendReliable(g.opponent, {type: 'uact', gid: g.gid, n: g.view.seq * 100 + g.actN % 100, ...act});
+}
+function handleUno(from, gid, dm) {
+  const g = mpGame;
+  if (dm.type === 'ujoin') {
+    if (!g || g.game !== 'uno' || g.gid !== gid || !g.isHost) { sendMpMsg(from, {type: 'ufull', gid}).catch(() => {}); return; }
+    const u = g.u;
+    if (u.players.some(p => p.id === from)) { unoPublish(g); return; }
+    if (u.started || g.over || u.players.length >= UNO_MAX || g.conv !== ALL) { sendMpMsg(from, {type: 'ufull', gid}).catch(() => {}); return; }
+    u.players.push({id: from, name: cleanName(dm.name) || nameOf(from)});
+    u.log = (cleanName(dm.name) || nameOf(from)) + ' sitzt jetzt am Tisch';
+    unoAnnounce(g, true);
+    unoPublish(g);
+    bumpUnread(ALL);
+    return;
+  }
+  if (!g || g.game !== 'uno' || g.gid !== gid) return;
+  if (g.isHost) {
+    if (!g.u.players.some(p => p.id === from)) return;
+    if (dm.type === 'uact') { if (!g.over && unoAct(g, from, {a: String(dm.a), i: dm.i, color: dm.color, seq: dm.seq})) unoPublish(g); }
+    else if (dm.type === 'uleave') unoRemove(g, from, ' hat den Tisch verlassen');
+    return;
+  }
+  if (from !== g.opponent || g.over) return;
+  if (dm.type === 'ustate') {
+    if (!dm.s || !Number.isInteger(dm.s.seq) || dm.s.seq <= g.view.seq) return;
+    unoSetView(g, unoSanitize(dm.s));
+    return;
+  }
+  if (dm.type === 'uclose') { g.over = true; g.closed = true; finishUno(g); }
+  else if (dm.type === 'ufull') {
+    if (g.view.started) return;
+    mpGame = null;
+    addMsg(g.conv, {id: 'full-' + gid, from: 'system', name: '', text: 'Uno: Der Tisch ist voll oder das Spiel läuft schon.', ts: Date.now()});
+    return;
+  }
+  if (conv === g.conv) renderMpBoard();
+}
+setInterval(() => {
+  const g = mpGame;
+  if (!g || g.game !== 'uno' || g.over || !mq) return;
+  if (g.isHost) {
+    for (const p of [...g.u.players]) {
+      if (p.id === me.id) continue;
+      if (people.has(p.id)) { delete g.u.missing[p.id]; continue; }
+      g.u.missing[p.id] = (g.u.missing[p.id] || 0) + 1;
+      if (g.u.missing[p.id] >= 3) unoRemove(g, p.id, ' ist offline und fliegt raus');
+    }
+    if (mpGame === g && g.conv === ALL && !g.u.started && !g.over && ++g.annCount % 3 === 0) unoAnnounce(g, true);
+  } else if (!people.has(g.opponent)) {
+    if (++g.hostMissing >= 3) { g.over = true; g.closed = true; finishUno(g); if (conv === g.conv) renderMpBoard(); }
+  } else g.hostMissing = 0;
+}, 5000);
+
+function unoCardEl(c, cls, onclick) {
+  return el('button', {class: 'uc ' + c.c + (cls ? ' ' + cls : ''), type: 'button', text: unoLabel(c.v), title: unoCardName(c), onclick});
+}
+function renderUno() {
+  const g = mpGame;
+  if (!g || g.game !== 'uno') return;
+  const v = g.view || {players: [], hand: [], started: false};
+  const grid = $('cmpgrid');
+  grid.className = 'uno-wrap';
+  grid.dataset.gid = '';
+  const mine = unoMyTurn(v), hostName = g.isHost ? me.name : g.opName;
+  const res = $('cmpresult');
+  res.hidden = false;
+  const leaveBtn = g.over ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
+    : el('button', {class: 'vbtn', text: g.isHost ? (v.started ? 'Spiel beenden' : 'Tisch schließen') : 'Verlassen', onclick: resignMp});
+
+  if (!v.started) {
+    const n = v.players.length;
+    $('cmpstatus').textContent = g.over ? 'Uno-Tisch geschlossen' : 'Uno-Tisch von ' + hostName;
+    grid.replaceChildren(
+      el('div', {class: 'uno-players'}, ...v.players.map(p => el('span', {class: 'uno-player', text: p.id === me.id ? p.name + ' (du)' : p.name}))),
+      el('div', {class: 'uno-log', text: !n ? 'Verbinde mit dem Tisch…'
+        : g.isHost ? (g.conv === ALL ? 'Die anderen klicken im „Alle“-Chat auf „Mitspielen“. ' : '') + n + ' von ' + UNO_MAX + ' Plätzen belegt.'
+        : 'Warte, bis ' + hostName + ' das Spiel startet…'}),
+      g.isHost && !g.over ? el('button', {class: 'vbtn', text: 'Spiel starten (' + n + '/' + UNO_MAX + ')', disabled: n < 2, onclick: () => unoStart(g)}) : null);
+    res.replaceChildren(leaveBtn);
+    return;
+  }
+
+  const cur = v.players[v.turn];
+  const winner = v.players.find(p => p.id === v.winner);
+  $('cmpstatus').textContent = g.closed ? 'Der Tisch wurde geschlossen' : g.left ? 'Du hast den Tisch verlassen'
+    : v.over ? (v.winner === me.id ? 'Du hast gewonnen! 🎉' : (winner ? winner.name : 'Jemand') + ' hat gewonnen!')
+    : mine ? (v.drawn !== null ? 'Leg die gezogene Karte oder klick „Weiter“' : 'Du bist dran!')
+    : (cur ? cur.name : '…') + ' ist dran';
+
+  const players = el('div', {class: 'uno-players'}, el('span', {class: 'uno-dir', text: v.dir > 0 ? '↻' : '↺', title: 'Spielrichtung'}),
+    ...v.players.map((p, i) => el('span', {class: 'uno-player' + (i === v.turn && !v.over ? ' on' : ''),
+      text: (p.id === me.id ? 'Du' : p.name) + ' · ' + p.n + (p.n === 1 ? ' Karte' : ' Karten')})));
+  const top = v.top;
+  const table = el('div', {class: 'uno-table'},
+    top ? unoCardEl(top, 'big') : null,
+    top && top.c === 'w' ? el('span', {class: 'uno-wish'}, el('span', {class: 'uno-color', style: 'background:' + UNO_HEX[v.color]}), UNO_COLORS[v.color]) : null,
+    el('button', {class: 'uc big back', type: 'button', text: 'Ziehen', title: v.deckN + ' Karten im Stapel', disabled: !mine || v.drawn !== null || unoBusy(g) || g.over,
+      onclick: () => unoDo({a: 'draw'})}));
+  const order = 'rygbw';
+  const hand = [...v.hand].sort((a, b) => order.indexOf(a.c) - order.indexOf(b.c) || UNO_VALUES.indexOf(a.v) - UNO_VALUES.indexOf(b.v));
+  const handEl = el('div', {class: 'uno-hand'}, ...hand.map(c => {
+    const ok = mine && !g.over && !unoBusy(g) && (v.drawn === null || v.drawn === c.i) && unoCanPlay(c, top, v.color);
+    return unoCardEl(c, ok ? 'can' + (c.i === v.drawn ? ' drawn' : '') : mine ? 'dim' : '', () => {
+      if (!ok) return;
+      if (c.c === 'w') { g.pick = c.i; renderUno(); } else unoDo({a: 'play', i: c.i});
+    });
+  }));
+  let actions;
+  if (g.pick !== undefined && g.pick !== null && mine && !g.over) {
+    actions = el('div', {class: 'dr-row'}, el('span', {text: 'Farbe wählen:'}),
+      ...Object.keys(UNO_COLORS).map(k => el('button', {class: 'uc ' + k, type: 'button', title: UNO_COLORS[k], text: '',
+        onclick: () => { const i = g.pick; g.pick = null; unoDo({a: 'play', i, color: k}); }})),
+      el('button', {class: 'vbtn', type: 'button', text: 'Abbrechen', onclick: () => { g.pick = null; renderUno(); }}));
+  } else {
+    g.pick = null;
+    actions = el('div', {class: 'dr-row'},
+      el('button', {class: 'vbtn unobtn', type: 'button', text: v.unoCalled ? 'UNO! ✓' : 'UNO!', title: 'Vor der vorletzten Karte drücken, sonst gibt es 2 Strafkarten',
+        disabled: g.over || v.unoCalled || v.hand.length > 2 || !v.hand.length, onclick: () => unoDo({a: 'uno'})}),
+      mine && v.drawn !== null ? el('button', {class: 'vbtn', type: 'button', text: 'Weiter', disabled: unoBusy(g), onclick: () => unoDo({a: 'pass'})}) : null,
+      leaveBtn);
+  }
+  grid.replaceChildren(players, table, el('div', {class: 'uno-log', text: v.log}), handEl, actions);
+  res.replaceChildren(g.over ? leaveBtn : '');
+  res.hidden = !g.over;
 }
 
 /* Malen & Raten */
@@ -2621,6 +3354,12 @@ function renderMsgs() {
       el('button', {class: 'mpaccept', text: 'Annehmen', disabled: mpRunning() || !mq, title: mpRunning() ? 'Erst das laufende Spiel beenden' : '', onclick: () => acceptMp(inv)}),
       el('button', {text: 'Ablehnen', onclick: () => declineMp(inv)})));
   });
+  if (c === ALL) for (const t of mpTables.values()) {
+    if (t.host === me.id || !people.has(t.host) || Date.now() - t.ts > 45000 || (mpGame && mpGame.gid === t.gid)) continue;
+    cmsgs.appendChild(el('div', {class: 'cmpinvite'},
+      el('span', {text: '🃏 ' + t.name + ' hat einen Uno-Tisch eröffnet (' + t.n + '/' + UNO_MAX + ')'}),
+      el('button', {class: 'mpaccept', text: 'Mitspielen', disabled: mpRunning() || !mq || t.n >= UNO_MAX, onclick: () => joinUnoTable(t)})));
+  }
   cmsgs.scrollTop = cmsgs.scrollHeight;
   syncMpView();
   updateComposer();
@@ -2633,7 +3372,9 @@ function updateComposer() {
   cin.disabled = !mq || offline;
   cin.placeholder = !mq ? 'Keine Verbindung' : offline ? nameOf(conv) + ' ist offline' : 'Nachricht schreiben';
   $('cemojiBtn').disabled = $('cgifBtn').disabled = cin.disabled;
-  $('cmpbtn').hidden = conv === ALL || !people.has(conv) || !mq || mpRunning();
+  $('cmpbtn').hidden = !mq || mpRunning() || (conv !== ALL && !people.has(conv));
+  for (const id of ['cmpTtt', 'cmpC4', 'cmpDraw', 'cmpReact', 'cmpEmoji']) $(id).hidden = conv === ALL;
+  $('cmpUno').textContent = conv === ALL ? 'Uno-Tisch eröffnen (2–6)' : 'Uno';
   if (cin.disabled) closePops();
 }
 
@@ -3031,6 +3772,9 @@ $('cmpbtn').addEventListener('click', () => togglePop('cmpbtn'));
 $('cmpTtt').addEventListener('click', () => { closePops(); inviteMp('ttt'); });
 $('cmpC4').addEventListener('click', () => { closePops(); inviteMp('c4'); });
 $('cmpDraw').addEventListener('click', () => { closePops(); inviteMp('draw'); });
+$('cmpEmoji').addEventListener('click', () => { closePops(); inviteMp('emoji'); });
+$('cmpReact').addEventListener('click', () => { closePops(); inviteMp('react'); });
+$('cmpUno').addEventListener('click', () => { closePops(); if (conv === ALL) openUnoTable(); else inviteMp('uno'); });
 
 // GIF search runs through the GIPHY API. GIPHY keys are meant to sit in client code; the only risk of a
 // public key is someone else using up its hourly limit. Search terms go to GIPHY unencrypted.
