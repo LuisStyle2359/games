@@ -2989,16 +2989,17 @@ function drDist(a, b) {
   return d[b.length];
 }
 const DR_DARK = 'Beerdigung;Sarg mit Notausgang;Grabstein mit QR-Code;Urne umgekippt;Opas Asche;Leichenschmaus;Erbschleicher;Testament;Lebensversicherung;Bestatter;Totengräber;Leichenstarre;Leichenwagen;Kreideumriss;Sensenmann;Sensenmann im Homeoffice;Henkersmahlzeit;Guillotine;Galgen;Elektrischer Stuhl;Giftmischerin;Auftragskiller;Betonschuhe;Leiche im Keller;Niere bei eBay;Kannibale;Zombie-Apokalypse;Goldfisch im Klo;Haiangriff;Fallschirm vergessen;Selfie an der Klippe;Geisterfahrer;Blindgänger;Eisberg voraus;Fallendes Klavier;Darwin Award;Halt mal mein Bier;Rollator-Rennen;Schwiegermutter im Kofferraum;Voodoo-Puppe;Horrorclown;Nahtoderfahrung;Totenkopf;Giftflasche'.split(';');
+const DR_CRUDE = 'Opas Arsch;Furzkissen;Furz im Fahrstuhl;Bremsspur;Arschgeweih;Arschbombe;Bauarbeiter-Dekolleté;Bierbauch;Popel essen;Käsefüße;Achselschweiß;Schweißflecken;Mundgeruch;Pickel ausdrücken;Rülpsen;Durchfall;Klo verstopft;Klopapier alle;Klobrille oben gelassen;Pinkeln im Pool;Hundehaufen;In Hundekacke getreten;Taubenkacke auf dem Kopf;Ohrenschmalz;Nasenhaare;Zehennagel;Gebiss im Wasserglas;Toupet im Wind;Halbglatze;Opa im Tanga;Oma beim Twerken;Speckrollen;Sabbernder Hund;Kotze im Taxi;Haare im Abfluss;Unterhose auf links;Sockenschuss;Blähungen;Kuhfladen;Zahnlücke'.split(';');
 // Entries may list other accepted spellings after '|'; the first one is shown.
 const DR_STREAMERS = 'Papaplatte;Gleggmire|Glegmire;MontanaBlack|Monte;Trymacs;Knossi;Gronkh;Unge;Rezo;HandOfBlood|Hänno;Rewinside|Rewi;Paluten;Stegi;Julien Bam|JulienBam;Elotrix;Mexify;Reved;Eligella;NoWay;Tanzverbot;Kayzahr;Inscope21;LeFloid;Dagi Bee|DagiBee;Bibi|BibisBeautyPalace;Fritz Meinecke;Simon Desue;Shurjoka;BastiGHG;Zarbex;Dner;Sidemen;MrBeast|Mr Beast;IShowSpeed|Speed;Kai Cenat;xQc;Ninja;KSI;Logan Paul'.split(';');
 function drMain(w) { return String(w).split('|')[0]; }
-function drCat(w) { return DR_STREAMERS.includes(w) ? 'Streamer' : DR_DARK.includes(w) ? 'schwarzer Humor' : ''; }
-// Two everyday words plus one streamer or dark-humour word, so the new ones come up every round.
+function drCat(w) { return DR_STREAMERS.includes(w) ? 'Streamer' : DR_DARK.includes(w) ? 'schwarzer Humor' : DR_CRUDE.includes(w) ? 'derb' : ''; }
+// Two everyday words plus one streamer, dark-humour or crude word, so the new ones come up every round.
 function drPick3() {
   const any = list => list[Math.floor(Math.random() * list.length)];
   const out = new Set();
   while (out.size < 2) out.add(any(DR_WORDS));
-  out.add(any(Math.random() < 0.5 ? DR_STREAMERS : DR_DARK));
+  out.add(any([DR_STREAMERS, DR_DARK, DR_CRUDE][Math.floor(Math.random() * 3)]));
   return [...out];
 }
 function drNewRound(g, r) {
