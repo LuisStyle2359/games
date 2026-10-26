@@ -1521,7 +1521,7 @@ const BROKERS = [
 ];
 // Our own relay (relay/worker.js on Cloudflare) runs next to the public brokers. The page stays connected to
 // both, sends everything over each and drops the duplicates, so either one can fail without anyone noticing.
-const OWN_BROKER = {url: ''};
+const OWN_BROKER = {url: 'wss://games.luisumbescheid1234.workers.dev/'};
 const ROOT = 'dv-2563318804-chat/';
 const ALL = 'all', MAXLEN = 500, STALE = 6 * 60000, DELETE_WINDOW = 5 * 60000;
 const chatEl = $('chat'), cpeople = $('cpeople'), cmsgs = $('cmsgs'), cin = $('cin'), cstat = $('cstat');
