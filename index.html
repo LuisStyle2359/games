@@ -1519,6 +1519,9 @@ const BROKERS = [
   {url: 'wss://broker.hivemq.com:8884/mqtt'},
   {url: 'wss://broker.emqx.io:8084/mqtt'}
 ];
+// Our own relay (relay/worker.js on Cloudflare) runs next to the public brokers. The page stays connected to
+// both, sends everything over each and drops the duplicates, so either one can fail without anyone noticing.
+const OWN_BROKER = {url: ''};
 const ROOT = 'dv-2563318804-chat/';
 const ALL = 'all', MAXLEN = 500, STALE = 6 * 60000, DELETE_WINDOW = 5 * 60000;
 const chatEl = $('chat'), cpeople = $('cpeople'), cmsgs = $('cmsgs'), cin = $('cin'), cstat = $('cstat');
@@ -1533,7 +1536,7 @@ if (!validId(me.id)) { me.id = (Math.random().toString(36).slice(2, 10) + Date.n
 // Chats from before end-to-end encryption were stored in plain text.
 try { localStorage.removeItem('chatLog'); localStorage.removeItem('chatUnread'); } catch (e) {}
 const people = new Map(), peers = new Map(), pins = store.get('chatPins', {});
-let log = {}, unread = {}, room = null, ident = null, conv = ALL, mq = null, brokerIdx = 0, retry = 0, retryTimer = 0;
+let log = {}, unread = {}, room = null, ident = null, conv = ALL, mq = null, brokerIdx = 0;
 const typing = new Map();
 let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
@@ -1699,49 +1702,73 @@ function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
 
+const links = new Map(), linksOpen = new Set(), retries = {pub: 0, own: 0}, retryTimers = {};
+const facade = {pub: (t, p, r) => { for (const k of linksOpen) links.get(k).pub(t, p, r); }};
+let beat = 0;
+
 function connect() {
-  if (mq || !me.name || !room || !ident) return;
-  setStatus('Verbinde…');
-  const broker = BROKERS[brokerIdx], base = ROOT + room.tag + '/', host = new URL(broker.url).host;
-  cstat.title = host;
-  let beat = 0;
+  if (!me.name || !room || !ident) return;
+  connectLink('pub');
+  if (OWN_BROKER.url) connectLink('own');
+}
+
+function connectLink(kind) {
+  if (links.has(kind) || !me.name || !room || !ident) return;
+  if (!mq) setStatus('Verbinde…');
+  const broker = kind === 'own' ? OWN_BROKER : BROKERS[brokerIdx], base = ROOT + room.tag + '/', host = new URL(broker.url).host;
   const c = mqttClient(broker, {
     clientId: me.id + Math.random().toString(36).slice(2, 6),
     will: {topic: base + 'p/' + me.id, payload: ''},
     onopen() {
-      retry = 0;
+      if (links.get(kind) !== c) return;
+      linksOpen.add(kind);
+      retries[kind] = 0;
       diag.set(host, 'verbunden');
       c.sub(['p/+', ALL, 'dm/' + me.id, 'hello', 'typing/+', 'read/+', 'hs/+'].map(t => base + t));
+      const first = !mq;
+      mq = facade;
       announce();
       broadcastScores();
       // Ask everyone to re-announce, in case the broker does not keep retained presence messages.
       publish('hello', {hello: me.id}).catch(() => {});
+      if (first) { clearInterval(beat); beat = setInterval(announce, 2 * 60000); }
+      cstat.title = [...linksOpen].map(k => new URL((k === 'own' ? OWN_BROKER : BROKERS[brokerIdx]).url).host).join(' + ');
       renderPeople();
-      beat = setInterval(announce, 2 * 60000);
       setStatus('Online');
     },
     onmessage: receive,
     onclose(wasOpen, why) {
-      clearInterval(beat);
-      if (mq !== c) return;
+      if (links.get(kind) !== c) return;
+      links.delete(kind);
+      linksOpen.delete(kind);
       diag.set(host, DIAG[why]);
-      mq = null;
-      people.clear();
-      if (!wasOpen) brokerIdx = (brokerIdx + 1) % BROKERS.length;
-      setStatus('Offline');
-      renderChat();
-      retryTimer = setTimeout(connect, wasOpen ? 1000 : Math.min(20000, 500 * 2 ** Math.floor(retry++ / BROKERS.length)));
+      if (!linksOpen.size && mq) {
+        mq = null;
+        clearInterval(beat);
+        people.clear();
+        setStatus('Offline');
+        renderChat();
+      } else setStatus(mq ? 'Online' : 'Offline');
+      if (kind === 'pub' && !wasOpen) brokerIdx = (brokerIdx + 1) % BROKERS.length;
+      const per = kind === 'pub' ? BROKERS.length : 1;
+      clearTimeout(retryTimers[kind]);
+      retryTimers[kind] = setTimeout(() => connectLink(kind), wasOpen ? 1000 : Math.min(20000, 500 * 2 ** Math.floor(retries[kind]++ / per)));
     }
   });
-  mq = c;
+  links.set(kind, c);
 }
 
 function disconnect() {
-  const c = mq;
-  if (!c) return;
+  const list = [...links];
+  links.clear();
+  for (const [kind, c] of list) {
+    if (linksOpen.has(kind) && room) c.pub(ROOT + room.tag + '/p/' + me.id, '', true);
+    c.close();
+  }
+  linksOpen.clear();
+  for (const k in retryTimers) clearTimeout(retryTimers[k]);
+  clearInterval(beat);
   mq = null;
-  c.pub(ROOT + room.tag + '/p/' + me.id, '', true);
-  c.close();
   people.clear();
   setStatus('Offline');
 }
@@ -1749,11 +1776,9 @@ function disconnect() {
 // Browsers stretch timers in background tabs, so a scheduled retry can lag by minutes. Start over
 // with the first broker (the one that works at the office) as soon as someone looks at the app again.
 function reconnectNow() {
-  if (mq || !me.name || !room || !ident) return;
-  clearTimeout(retryTimer);
-  retry = 0;
-  brokerIdx = 0;
-  connect();
+  if (!me.name || !room || !ident) return;
+  if (!links.has('pub')) { clearTimeout(retryTimers.pub); retries.pub = 0; brokerIdx = 0; connectLink('pub'); }
+  if (OWN_BROKER.url && !links.has('own')) { clearTimeout(retryTimers.own); retries.own = 0; connectLink('own'); }
 }
 window.addEventListener('online', reconnectNow);
 window.addEventListener('focus', reconnectNow);
@@ -1777,7 +1802,24 @@ function setStatus(s) {
 }
 
 let inbox = Promise.resolve();
-function receive(t, payload) { inbox = inbox.then(() => incoming(t, payload)).catch(() => {}); }
+// With two brokers every message arrives twice; the random IV at the start of each sealed payload tells copies apart.
+const seenMsgs = new Map();
+function receive(t, payload) {
+  if (payload) {
+    const k = t + '|' + payload.length + '|' + payload.slice(0, 64), now = Date.now();
+    if (now - (seenMsgs.get(k) || 0) < 120000) return;
+    seenMsgs.set(k, now);
+    if (seenMsgs.size > 4000) for (const [x, ts] of seenMsgs) if (now - ts > 120000) seenMsgs.delete(x);
+  }
+  inbox = inbox.then(() => incoming(t, payload)).catch(() => {});
+}
+// A last will from one broker doesn't mean someone left if they are still on the other; let them re-announce.
+let lastHelloAsk = 0;
+function askHello() {
+  if (linksOpen.size < 2 || Date.now() - lastHelloAsk < 5000) return;
+  lastHelloAsk = Date.now();
+  publish('hello', {hello: me.id}).catch(() => {});
+}
 
 async function incoming(t, payload) {
   const r = room;
@@ -1801,6 +1843,7 @@ async function incoming(t, payload) {
     return;
   }
   if (sub.startsWith('p/') && !payload) {
+    askHello();
     const id = sub.slice(2);
     if (people.delete(id)) { renderPeople(); if (id === conv) renderMsgs(); }
     return;
