@@ -169,7 +169,8 @@ export class Hub {
 
 // Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
 // their paddle is; the page draws its own paddle right away and the rest from these updates.
-const W = 640, H = 360, PH = 70, PW = 10, PX = 24, BR = 7, WIN = 7, V0 = 380, VMAX = 1150, PADDLE_V = 1600, TICK = 1000 / 60;
+const W = 640, H = 360, PH = 70, BIG = 105, PW = 10, PX = 24, BR = 7, WIN = 7, V0 = 330, VFAST = 1150, VMAX = 1600,
+  TURBO = 1700, PADDLE_V = 1600, TICK = 1000 / 60, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet'];
 
 export class Arena {
   constructor(ctx) {
@@ -185,11 +186,25 @@ export class Arena {
     this.st = 'wait';
     this.until = 0;
     this.w = 0;
-    this.n = 0;
     this.dir = Math.random() < 0.5 ? -1 : 1;
     this.rtt = [80, 80];
     this.hist = [[], []];
     this.pend = [null, null];
+    this.votes = [null, null];
+    this.pu = null;
+    this.coin = false;
+    this.item = null;
+    this.nextItem = 0;
+    this.ph = [PH, PH];
+    this.bigUntil = [0, 0];
+    this.shield = [false, false];
+    this.magnet = [false, false];
+    this.stuck = -1;
+    this.stuckUntil = 0;
+    this.aim = [H / 2, H / 2];
+    this.turbo = false;
+    this.last = -1;
+    this.ev = {n: 0};
   }
 
   async fetch(req) {
@@ -207,7 +222,7 @@ export class Arena {
     const gone = () => { if (this.seats[i] === server) { this.seats[i] = null; this.left[i] = Date.now(); } };
     server.addEventListener('close', gone);
     server.addEventListener('error', gone);
-    if (this.st === 'wait' && this.seats[0] && this.seats[1]) this.serve('count', 3000);
+    if (this.st === 'wait' && this.seats[0] && this.seats[1]) { this.st = 'vote'; this.until = Date.now() + 20000; }
     if (!this.timer) this.timer = setInterval(() => this.tick(), TICK);
     return new Response(null, {status: 101, webSocket: client});
   }
@@ -215,16 +230,33 @@ export class Arena {
   onMessage(i, data) {
     let msg;
     try { msg = JSON.parse(data); } catch (e) { return; }
+    const now = Date.now();
     if (msg.t === 'm' && Number.isFinite(msg.y)) {
-      const y = Math.max(PH / 2, Math.min(H - PH / 2, msg.y)), now = Date.now(), h = this.hist[i];
+      if (this.stuck === i) { this.aim[i] = Math.max(BR, Math.min(H - BR, msg.y)); return; }
+      const y = Math.max(this.ph[i] / 2, Math.min(H - this.ph[i] / 2, msg.y)), h = this.hist[i];
       this.pad[i].ty = y;
       h.push([now, y]);
       while (h.length && now - h[0][0] > 800) h.shift();
     } else if (msg.t === 'ping' && Number.isFinite(msg.c)) {
       if (Number.isFinite(msg.rtt)) this.rtt[i] = Math.max(0, Math.min(400, msg.rtt));
       try { this.seats[i].send(JSON.stringify({t: 'pong', c: msg.c})); } catch (e) {}
+    } else if (msg.t === 'vote' && this.st === 'vote' && typeof msg.v === 'boolean') {
+      this.votes[i] = msg.v;
+      if (this.votes[0] !== null && this.votes[1] !== null) this.decide();
+    } else if (msg.t === 'fire' && this.stuck === i) {
+      this.release(now);
+    } else if (msg.t === 'quit' && this.st !== 'over') {
+      this.finish(2 - i);
     }
-    else if (msg.t === 'quit' && this.st !== 'over') this.finish(2 - i);
+  }
+
+  // Same vote wins; a tie (one for, one against) is a coin toss. A missing vote just doesn't count.
+  decide() {
+    const [a, b] = this.votes;
+    this.coin = a !== null && b !== null && a !== b;
+    this.pu = this.coin ? Math.random() < 0.5 : (a !== null ? a : b === true);
+    this.nextItem = Date.now() + 3000 + 6000;
+    this.serve('count', 3000);
   }
 
   serve(st, ms) {
@@ -232,6 +264,9 @@ export class Arena {
     this.until = Date.now() + ms;
     Object.assign(this.b, {x: W / 2, y: H / 2, vx: 0, vy: 0});
     this.pend = [null, null];
+    this.stuck = -1;
+    this.turbo = false;
+    this.last = -1;
   }
 
   launch() {
@@ -246,15 +281,19 @@ export class Arena {
     this.until = Date.now() + 8000;
   }
 
+  event(k, i, kind) { this.ev = {n: this.ev.n + 1, k, i, kind}; }
+
   tick() {
     const now = Date.now();
     if (this.st === 'over') {
       if (now > this.until || (!this.seats[0] && !this.seats[1])) { clearInterval(this.timer); this.timer = 0; }
+    } else if (this.st === 'vote') {
+      if (now > this.until) this.decide();
     } else if (this.st !== 'wait') {
       for (let i = 0; i < 2; i++) if (!this.seats[i] && now - this.left[i] > 10000) this.finish(2 - i);
       if (this.st !== 'over' && this.seats[0] && this.seats[1]) {
         if ((this.st === 'count' || this.st === 'goal') && now >= this.until) { this.st = 'play'; this.launch(); }
-        if (this.st === 'play') { this.judge(now); this.physics(TICK / 1000, now); }
+        if (this.st === 'play') { this.powers(now); this.judge(now); this.physics(TICK / 1000, now); }
       }
     } else if (!this.seats[0] && !this.seats[1] && now - Math.max(...this.left) > 60000) {
       clearInterval(this.timer);
@@ -263,21 +302,66 @@ export class Arena {
     this.broadcast(now);
   }
 
+  powers(now) {
+    for (let i = 0; i < 2; i++) if (this.bigUntil[i] && now > this.bigUntil[i]) { this.bigUntil[i] = 0; this.ph[i] = PH; }
+    if (!this.pu) return;
+    if (!this.item && now > this.nextItem) {
+      this.item = {k: ITEMS[Math.floor(Math.random() * ITEMS.length)], x: W / 2 + (Math.random() * 2 - 1) * 110, y: 50 + Math.random() * (H - 100)};
+    }
+    const it = this.item, b = this.b;
+    if (it && this.last >= 0 && this.stuck < 0 && Math.hypot(b.x - it.x, b.y - it.y) < BR + ITEM_R) {
+      const i = this.last;
+      if (it.k === 'big') { this.ph[i] = BIG; this.bigUntil[i] = now + 10000; }
+      if (it.k === 'shield') this.shield[i] = true;
+      if (it.k === 'magnet') this.magnet[i] = true;
+      this.event('get', i, it.k);
+      this.item = null;
+      this.nextItem = now + 7000 + Math.random() * 5000;
+    }
+  }
+
   // A player sees the ball a little late but their own paddle at once, so a miss on the server can be a hit
   // on their screen. Before a miss counts, wait about one round trip for paddle reports from that moment.
   grace(i) { return Math.min(260, this.rtt[i] + 70); }
 
   bounce(i, paddleY, x, y, speed) {
-    const s = i === 0 ? -1 : 1, rel = Math.max(-1, Math.min(1, (y - paddleY) / (PH / 2))), a = rel * Math.PI / 3;
-    const v = Math.min(VMAX, speed * 1.06);
+    const s = i === 0 ? -1 : 1, rel = Math.max(-1, Math.min(1, (y - paddleY) / (this.ph[i] / 2))), a = rel * Math.PI / 3;
+    // +5 % per return up to VFAST, then only +2 %, so the top speeds take a long rally.
+    const v = Math.min(VMAX, speed * (speed < VFAST ? 1.05 : 1.02));
     Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
+    this.last = i;
+    this.turbo = false;
+  }
+
+  stick(i, now) {
+    this.stuck = i;
+    this.stuckUntil = now + 3000;
+    this.magnet[i] = false;
+    this.pad[i].ty = this.pad[i].y;
+    this.aim[i] = H / 2;
+    this.pend[i] = null;
+    this.event('catch', i);
+  }
+
+  // The magnet shot leaves at full speed toward the aimed point on the other side.
+  release() {
+    const i = this.stuck, s = i === 0 ? -1 : 1, b = this.b;
+    const dx = -s * (W - 2 * (PX + PW / 2 + BR)), dy = this.aim[i] - b.y;
+    let a = Math.atan2(dy, Math.abs(dx));
+    a = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, a));
+    b.vx = -s * TURBO * Math.cos(a);
+    b.vy = TURBO * Math.sin(a);
+    this.stuck = -1;
+    this.turbo = true;
+    this.last = i;
+    this.event('fire', i);
   }
 
   judge(now) {
     for (let i = 0; i < 2; i++) {
       const p = this.pend[i];
       if (!p) continue;
-      const g = this.grace(i), reach = PH / 2 + BR + 3;
+      const g = this.grace(i), reach = this.ph[i] / 2 + BR + 3;
       const hit = this.hist[i].find(([t, y]) => t >= p.t - 60 && t <= p.t + g && Math.abs(p.y - y) <= reach);
       if (hit) {
         this.pend[i] = null;
@@ -297,7 +381,26 @@ export class Arena {
   physics(dt, now) {
     const steps = 4, h = dt / steps, b = this.b, maxStep = PADDLE_V * h;
     for (let k = 0; k < steps; k++) {
-      for (const p of this.pad) p.y += Math.max(-maxStep, Math.min(maxStep, p.ty - p.y));
+      for (let i = 0; i < 2; i++) {
+        const p = this.pad[i], half = this.ph[i] / 2;
+        p.ty = Math.max(half, Math.min(H - half, p.ty));
+        if (this.stuck !== i) p.y += Math.max(-maxStep, Math.min(maxStep, p.ty - p.y));
+        p.y = Math.max(half, Math.min(H - half, p.y));
+      }
+      if (this.stuck >= 0) {
+        const i = this.stuck;
+        b.x = i === 0 ? PX + PW / 2 + BR : W - PX - PW / 2 - BR;
+        b.y = this.pad[i].y;
+        if (now >= this.stuckUntil) this.release();
+        return;
+      }
+      // An armed magnet pulls the ball toward its paddle while the ball is on its way there.
+      for (let i = 0; i < 2; i++) {
+        if (!this.magnet[i] || (i === 0 ? b.vx >= 0 : b.vx <= 0)) continue;
+        b.vy += (this.pad[i].y - b.y) * 9 * h;
+        const cap = Math.max(250, Math.abs(b.vx) * 1.4);
+        b.vy = Math.max(-cap, Math.min(cap, b.vy));
+      }
       const px = b.x;
       b.x += b.vx * h;
       b.y += b.vy * h;
@@ -307,15 +410,25 @@ export class Arena {
         const face = i === 0 ? PX + PW / 2 : W - PX - PW / 2, s = i === 0 ? -1 : 1;
         const crossed = s < 0 ? b.vx < 0 && px - BR >= face - 1 && b.x - BR < face : b.vx > 0 && px + BR <= face + 1 && b.x + BR > face;
         if (!crossed) continue;
+        if (this.magnet[i]) { this.stick(i, now); return; }
         // Where the ball meets the paddle sets the angle; every return is a bit faster.
-        if (Math.abs(b.y - this.pad[i].y) <= PH / 2 + BR) this.bounce(i, this.pad[i].y, face - s * BR, b.y, Math.hypot(b.vx, b.vy));
+        if (Math.abs(b.y - this.pad[i].y) <= this.ph[i] / 2 + BR) this.bounce(i, this.pad[i].y, face - s * BR, b.y, Math.hypot(b.vx, b.vy));
         else if (!this.pend[i]) this.pend[i] = {t: now, x: face - s * BR, y: b.y, v: Math.hypot(b.vx, b.vy)};
       }
-      // A goal only counts once the defender's grace period is over.
       for (let i = 0; i < 2; i++) {
         const out = i === 0 ? b.x < -BR : b.x > W + BR;
         if (!out) continue;
         if (this.pend[i] && !this.pend[i].done) { b.x = i === 0 ? -BR : W + BR; continue; }
+        if (this.shield[i]) {
+          this.shield[i] = false;
+          this.pend[i] = null;
+          b.x = i === 0 ? BR : W - BR;
+          b.vx = i === 0 ? Math.abs(b.vx) : -Math.abs(b.vx);
+          this.turbo = false;
+          b.vx = Math.sign(b.vx) * Math.min(Math.abs(b.vx), VMAX);
+          this.event('shield', i);
+          continue;
+        }
         return this.point(1 - i);
       }
     }
@@ -332,7 +445,10 @@ export class Arena {
     const r = v => Math.round(v);
     const s = JSON.stringify({t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, sc: this.sc, names: this.names,
       on: [!!this.seats[0], !!this.seats[1]], p: [r(this.b.x), r(this.b.y), r(this.b.vx), r(this.b.vy)],
-      m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]]});
+      m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]], ph: this.ph,
+      votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y)},
+      sh: this.shield, mg: this.magnet, stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
+      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }
 }

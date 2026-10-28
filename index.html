@@ -332,7 +332,14 @@ tbody tr.sel td { background: var(--select); }
 .uno-hand .uc.dim { opacity: .5; }
 .uno-color { display: inline-block; width: 12px; height: 12px; margin-right: 4px; border-radius: 50%; vertical-align: middle; }
 .unobtn { color: #c0392b; font-weight: 700; }
-.pg-over { background: rgba(16,22,31,.55); color: #fff; font-size: 28px; font-weight: 700; }
+.pg-over { background: rgba(16,22,31,.55); color: #fff; font-size: 28px; font-weight: 700; white-space: pre-line; line-height: 1.4; }
+.pg-vote { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(16,22,31,.82); color: #fff; }
+.pg-vote-q { font-size: 18px; font-weight: 700; }
+.pg-vote-row { display: flex; gap: 10px; }
+.pg-vote-row .vbtn { height: 34px; padding: 0 16px; font-size: 14px; }
+.pg-vote-yes { background: #f5b041; border-color: #d68910; color: #10161f; font-weight: 700; }
+.pg-vote.done .pg-vote-row { opacity: .45; pointer-events: none; }
+.pg-vote-info { min-height: 16px; font-size: 12px; color: #c9d3df; }
 .cmpinvite { background: #eef2f8; border: 1px solid #cdd8e8; border-radius: 8px; padding: 8px 12px; margin: 4px 0; display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
 .cmpinvite button { padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; border: 1px solid var(--grid-line); background: var(--paper); }
 .cmpinvite .mpaccept { background: var(--check); color: #fff; border-color: var(--check); }
@@ -1699,7 +1706,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 11;
+const APP_VERSION = 12;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -2998,18 +3005,24 @@ function renderUno() {
 }
 
 /* Ping Pong: the ball runs on our own server (relay/worker.js, class Arena). Each side sends where its
-   paddle is and draws it immediately; ball and opponent come from the server and are extrapolated. */
-const PG_W = 640, PG_H = 360, PG_PH = 70, PG_PW = 10, PG_PX = 24, PG_BR = 7;
+   paddle is and draws it immediately; ball and opponent come from the server, drawn slightly in the past. */
+const PG_W = 640, PG_H = 360, PG_PH = 70, PG_PW = 10, PG_PX = 24, PG_BR = 7, PG_FACE = PG_PX + PG_PW / 2 + PG_BR, PG_DELAY = 45;
+const PG_ITEMS = {big: {icon: '🟩', name: 'Riesen-Schläger', color: '#2ecc71'}, shield: {icon: '🛡️', name: 'Schutzwand', color: '#5dade2'},
+  magnet: {icon: '🧲', name: 'Magnet-Schuss', color: '#e056fd'}};
 let pgGame = null;
 function pgKey() { return [...crypto.getRandomValues(new Uint8Array(14))].map(b => (b % 36).toString(36)).join(''); }
 function pgInit(g, key) {
   g.key = /^[a-z0-9]{12,40}$/.test(key || '') ? key : '';
-  g.pg = {ws: null, s: null, at: 0, y: PG_H / 2, dirty: true, conn: 'connecting', raf: 0, tries: 0, buf: [], offs: [], off: 0, rtt: 0, pingAt: 0};
+  g.pg = {ws: null, s: null, at: 0, y: PG_H / 2, aimY: PG_H / 2, dirty: true, conn: 'connecting', raf: 0, tries: 0, buf: [], offs: [], off: 0,
+    rtt: 0, pingAt: 0, ev: 0, trail: [], flash: 0, shake: 0, toast: null};
   pgGame = g;
   pgConnect(g);
 }
 // Mirrored for seat 2, so everyone plays from the left.
 function pgView(g, x) { return g.myMark === 1 ? x : PG_W - x; }
+function pgSend(g, msg) { const ws = g.pg.ws; if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+function pgMine(g, s) { return s && s.stuck === g.myMark - 1; }
+function pgHalf(g, s, i) { return ((s && s.ph && s.ph[i]) || PG_PH) / 2; }
 function pgConnect(g) {
   if (mpGame !== g || g.over || !OWN_BROKER.url || !g.key) { if (g.pg) g.pg.conn = 'lost'; return; }
   const pg = g.pg;
@@ -3035,6 +3048,7 @@ function pgConnect(g) {
       pg.buf.push(s);
       if (pg.buf.length > 40) pg.buf.shift();
     }
+    if (s.ev && s.ev.n > pg.ev) { pgEvent(g, s.ev); pg.ev = s.ev.n; }
     if (s.st === 'over' && !g.over && (s.w === 1 || s.w === 2)) {
       g.over = true;
       g.winner = s.w;
@@ -3049,10 +3063,14 @@ function pgConnect(g) {
     if (mpGame === g && !g.over && pg.tries++ < 30) setTimeout(() => pgConnect(g), 1000);
   };
 }
-function pgQuit(g) {
-  const ws = g.pg && g.pg.ws;
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify({t: 'quit'}));
+function pgEvent(g, ev) {
+  const pg = g.pg, mine = ev.i === g.myMark - 1, who = mine ? 'Du' : g.opName;
+  if (ev.k === 'get' && PG_ITEMS[ev.kind]) pg.toast = {text: PG_ITEMS[ev.kind].icon + ' ' + who + ': ' + PG_ITEMS[ev.kind].name + '!', color: PG_ITEMS[ev.kind].color, until: performance.now() + 1800};
+  if (ev.k === 'catch') { pg.toast = {text: mine ? '🧲 Gefangen! Zielen & klicken' : '🧲 ' + g.opName + ' zielt…', color: '#e056fd', until: performance.now() + 1500}; pg.fireAt = 0; }
+  if (ev.k === 'fire') { pg.flash = 1; pg.shake = 1; pg.trail = []; }
+  if (ev.k === 'shield') pg.toast = {text: '🛡️ ' + (mine ? 'Deine' : g.opName + 's') + ' Schutzwand hält!', color: '#5dade2', until: performance.now() + 1500};
 }
+function pgQuit(g) { pgSend(g, {t: 'quit'}); }
 setInterval(() => {
   const g = pgGame;
   if (!g) return;
@@ -3064,51 +3082,11 @@ setInterval(() => {
   }
   pgAssistStep(g);
   if (pg.ws && pg.ws.readyState === 1) {
-    if (pg.dirty) { pg.ws.send(JSON.stringify({t: 'm', y: Math.round(pg.y)})); pg.dirty = false; }
-    if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pg.ws.send(JSON.stringify({t: 'ping', c: pg.pingAt, rtt: Math.round(pg.rtt)})); }
+    if (pg.dirty) { pgSend(g, {t: 'm', y: Math.round(pgMine(g, pg.s) ? pg.aimY : pg.y)}); pg.dirty = false; }
+    if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pgSend(g, {t: 'ping', c: pg.pingAt, rtt: Math.round(pg.rtt)}); }
   }
 }, 16);
-const PG_DELAY = 45;
-// Owner's trick: enabled once per browser by opening the page with #autopaddle. Then, while 1 is held
-// during Ping Pong, the paddle glides to where the ball will arrive. Wins with it don't go on the leaderboard.
-let pgAssistOn = !!store.get('pgAssist', false), pgAssistHeld = false;
-if (location.hash === '#autopaddle') { pgAssistOn = true; store.set('pgAssist', true); history.replaceState(null, '', location.pathname + location.search); }
-document.addEventListener('keydown', e => { if (pgAssistOn && (e.code === 'Digit1' || e.code === 'Numpad1') && !(e.target.matches && e.target.matches('input, textarea'))) pgAssistHeld = true; });
-document.addEventListener('keyup', e => { if (e.code === 'Digit1' || e.code === 'Numpad1') pgAssistHeld = false; });
-window.addEventListener('blur', () => { pgAssistHeld = false; });
-function pgAssistTarget(g) {
-  const s = g.pg.buf[g.pg.buf.length - 1] || g.pg.s;
-  if (!s || s.st !== 'play') return {y: PG_H / 2, t: 0, toward: false};
-  const face = PG_PX + PG_PW / 2 + PG_BR, x = g.myMark === 1 ? face : PG_W - face, [bx, by, vx, vy] = s.p;
-  if (!vx || (x - bx) / vx <= 0) return {y: PG_H / 2 + (by - PG_H / 2) * 0.35, t: 0, toward: false};
-  const t = (x - bx) / vx, span = PG_H - 2 * PG_BR, period = 2 * span;
-  let y = ((by - PG_BR + vy * t) % period + period) % period;
-  if (y > span) y = period - y;
-  return {y: y + PG_BR, t, toward: true};
-}
-// Made to look like a person: a short reaction time, eased movement with a little tremor, and the ball
-// taken anywhere on the paddle so returns come back at varying angles. It still always gets there.
-function pgAssistStep(g) {
-  const pg = g.pg;
-  if (!pgAssistOn || !pgAssistHeld || g.over || !pg.s || pg.s.st !== 'play') { pg.aDir = null; return; }
-  const now = performance.now(), aim = pgAssistTarget(g);
-  if (aim.toward !== pg.aDir) {
-    pg.aDir = aim.toward;
-    pg.aim = (Math.random() * 2 - 1) * (PG_PH / 2 - 12);
-    const latest = aim.toward ? Math.max(0, (aim.t - Math.abs(aim.y - pg.y) / 900) * 1000 - 60) : 400;
-    pg.reactAt = now + Math.min(150 + Math.random() * 100, latest);
-  }
-  if (now < pg.reactAt) return;
-  const target = Math.max(PG_PH / 2, Math.min(PG_H - PG_PH / 2, aim.y + (aim.toward ? pg.aim : pg.aim * 0.5)));
-  const d = target - pg.y, dist = Math.abs(d);
-  if (dist < 0.8) return;
-  let step = Math.max(1.2, dist * (aim.toward ? 0.2 : 0.06));
-  if (aim.toward) step = Math.max(step, dist / Math.max(1, (aim.t - 0.04) * 60) * 1.25);
-  step = Math.min(step, dist, aim.toward ? 22 : 6);
-  pg.y = Math.max(PG_PH / 2, Math.min(PG_H - PG_PH / 2, pg.y + Math.sign(d) * step + (Math.random() - 0.5) * 0.9));
-  pg.dirty = true;
-  pg.assisted = true;
-}
+
 // Ball and opponent drawn PG_DELAY ms in the past, interpolated between the two surrounding snapshots.
 function pgSample(pg) {
   const buf = pg.buf, last = buf[buf.length - 1];
@@ -3118,7 +3096,7 @@ function pgSample(pg) {
   while (i > 0 && buf[i - 1].ts > t) i--;
   const b = buf[i], a = buf[i - 1];
   if (!a || t >= last.ts) {
-    const dt = last.st === 'play' ? Math.min(0.05, Math.max(0, t - last.ts) / 1000) : 0;
+    const dt = last.st === 'play' && last.stuck < 0 ? Math.min(0.05, Math.max(0, t - last.ts) / 1000) : 0;
     let y = last.p[1] + last.p[3] * dt;
     if (y < PG_BR) y = 2 * PG_BR - y;
     if (y > PG_H - PG_BR) y = 2 * (PG_H - PG_BR) - y;
@@ -3129,6 +3107,57 @@ function pgSample(pg) {
   const lerp = (x, y) => x + (y - x) * k;
   return {...b, p: jump ? b.p : [lerp(a.p[0], b.p[0]), lerp(a.p[1], b.p[1]), b.p[2], b.p[3]],
     m: [[b.m[0][0], lerp(a.m[0][1], b.m[0][1])], [b.m[1][0], lerp(a.m[1][1], b.m[1][1])]]};
+}
+
+// Owner's trick: enabled once per browser by opening the page with #autopaddle. Then, while 1 is held
+// during Ping Pong, the paddle glides to where the ball will arrive and magnet shots aim themselves.
+// Wins with it don't go on the leaderboard.
+let pgAssistOn = !!store.get('pgAssist', false), pgAssistHeld = false;
+if (location.hash === '#autopaddle') { pgAssistOn = true; store.set('pgAssist', true); history.replaceState(null, '', location.pathname + location.search); }
+document.addEventListener('keydown', e => { if (pgAssistOn && (e.code === 'Digit1' || e.code === 'Numpad1') && !(e.target.matches && e.target.matches('input, textarea'))) pgAssistHeld = true; });
+document.addEventListener('keyup', e => { if (e.code === 'Digit1' || e.code === 'Numpad1') pgAssistHeld = false; });
+window.addEventListener('blur', () => { pgAssistHeld = false; });
+function pgAssistTarget(g, s) {
+  if (!s || s.st !== 'play') return {y: PG_H / 2, t: 0, toward: false};
+  const x = g.myMark === 1 ? PG_FACE : PG_W - PG_FACE, [bx, by, vx, vy] = s.p;
+  if (!vx || (x - bx) / vx <= 0) return {y: PG_H / 2 + (by - PG_H / 2) * 0.35, t: 0, toward: false};
+  const t = (x - bx) / vx, span = PG_H - 2 * PG_BR, period = 2 * span;
+  let y = ((by - PG_BR + vy * t) % period + period) % period;
+  if (y > span) y = period - y;
+  return {y: y + PG_BR, t, toward: true};
+}
+// Made to look like a person: a short reaction time, eased movement with a little tremor, and the ball
+// taken anywhere on the paddle so returns come back at varying angles. It still always gets there.
+function pgAssistStep(g) {
+  const pg = g.pg, s = pg.buf[pg.buf.length - 1] || pg.s;
+  if (!pgAssistOn || !pgAssistHeld || g.over || !s || s.st !== 'play') { pg.aDir = null; return; }
+  const now = performance.now(), me1 = g.myMark - 1, half = pgHalf(g, s, me1);
+  pg.assisted = true;
+  if (pgMine(g, s)) {
+    // Aim for the corner the opponent is farthest from, then fire after a human-looking pause.
+    const target = s.m[1 - me1][1] < PG_H / 2 ? PG_H - 30 : 30;
+    pg.aimY += Math.max(-9, Math.min(9, target - pg.aimY));
+    pg.dirty = true;
+    if (!pg.fireAt) pg.fireAt = now + 900 + Math.random() * 700;
+    if (now > pg.fireAt) { pg.fireAt = Infinity; pgSend(g, {t: 'fire'}); }
+    return;
+  }
+  const aim = pgAssistTarget(g, s);
+  if (aim.toward !== pg.aDir) {
+    pg.aDir = aim.toward;
+    pg.aim = (Math.random() * 2 - 1) * Math.max(0, half - 12);
+    const latest = aim.toward ? Math.max(0, (aim.t - Math.abs(aim.y - pg.y) / 900) * 1000 - 60) : 400;
+    pg.reactAt = now + Math.min(150 + Math.random() * 100, latest);
+  }
+  if (now < pg.reactAt) return;
+  const target = Math.max(half, Math.min(PG_H - half, aim.y + (aim.toward ? pg.aim : pg.aim * 0.5)));
+  const d = target - pg.y, dist = Math.abs(d);
+  if (dist < 0.8) return;
+  let step = Math.max(1.2, dist * (aim.toward ? 0.2 : 0.06));
+  if (aim.toward) step = Math.max(step, dist / Math.max(1, (aim.t - 0.04) * 60) * 1.25);
+  step = Math.min(step, dist, aim.toward ? Math.max(22, step) : 6);
+  pg.y = Math.max(half, Math.min(PG_H - half, pg.y + Math.sign(d) * step + (Math.random() - 0.5) * 0.9));
+  pg.dirty = true;
 }
 
 const pgResize = new ResizeObserver(() => {
@@ -3145,13 +3174,26 @@ function buildPong(g) {
   const cv = el('canvas', {class: 'dr-canvas pg-canvas', id: 'pgcanvas', width: PG_W, height: PG_H});
   const move = e => {
     if (mpGame !== g || g.over || (pgAssistOn && pgAssistHeld)) return;
-    const r = cv.getBoundingClientRect();
-    g.pg.y = Math.max(PG_PH / 2, Math.min(PG_H - PG_PH / 2, (e.clientY - r.top) / r.height * PG_H));
+    const r = cv.getBoundingClientRect(), y = (e.clientY - r.top) / r.height * PG_H, s = g.pg.s, half = pgHalf(g, s, g.myMark - 1);
+    if (pgMine(g, s)) g.pg.aimY = Math.max(PG_BR, Math.min(PG_H - PG_BR, y));
+    else g.pg.y = Math.max(half, Math.min(PG_H - half, y));
     g.pg.dirty = true;
   };
   cv.addEventListener('pointermove', move);
-  cv.addEventListener('pointerdown', e => { e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) {} move(e); });
-  const stage = el('div', {class: 'dr-stage', id: 'pgstage'}, cv, el('div', {class: 'dr-over pg-over', id: 'pgover', hidden: true}));
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    move(e);
+    if (pgMine(g, g.pg.s)) pgSend(g, {t: 'fire'});
+  });
+  const vote = v => { pgSend(g, {t: 'vote', v}); g.pg.voted = v; renderPong(); };
+  const voteBox = el('div', {class: 'pg-vote', id: 'pgvote', hidden: true},
+    el('div', {class: 'pg-vote-q', text: 'Diese Runde mit Power-ups?'}),
+    el('div', {class: 'pg-vote-row'},
+      el('button', {class: 'vbtn pg-vote-yes', type: 'button', text: '⚡ Mit Power-ups', onclick: () => vote(true)}),
+      el('button', {class: 'vbtn', type: 'button', text: 'Ohne', onclick: () => vote(false)})),
+    el('div', {class: 'pg-vote-info', id: 'pgvoteinfo'}));
+  const stage = el('div', {class: 'dr-stage', id: 'pgstage'}, cv, el('div', {class: 'dr-over pg-over', id: 'pgover', hidden: true}), voteBox);
   grid.replaceChildren(el('div', {class: 'rx-score', id: 'pgscore'}), stage);
   pgResize.disconnect();
   pgResize.observe(stage);
@@ -3173,43 +3215,105 @@ function pgFrame(g) {
   g.pg.raf = 0;
   const cv = $('pgcanvas');
   if (mpGame !== g || !cv || $('cmpboard').hidden) return;
-  const pg = g.pg, s = pgSample(pg), ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1;
+  const pg = g.pg, s = pgSample(pg), ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1, now = performance.now();
+  ctx.save();
+  if (pg.shake > 0.02) { ctx.translate((Math.random() - 0.5) * 14 * pg.shake, (Math.random() - 0.5) * 14 * pg.shake); pg.shake *= 0.88; }
   ctx.fillStyle = '#10161f';
-  ctx.fillRect(0, 0, PG_W, PG_H);
+  ctx.fillRect(-10, -10, PG_W + 20, PG_H + 20);
   ctx.strokeStyle = 'rgba(255,255,255,.35)';
   ctx.lineWidth = 3;
   ctx.setLineDash([12, 12]);
   ctx.beginPath(); ctx.moveTo(PG_W / 2, 0); ctx.lineTo(PG_W / 2, PG_H); ctx.stroke();
   ctx.setLineDash([]);
-  const paddle = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x - PG_PW / 2, y - PG_PH / 2, PG_PW, PG_PH); };
+  const paddle = (x, y, h, c, glow) => {
+    if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 18; }
+    ctx.fillStyle = c;
+    ctx.fillRect(x - PG_PW / 2, y - h / 2, PG_PW, h);
+    ctx.shadowBlur = 0;
+  };
   if (s) {
-    const by = Math.max(PG_BR, Math.min(PG_H - PG_BR, s.p[1]));
-    let bx = pgView(g, Math.max(-PG_BR, Math.min(PG_W + PG_BR, s.p[0])));
-    // While the server is still checking a ball that reached our paddle on this screen, keep it there
-    // instead of letting it slip through and snap back.
-    const face = PG_PX + PG_PW / 2 + PG_BR, towardUs = (g.myMark === 1 ? s.p[2] : -s.p[2]) < 0;
-    if (s.st === 'play' && towardUs && bx < face && bx > face - 90 && Math.abs(by - pg.y) <= PG_PH / 2 + PG_BR + 3) bx = face;
-    paddle(pgView(g, s.m[op1][0]), s.m[op1][1], '#5dade2');
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(bx, by, PG_BR, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.18)';
     ctx.font = 'bold 64px Consolas, monospace';
     ctx.textAlign = 'center';
     ctx.fillText(String(s.sc[me1]), PG_W / 4, 76);
     ctx.fillText(String(s.sc[op1]), PG_W * 3 / 4, 76);
+    // Shields light up the back line they protect.
+    for (const [i, x] of [[me1, 3], [op1, PG_W - 3]]) {
+      if (!s.sh || !s.sh[i]) continue;
+      ctx.strokeStyle = '#5dade2'; ctx.lineWidth = 5; ctx.shadowColor = '#5dade2'; ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, PG_H); ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    if (s.item && PG_ITEMS[s.item.k]) {
+      const it = PG_ITEMS[s.item.k], x = pgView(g, s.item.x), y = s.item.y, pulse = 1 + Math.sin(now / 180) * 0.08;
+      ctx.fillStyle = it.color + '33'; ctx.strokeStyle = it.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 17 * pulse, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.font = '18px "Segoe UI Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(it.icon, x, y + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+    const opHalf = pgHalf(g, s, op1), myHalf = pgHalf(g, s, me1);
+    paddle(pgView(g, s.m[op1][0]), s.m[op1][1], opHalf * 2, '#5dade2', s.mg && s.mg[op1] ? '#e056fd' : null);
+    const myY = pgMine(g, s) ? s.m[me1][1] : pg.y;
+    paddle(PG_PX, myY, myHalf * 2, '#f5b041', s.mg && s.mg[me1] ? '#e056fd' : null);
+
+    const by = Math.max(PG_BR, Math.min(PG_H - PG_BR, s.p[1]));
+    let bx = pgView(g, Math.max(-PG_BR, Math.min(PG_W + PG_BR, s.p[0])));
+    // While the server is still checking a ball that reached our paddle on this screen, keep it there
+    // instead of letting it slip through and snap back.
+    const towardUs = (g.myMark === 1 ? s.p[2] : -s.p[2]) < 0;
+    if (s.st === 'play' && s.stuck < 0 && towardUs && bx < PG_FACE && bx > PG_FACE - 90 && Math.abs(by - pg.y) <= myHalf + PG_BR + 3) bx = PG_FACE;
+
+    if (s.stuck >= 0) {
+      const mine = s.stuck === me1, ay = mine ? pg.aimY : s.aim, tx = mine ? PG_W - PG_FACE : PG_FACE;
+      ctx.strokeStyle = 'rgba(224,86,253,.8)'; ctx.lineWidth = 2; ctx.setLineDash([8, 7]);
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ay); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(tx, ay, 10, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(bx, by, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (s.su / 3000)); ctx.stroke();
+    }
+    if (s.turbo && s.stuck < 0) {
+      pg.trail.push([bx, by]);
+      if (pg.trail.length > 14) pg.trail.shift();
+      pg.trail.forEach(([x, y], i) => {
+        const k = (i + 1) / pg.trail.length;
+        ctx.fillStyle = `rgba(255,${Math.round(120 + 100 * k)},40,${0.15 + 0.5 * k})`;
+        ctx.beginPath(); ctx.arc(x, y, PG_BR * (0.5 + k), 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.shadowColor = '#ff9f1a'; ctx.shadowBlur = 22;
+    } else pg.trail = [];
+    ctx.fillStyle = s.turbo ? '#fff3c4' : '#fff';
+    ctx.beginPath(); ctx.arc(bx, by, PG_BR, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+  } else paddle(PG_PX, pg.y, PG_PH, '#f5b041');
+  if (pg.toast && now < pg.toast.until) {
+    ctx.font = 'bold 18px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = pg.toast.color; ctx.globalAlpha = Math.min(1, (pg.toast.until - now) / 400);
+    ctx.fillText(pg.toast.text, PG_W / 2, PG_H - 22);
+    ctx.globalAlpha = 1;
   }
-  paddle(PG_PX, pg.y, '#f5b041');
+  ctx.restore();
+  if (pg.flash > 0.02) { ctx.fillStyle = `rgba(255,240,200,${pg.flash * 0.7})`; ctx.fillRect(0, 0, PG_W, PG_H); pg.flash *= 0.85; }
 
   const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis 7)' : 'Du 0 : 0 ' + g.opName) + (pg.rtt ? '   ·   Ping ' + Math.round(pg.rtt) + (pgAssistOn ? 'ms' : ' ms') : '');
   if ($('pgscore').textContent !== score) $('pgscore').textContent = score;
+  const voting = !g.over && s && s.st === 'vote';
+  $('pgvote').hidden = !voting;
+  if (voting) {
+    const mineV = s.votes ? s.votes[me1] : null, theirs = s.votes ? s.votes[op1] : null;
+    $('pgvote').classList.toggle('done', mineV !== null);
+    const info = (mineV === null ? '' : 'Du: ' + (mineV ? '⚡ mit' : 'ohne') + ' · ') + g.opName + ': ' + (theirs === null ? 'stimmt noch ab…' : 'hat abgestimmt');
+    if ($('pgvoteinfo').textContent !== info) $('pgvoteinfo').textContent = info;
+  }
   const over = $('pgover');
   let text = '';
   if (g.over) text = g.winner === g.myMark ? '🏆 Gewonnen!' : g.opName + ' gewinnt';
   else if (!OWN_BROKER.url) text = 'Kein eigener Spielserver eingerichtet';
   else if (pg.conn !== 'open') text = pg.conn === 'lost' ? 'Spielserver nicht erreichbar – neuer Versuch…' : 'Verbinde mit dem Spielserver…';
   else if (!s || s.st === 'wait') text = 'Warte auf ' + g.opName + '…';
+  else if (voting) text = '';
   else if (!s.on[op1]) text = g.opName + ' ist weg… (gewinnst in 10 s)';
-  else if (s.st === 'count') text = String(Math.max(1, Math.ceil(s.c / 1000)));
+  else if (s.st === 'count') text = (s.pu ? '⚡ Power-ups AN' : 'Power-ups AUS') + (s.coin ? ' (Münzwurf)' : '') + '\n' + Math.max(1, Math.ceil(s.c / 1000));
   else if (s.st === 'goal') text = 'Punkt!';
   if (over.textContent !== text) over.textContent = text;
   over.hidden = !text;
