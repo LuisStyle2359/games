@@ -3128,7 +3128,7 @@ function buildPong(g) {
   grid.dataset.gid = g.gid;
   const cv = el('canvas', {class: 'dr-canvas pg-canvas', id: 'pgcanvas', width: PG_W, height: PG_H});
   const move = e => {
-    if (mpGame !== g || g.over) return;
+    if (mpGame !== g || g.over || (pgAssistOn && pgAssistHeld)) return;
     const r = cv.getBoundingClientRect();
     g.pg.y = Math.max(PG_PH / 2, Math.min(PG_H - PG_PH / 2, (e.clientY - r.top) / r.height * PG_H));
     g.pg.dirty = true;
@@ -3184,7 +3184,7 @@ function pgFrame(g) {
   }
   paddle(PG_PX, pg.y, '#f5b041');
 
-  const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis 7)' : 'Du 0 : 0 ' + g.opName) + (pg.rtt ? '   ·   Ping ' + Math.round(pg.rtt) + ' ms' : '');
+  const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis 7)' : 'Du 0 : 0 ' + g.opName) + (pg.rtt ? '   ·   Ping ' + Math.round(pg.rtt) + (pgAssistOn ? 'ms' : ' ms') : '');
   if ($('pgscore').textContent !== score) $('pgscore').textContent = score;
   const over = $('pgover');
   let text = '';
