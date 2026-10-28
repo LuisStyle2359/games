@@ -12,8 +12,9 @@ export default {
   async fetch(req, env) {
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('ok\n', {headers: {'content-type': 'text/plain'}});
     const game = new URL(req.url).pathname.match(/^\/game\/([A-Za-z0-9]{8,48})$/);
-    if (game) return env.ARENA.get(env.ARENA.idFromName(game[1])).fetch(req);
-    return env.HUB.get(env.HUB.idFromName('main')).fetch(req);
+    // Pinned to western Europe, where everyone plays; otherwise an object lives wherever it was first used.
+    if (game) return env.ARENA.get(env.ARENA.idFromName(game[1]), {locationHint: 'weur'}).fetch(req);
+    return env.HUB.get(env.HUB.idFromName('eu'), {locationHint: 'weur'}).fetch(req);
   }
 };
 
@@ -212,6 +213,7 @@ export class Arena {
     let msg;
     try { msg = JSON.parse(data); } catch (e) { return; }
     if (msg.t === 'm' && Number.isFinite(msg.y)) this.pad[i].ty = Math.max(PH / 2, Math.min(H - PH / 2, msg.y));
+    else if (msg.t === 'ping' && Number.isFinite(msg.c)) { try { this.seats[i].send(JSON.stringify({t: 'pong', c: msg.c})); } catch (e) {} }
     else if (msg.t === 'quit' && this.st !== 'over') this.finish(2 - i);
   }
 
@@ -247,7 +249,7 @@ export class Arena {
       clearInterval(this.timer);
       this.timer = 0;
     }
-    if (++this.n % 2 === 0 || this.st === 'over') this.broadcast(now);
+    this.broadcast(now);
   }
 
   physics(dt) {
@@ -284,7 +286,7 @@ export class Arena {
 
   broadcast(now) {
     const r = v => Math.round(v);
-    const s = JSON.stringify({t: 's', st: this.st, c: Math.max(0, this.until - now), w: this.w, sc: this.sc, names: this.names,
+    const s = JSON.stringify({t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, sc: this.sc, names: this.names,
       on: [!!this.seats[0], !!this.seats[1]], p: [r(this.b.x), r(this.b.y), r(this.b.vx), r(this.b.vy)],
       m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]]});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}

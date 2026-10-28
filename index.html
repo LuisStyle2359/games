@@ -1699,7 +1699,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 9;
+const APP_VERSION = 10;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -3004,7 +3004,7 @@ let pgGame = null;
 function pgKey() { return [...crypto.getRandomValues(new Uint8Array(14))].map(b => (b % 36).toString(36)).join(''); }
 function pgInit(g, key) {
   g.key = /^[a-z0-9]{12,40}$/.test(key || '') ? key : '';
-  g.pg = {ws: null, s: null, at: 0, y: PG_H / 2, dirty: true, conn: 'connecting', raf: 0, tries: 0};
+  g.pg = {ws: null, s: null, at: 0, y: PG_H / 2, dirty: true, conn: 'connecting', raf: 0, tries: 0, buf: [], offs: [], off: 0, rtt: 0, pingAt: 0};
   pgGame = g;
   pgConnect(g);
 }
@@ -3022,9 +3022,19 @@ function pgConnect(g) {
   ws.onmessage = e => {
     let s;
     try { s = JSON.parse(e.data); } catch (err) { return; }
+    if (s.t === 'pong' && Number.isFinite(s.c)) { const r = performance.now() - s.c; pg.rtt = pg.rtt ? pg.rtt * 0.7 + r * 0.3 : r; return; }
     if (s.t !== 's' || !Array.isArray(s.p) || !Array.isArray(s.m) || !Array.isArray(s.sc)) return;
     pg.s = s;
     pg.at = performance.now();
+    if (Number.isFinite(s.ts)) {
+      // The smallest gap between server and local clock over the last few seconds is the best estimate of
+      // their offset; snapshots are then drawn a little in the past, between two real positions.
+      pg.offs.push(Date.now() - s.ts);
+      if (pg.offs.length > 120) pg.offs.shift();
+      pg.off = Math.min(...pg.offs);
+      pg.buf.push(s);
+      if (pg.buf.length > 40) pg.buf.shift();
+    }
     if (s.st === 'over' && !g.over && (s.w === 1 || s.w === 2)) {
       g.over = true;
       g.winner = s.w;
@@ -3052,11 +3062,33 @@ setInterval(() => {
     if (mpGame !== g) pgGame = null;
     return;
   }
-  if (pg.dirty && pg.ws && pg.ws.readyState === 1) {
-    pg.ws.send(JSON.stringify({t: 'm', y: Math.round(pg.y)}));
-    pg.dirty = false;
+  if (pg.ws && pg.ws.readyState === 1) {
+    if (pg.dirty) { pg.ws.send(JSON.stringify({t: 'm', y: Math.round(pg.y)})); pg.dirty = false; }
+    if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pg.ws.send(JSON.stringify({t: 'ping', c: pg.pingAt})); }
   }
-}, 33);
+}, 16);
+const PG_DELAY = 45;
+// Ball and opponent drawn PG_DELAY ms in the past, interpolated between the two surrounding snapshots.
+function pgSample(pg) {
+  const buf = pg.buf, last = buf[buf.length - 1];
+  if (!last) return pg.s;
+  const t = Date.now() - pg.off - PG_DELAY;
+  let i = buf.length - 1;
+  while (i > 0 && buf[i - 1].ts > t) i--;
+  const b = buf[i], a = buf[i - 1];
+  if (!a || t >= last.ts) {
+    const dt = last.st === 'play' ? Math.min(0.05, Math.max(0, t - last.ts) / 1000) : 0;
+    let y = last.p[1] + last.p[3] * dt;
+    if (y < PG_BR) y = 2 * PG_BR - y;
+    if (y > PG_H - PG_BR) y = 2 * (PG_H - PG_BR) - y;
+    return {...last, p: [last.p[0] + last.p[2] * dt, y, last.p[2], last.p[3]]};
+  }
+  const k = Math.max(0, Math.min(1, (t - a.ts) / ((b.ts - a.ts) || 1)));
+  const jump = Math.abs(b.p[0] - a.p[0]) + Math.abs(b.p[1] - a.p[1]) > 120;
+  const lerp = (x, y) => x + (y - x) * k;
+  return {...b, p: jump ? b.p : [lerp(a.p[0], b.p[0]), lerp(a.p[1], b.p[1]), b.p[2], b.p[3]],
+    m: [[b.m[0][0], lerp(a.m[0][1], b.m[0][1])], [b.m[1][0], lerp(a.m[1][1], b.m[1][1])]]};
+}
 
 const pgResize = new ResizeObserver(() => {
   const st = $('pgstage'), cv = $('pgcanvas');
@@ -3100,7 +3132,7 @@ function pgFrame(g) {
   g.pg.raf = 0;
   const cv = $('pgcanvas');
   if (mpGame !== g || !cv || $('cmpboard').hidden) return;
-  const pg = g.pg, s = pg.s, ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1;
+  const pg = g.pg, s = pgSample(pg), ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1;
   ctx.fillStyle = '#10161f';
   ctx.fillRect(0, 0, PG_W, PG_H);
   ctx.strokeStyle = 'rgba(255,255,255,.35)';
@@ -3110,8 +3142,7 @@ function pgFrame(g) {
   ctx.setLineDash([]);
   const paddle = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x - PG_PW / 2, y - PG_PH / 2, PG_PW, PG_PH); };
   if (s) {
-    const dt = s.st === 'play' ? Math.min(0.08, (performance.now() - pg.at) / 1000) : 0;
-    const bx = Math.max(-PG_BR, Math.min(PG_W + PG_BR, s.p[0] + s.p[2] * dt)), by = Math.max(PG_BR, Math.min(PG_H - PG_BR, s.p[1] + s.p[3] * dt));
+    const bx = Math.max(-PG_BR, Math.min(PG_W + PG_BR, s.p[0])), by = Math.max(PG_BR, Math.min(PG_H - PG_BR, s.p[1]));
     paddle(pgView(g, s.m[op1][0]), s.m[op1][1], '#5dade2');
     ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.arc(pgView(g, bx), by, PG_BR, 0, Math.PI * 2); ctx.fill();
@@ -3123,7 +3154,7 @@ function pgFrame(g) {
   }
   paddle(PG_PX, pg.y, '#f5b041');
 
-  const score = s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis 7)' : 'Du 0 : 0 ' + g.opName;
+  const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis 7)' : 'Du 0 : 0 ' + g.opName) + (pg.rtt ? '   ·   Ping ' + Math.round(pg.rtt) + ' ms' : '');
   if ($('pgscore').textContent !== score) $('pgscore').textContent = score;
   const over = $('pgover');
   let text = '';
