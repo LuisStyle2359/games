@@ -170,7 +170,7 @@ export class Hub {
 // Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
 // their paddle is; the page draws its own paddle right away and the rest from these updates.
 const W = 640, H = 360, PH = 70, BIG = 105, PW = 10, PX = 24, BR = 7, WIN = 7, V0 = 330, VFAST = 1150, VMAX = 1600,
-  TURBO = 1700, PADDLE_V = 1600, TICK = 1000 / 60, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet'];
+  TURBO = 1700, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet'];
 
 export class Arena {
   constructor(ctx) {
@@ -284,7 +284,8 @@ export class Arena {
   event(k, i, kind) { this.ev = {n: this.ev.n + 1, k, i, kind}; }
 
   tick() {
-    const now = Date.now();
+    const now = Date.now(), prevTick = this.tickAt;
+    this.tickAt = now;
     if (this.st === 'over') {
       if (now > this.until || (!this.seats[0] && !this.seats[1])) { clearInterval(this.timer); this.timer = 0; }
     } else if (this.st === 'vote') {
@@ -293,7 +294,9 @@ export class Arena {
       for (let i = 0; i < 2; i++) if (!this.seats[i] && now - this.left[i] > 10000) this.finish(2 - i);
       if (this.st !== 'over' && this.seats[0] && this.seats[1]) {
         if ((this.st === 'count' || this.st === 'goal') && now >= this.until) { this.st = 'play'; this.launch(); }
-        if (this.st === 'play') { this.powers(now); this.judge(now); this.physics(TICK / 1000, now); }
+        // The ball moves by the time that really passed, so a late timer never slows or speeds it.
+        const el = Math.min(0.05, Math.max(0, now - (prevTick || now - TICK)) / 1000);
+        if (this.st === 'play') { this.powers(now); this.judge(now); this.physics(el, now); }
       }
     } else if (!this.seats[0] && !this.seats[1] && now - Math.max(...this.left) > 60000) {
       clearInterval(this.timer);
@@ -379,7 +382,7 @@ export class Arena {
   }
 
   physics(dt, now) {
-    const steps = 4, h = dt / steps, b = this.b, maxStep = PADDLE_V * h;
+    const steps = Math.max(1, Math.ceil(dt / 0.0042)), h = dt / steps, b = this.b, maxStep = PADDLE_V * h;
     for (let k = 0; k < steps; k++) {
       for (let i = 0; i < 2; i++) {
         const p = this.pad[i], half = this.ph[i] / 2;

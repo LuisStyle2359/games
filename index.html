@@ -1706,7 +1706,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -3016,7 +3016,7 @@ function pgKey() { return [...crypto.getRandomValues(new Uint8Array(14))].map(b 
 function pgInit(g, key) {
   g.key = /^[a-z0-9]{12,40}$/.test(key || '') ? key : '';
   g.pg = {ws: null, s: null, at: 0, y: PG_H / 2, aimY: PG_H / 2, dirty: true, conn: 'connecting', raf: 0, tries: 0, buf: [], offs: [], off: 0,
-    rtt: 0, pingAt: 0, ev: 0, trail: [], flash: 0, shake: 0, toast: null, parts: [], rings: [], burstAt: null, wasTurbo: false, frameAt: 0};
+    rtt: 0, pingAt: 0, ev: 0, hist: [], sm: {ex: 0, ey: 0}, sentAt: 0, pushT: 0, trail: [], flash: 0, shake: 0, toast: null, parts: [], rings: [], burstAt: null, wasTurbo: false, frameAt: 0};
   pgGame = g;
   pgConnect(g);
 }
@@ -3045,14 +3045,21 @@ function pgConnect(g) {
       // The smallest gap between server and local clock over the last few seconds is the best estimate of
       // their offset; snapshots are then drawn a little in the past, between two real positions.
       pg.offs.push(Date.now() - s.ts);
-      if (pg.offs.length > 120) pg.offs.shift();
+      if (pg.offs.length > 240) pg.offs.shift();
       pg.off = Math.min(...pg.offs);
       // How late snapshots arrive on top of that: the drawing delay follows it, short on a steady line and
       // longer on a shaky one, so the ball neither lags needlessly nor stutters.
       const late = Date.now() - s.ts - pg.off;
       pg.jit = Math.max(late, (pg.jit === undefined ? 25 : pg.jit) * 0.985);
-      pg.delay = Math.max(22, Math.min(90, 12 + pg.jit));
+      pg.delay = Math.max(16, Math.min(90, 10 + pg.jit));
+      // A correction from the server (say our return was judged a little differently) is eased out over a
+      // few frames instead of making the ball jump.
+      const before = pg.ballT !== undefined && s.st === 'play' && pg.buf.length ? pgBallAt(g, pg.ballT) : null;
       pg.buf.push(s);
+      if (before) {
+        const after = pgBallAt(g, pg.ballT), dx = before[0] - after[0], dy = before[1] - after[1];
+        if (Math.hypot(pg.sm.ex + dx, pg.sm.ey + dy) < 260) { pg.sm.ex += dx; pg.sm.ey += dy; } else pg.sm.ex = pg.sm.ey = 0;
+      }
       if (pg.buf.length > 40) pg.buf.shift();
     }
     if (s.ev && s.ev.n > pg.ev) { pgEvent(g, s.ev); pg.ev = s.ev.n; }
@@ -3087,10 +3094,77 @@ setInterval(() => {
     sendMpMsg(g.opponent, {type: 'pgstat', gid: g.gid, c: pg.conn}).catch(() => {});
   }
   if (pg.ws && pg.ws.readyState === 1) {
-    if (pg.dirty) { pgSend(g, {t: 'm', y: Math.round(pgMine(g, pg.s) ? pg.aimY : pg.y)}); pg.dirty = false; }
+    pgPush(g);
     if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pgSend(g, {t: 'ping', c: pg.pingAt, rtt: Math.round(pg.rtt)}); }
   }
 }, 16);
+
+// Paddle reports leave the moment the mouse moves, at most one per 15 ms (the server counts messages).
+function pgPush(g) {
+  const pg = g.pg;
+  if (!pg.dirty || !pg.ws || pg.ws.readyState !== 1) return;
+  const wait = 15 - (performance.now() - pg.sentAt);
+  if (wait > 0) { if (!pg.pushT) pg.pushT = setTimeout(() => { pg.pushT = 0; pgPush(g); }, wait); return; }
+  pgSend(g, {t: 'm', y: Math.round(pgMine(g, pg.s) ? pg.aimY : pg.y)});
+  pg.dirty = false;
+  pg.sentAt = performance.now();
+  // Where our paddle will be on the server, by server time, for predicting our own returns.
+  pg.hist.push([Date.now() - pg.off + pgLeadMax(pg), pg.y]);
+  if (pg.hist.length > 200) pg.hist.shift();
+}
+function pgPadAt(pg, t) {
+  const h = pg.hist;
+  if (!h.length || t > h[h.length - 1][0]) return pg.y;
+  for (let i = h.length - 1; i >= 0; i--) if (h[i][0] <= t) return h[i][1];
+  return h[0][1];
+}
+// The ball is shown at a moment that depends on where it is: slightly in the past near the opponent (smooth,
+// exactly as the server had it) and about one round trip ahead near our paddle, so it reaches our paddle on
+// screen when our paddle report reaches the server. In between the lead changes gradually.
+function pgLeadMax(pg) { return Math.min(120, pg.rtt || 60); }
+function pgLead(g, x) {
+  const pg = g.pg, d = pg.delay || PG_DELAY, k = Math.max(0, Math.min(1, 1 - (pgView(g, x) - PG_FACE) / (PG_W - 2 * PG_FACE)));
+  return -d + (pgLeadMax(pg) + d) * k;
+}
+// Ball [x, y, vx, vy] at server time T: interpolated between snapshots, and past the newest one run forward
+// with the server's rules, including a return off our paddle where our paddle will be. The opponent's
+// return isn't known yet, so there the ball waits at their paddle until the server says.
+function pgBallAt(g, T) {
+  const pg = g.pg, buf = pg.buf, last = buf[buf.length - 1];
+  if (!last) return null;
+  if (T <= last.ts) {
+    let i = buf.length - 1;
+    while (i > 0 && buf[i - 1].ts > T) i--;
+    const b = buf[i], a = buf[i - 1];
+    if (!a || a.st !== 'play' || Math.abs(b.p[0] - a.p[0]) + Math.abs(b.p[1] - a.p[1]) > 120) return b.p;
+    const k = Math.max(0, Math.min(1, (T - a.ts) / ((b.ts - a.ts) || 1)));
+    return [a.p[0] + (b.p[0] - a.p[0]) * k, a.p[1] + (b.p[1] - a.p[1]) * k, b.p[2], b.p[3]];
+  }
+  if (last.st !== 'play' || last.stuck >= 0) return last.p;
+  const me = g.myMark - 1, s = me === 0 ? -1 : 1, face = me === 0 ? PG_PX + PG_PW / 2 : PG_W - PG_PX - PG_PW / 2;
+  const far = me === 0 ? PG_W - PG_PX - PG_PW / 2 : PG_PX + PG_PW / 2, half = pgHalf(g, last, me), end = Math.min(T, last.ts + 250);
+  let [x, y, vx, vy] = last.p, t = last.ts;
+  while (t < end) {
+    const h = Math.min(4, end - t), px = x;
+    t += h;
+    x += vx * h / 1000;
+    y += vy * h / 1000;
+    if (y < PG_BR) { y = 2 * PG_BR - y; vy = Math.abs(vy); }
+    if (y > PG_H - PG_BR) { y = 2 * (PG_H - PG_BR) - y; vy = -Math.abs(vy); }
+    if (s < 0 ? vx < 0 && px - PG_BR >= face - 1 && x - PG_BR < face : vx > 0 && px + PG_BR <= face + 1 && x + PG_BR > face) {
+      if (last.mg && last.mg[me]) return [face - s * PG_BR, y, 0, 0];
+      const py = pgPadAt(pg, t);
+      if (Math.abs(y - py) <= half + PG_BR) {
+        const a = Math.max(-1, Math.min(1, (y - py) / half)) * Math.PI / 3, sp = Math.hypot(vx, vy), v = Math.min(1600, sp * (sp < 1150 ? 1.05 : 1.02));
+        x = face - s * PG_BR;
+        vx = -s * v * Math.cos(a);
+        vy = v * Math.sin(a);
+      }
+    }
+    if (s < 0 ? vx > 0 && x + PG_BR > far : vx < 0 && x - PG_BR < far) return [far + s * PG_BR, y, vx, vy];
+  }
+  return [x, y, vx, vy];
+}
 
 // Ball and opponent drawn a little in the past (pg.delay, PG_DELAY until measured), interpolated between the two surrounding snapshots.
 function pgSample(pg) {
@@ -3183,6 +3257,7 @@ function buildPong(g) {
     if (pgMine(g, s)) g.pg.aimY = Math.max(PG_BR, Math.min(PG_H - PG_BR, y));
     else g.pg.y = Math.max(half, Math.min(PG_H - half, y));
     g.pg.dirty = true;
+    pgPush(g);
   };
   cv.addEventListener('pointermove', move);
   cv.addEventListener('pointerdown', e => {
@@ -3362,6 +3437,14 @@ function pgFrame(g) {
   const pg = g.pg, ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1, now = performance.now(), fx = pgFx(pg);
   // Hit-stop: on a big hit the picture holds for a few frames.
   let s = pgSample(pg);
+  if (s && s.st === 'play' && s.stuck < 0 && pg.buf.length) {
+    const ball = pgBallAt(g, pg.ballT = Date.now() - pg.off + pgLead(g, pg.ballX !== undefined ? pg.ballX : s.p[0]));
+    const ease = Math.exp(-Math.min(0.05, pg.frameAt ? (now - pg.frameAt) / 1000 : 0.016) / 0.07);
+    pg.sm.ex *= ease;
+    pg.sm.ey *= ease;
+    pg.ballX = ball[0];
+    s = {...s, p: [ball[0] + pg.sm.ex, Math.max(PG_BR, Math.min(PG_H - PG_BR, ball[1] + pg.sm.ey)), ball[2], ball[3]]};
+  } else { pg.ballX = pg.ballT = undefined; pg.sm.ex = pg.sm.ey = 0; }
   if (now < fx.hitStop && fx.frozen) s = fx.frozen; else fx.frozen = s;
   const dt = now < fx.hitStop ? 0 : Math.min(0.05, pg.frameAt ? (now - pg.frameAt) / 1000 : 0.016);
   pg.frameAt = now;
@@ -3605,8 +3688,6 @@ function pgFrame(g) {
       }
     }
 
-    // While the server is still checking a ball that reached our paddle on this screen, keep it there.
-    if (s.st === 'play' && s.stuck < 0 && dvx < 0 && bx < PG_FACE && bx > PG_FACE - 90 && Math.abs(by - pg.y) <= halves[0] + PG_BR + 3) bx = PG_FACE;
 
     // Hits: a few paddle-coloured pixels; a returned fireball holds the picture and explodes on the paddle.
     if (s.st === 'play' && s.stuck < 0 && pg.prevDvx !== undefined && Math.sign(dvx) !== Math.sign(pg.prevDvx) && dvx !== 0) {
@@ -3628,6 +3709,7 @@ function pgFrame(g) {
     pg.wasHot = hot;
     if (hot) pg.hotAt = now;
     if (s.st === 'play') pg.lastBall = [bx, by];
+    pg.drawn = s.st === 'play' && s.stuck < 0 ? [pgView(g, bx), by] : null;
 
     // Aiming: the predicted path, walls included, as marching pixels and a blinking target; white-hot when full.
     if (path.length) {
