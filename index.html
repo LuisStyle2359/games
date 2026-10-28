@@ -2308,6 +2308,8 @@ function handleMp(from, dm) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'react' && !g.over) handleReact(g, dm);
   } else if (EM_TYPES.has(dm.type)) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'emoji' && !g.over) handleEmoji(g, dm);
+  } else if (dm.type === 'pgstat') {
+    if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) { g.pg.opConn = String(dm.c || ''); g.pg.opAt = Date.now(); }
   } else if (UNO_TYPES.has(dm.type)) {
     handleUno(from, gid, dm);
   } else if (DRAW_TYPES.has(dm.type)) {
@@ -3081,6 +3083,12 @@ setInterval(() => {
     return;
   }
   pgAssistStep(g);
+  // Until the round runs, tell the opponent how our connection to the game server is doing.
+  if ((!pg.s || pg.s.st === 'wait') && performance.now() - (pg.statAt || 0) > 3000) {
+    pg.statAt = performance.now();
+    if (!pg.waitFrom) pg.waitFrom = Date.now();
+    sendMpMsg(g.opponent, {type: 'pgstat', gid: g.gid, c: pg.conn}).catch(() => {});
+  }
   if (pg.ws && pg.ws.readyState === 1) {
     if (pg.dirty) { pgSend(g, {t: 'm', y: Math.round(pgMine(g, pg.s) ? pg.aimY : pg.y)}); pg.dirty = false; }
     if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pgSend(g, {t: 'ping', c: pg.pingAt, rtt: Math.round(pg.rtt)}); }
@@ -3310,7 +3318,13 @@ function pgFrame(g) {
   if (g.over) text = g.winner === g.myMark ? '🏆 Gewonnen!' : g.opName + ' gewinnt';
   else if (!OWN_BROKER.url) text = 'Kein eigener Spielserver eingerichtet';
   else if (pg.conn !== 'open') text = pg.conn === 'lost' ? 'Spielserver nicht erreichbar – neuer Versuch…' : 'Verbinde mit dem Spielserver…';
-  else if (!s || s.st === 'wait') text = 'Warte auf ' + g.opName + '…';
+  else if (!s || s.st === 'wait') {
+    const waited = Date.now() - (pg.waitFrom || Date.now());
+    text = pg.opConn === 'lost' ? g.opName + ' kann den Spielserver nicht erreichen.\nSein Netz blockiert wohl workers.dev.'
+      : pg.opConn === 'connecting' ? g.opName + ' verbindet sich…'
+      : waited > 8000 ? 'Warte auf ' + g.opName + '…\nKommt nichts: ' + g.opName + ' soll Strg+F5 drücken, dann neu einladen.'
+      : 'Warte auf ' + g.opName + '…';
+  }
   else if (voting) text = '';
   else if (!s.on[op1]) text = g.opName + ' ist weg… (gewinnst in 10 s)';
   else if (s.st === 'count') text = (s.pu ? '⚡ Power-ups AN' : 'Power-ups AUS') + (s.coin ? ' (Münzwurf)' : '') + '\n' + Math.max(1, Math.ceil(s.c / 1000));
