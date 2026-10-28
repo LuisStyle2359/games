@@ -187,6 +187,9 @@ export class Arena {
     this.w = 0;
     this.n = 0;
     this.dir = Math.random() < 0.5 ? -1 : 1;
+    this.rtt = [80, 80];
+    this.hist = [[], []];
+    this.pend = [null, null];
   }
 
   async fetch(req) {
@@ -212,8 +215,15 @@ export class Arena {
   onMessage(i, data) {
     let msg;
     try { msg = JSON.parse(data); } catch (e) { return; }
-    if (msg.t === 'm' && Number.isFinite(msg.y)) this.pad[i].ty = Math.max(PH / 2, Math.min(H - PH / 2, msg.y));
-    else if (msg.t === 'ping' && Number.isFinite(msg.c)) { try { this.seats[i].send(JSON.stringify({t: 'pong', c: msg.c})); } catch (e) {} }
+    if (msg.t === 'm' && Number.isFinite(msg.y)) {
+      const y = Math.max(PH / 2, Math.min(H - PH / 2, msg.y)), now = Date.now(), h = this.hist[i];
+      this.pad[i].ty = y;
+      h.push([now, y]);
+      while (h.length && now - h[0][0] > 800) h.shift();
+    } else if (msg.t === 'ping' && Number.isFinite(msg.c)) {
+      if (Number.isFinite(msg.rtt)) this.rtt[i] = Math.max(0, Math.min(400, msg.rtt));
+      try { this.seats[i].send(JSON.stringify({t: 'pong', c: msg.c})); } catch (e) {}
+    }
     else if (msg.t === 'quit' && this.st !== 'over') this.finish(2 - i);
   }
 
@@ -221,6 +231,7 @@ export class Arena {
     this.st = st;
     this.until = Date.now() + ms;
     Object.assign(this.b, {x: W / 2, y: H / 2, vx: 0, vy: 0});
+    this.pend = [null, null];
   }
 
   launch() {
@@ -243,7 +254,7 @@ export class Arena {
       for (let i = 0; i < 2; i++) if (!this.seats[i] && now - this.left[i] > 10000) this.finish(2 - i);
       if (this.st !== 'over' && this.seats[0] && this.seats[1]) {
         if ((this.st === 'count' || this.st === 'goal') && now >= this.until) { this.st = 'play'; this.launch(); }
-        if (this.st === 'play') this.physics(TICK / 1000);
+        if (this.st === 'play') { this.judge(now); this.physics(TICK / 1000, now); }
       }
     } else if (!this.seats[0] && !this.seats[1] && now - Math.max(...this.left) > 60000) {
       clearInterval(this.timer);
@@ -252,7 +263,38 @@ export class Arena {
     this.broadcast(now);
   }
 
-  physics(dt) {
+  // A player sees the ball a little late but their own paddle at once, so a miss on the server can be a hit
+  // on their screen. Before a miss counts, wait about one round trip for paddle reports from that moment.
+  grace(i) { return Math.min(260, this.rtt[i] + 70); }
+
+  bounce(i, paddleY, x, y, speed) {
+    const s = i === 0 ? -1 : 1, rel = Math.max(-1, Math.min(1, (y - paddleY) / (PH / 2))), a = rel * Math.PI / 3;
+    const v = Math.min(VMAX, speed * 1.06);
+    Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
+  }
+
+  judge(now) {
+    for (let i = 0; i < 2; i++) {
+      const p = this.pend[i];
+      if (!p) continue;
+      const g = this.grace(i), reach = PH / 2 + BR + 3;
+      const hit = this.hist[i].find(([t, y]) => t >= p.t - 60 && t <= p.t + g && Math.abs(p.y - y) <= reach);
+      if (hit) {
+        this.pend[i] = null;
+        this.bounce(i, hit[1], p.x, p.y, p.v);
+        const b = this.b, el = (now - p.t) / 1000;
+        b.x += b.vx * el;
+        b.y += b.vy * el;
+        if (b.y < BR) b.y = 2 * BR - b.y;
+        if (b.y > H - BR) b.y = 2 * (H - BR) - b.y;
+        b.y = Math.max(BR, Math.min(H - BR, b.y));
+      } else if (now > p.t + g) {
+        p.done = true;
+      }
+    }
+  }
+
+  physics(dt, now) {
     const steps = 4, h = dt / steps, b = this.b, maxStep = PADDLE_V * h;
     for (let k = 0; k < steps; k++) {
       for (const p of this.pad) p.y += Math.max(-maxStep, Math.min(maxStep, p.ty - p.y));
@@ -264,16 +306,18 @@ export class Arena {
       for (let i = 0; i < 2; i++) {
         const face = i === 0 ? PX + PW / 2 : W - PX - PW / 2, s = i === 0 ? -1 : 1;
         const crossed = s < 0 ? b.vx < 0 && px - BR >= face - 1 && b.x - BR < face : b.vx > 0 && px + BR <= face + 1 && b.x + BR > face;
-        if (!crossed || Math.abs(b.y - this.pad[i].y) > PH / 2 + BR) continue;
+        if (!crossed) continue;
         // Where the ball meets the paddle sets the angle; every return is a bit faster.
-        const rel = Math.max(-1, Math.min(1, (b.y - this.pad[i].y) / (PH / 2))), a = rel * Math.PI / 3;
-        const v = Math.min(VMAX, Math.hypot(b.vx, b.vy) * 1.06);
-        b.vx = -s * v * Math.cos(a);
-        b.vy = v * Math.sin(a);
-        b.x = face - s * BR;
+        if (Math.abs(b.y - this.pad[i].y) <= PH / 2 + BR) this.bounce(i, this.pad[i].y, face - s * BR, b.y, Math.hypot(b.vx, b.vy));
+        else if (!this.pend[i]) this.pend[i] = {t: now, x: face - s * BR, y: b.y, v: Math.hypot(b.vx, b.vy)};
       }
-      if (b.x < -BR) return this.point(1);
-      if (b.x > W + BR) return this.point(0);
+      // A goal only counts once the defender's grace period is over.
+      for (let i = 0; i < 2; i++) {
+        const out = i === 0 ? b.x < -BR : b.x > W + BR;
+        if (!out) continue;
+        if (this.pend[i] && !this.pend[i].done) { b.x = i === 0 ? -BR : W + BR; continue; }
+        return this.point(1 - i);
+      }
     }
   }
 

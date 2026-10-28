@@ -1699,7 +1699,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 10;
+const APP_VERSION = 11;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -2215,7 +2215,7 @@ function finishMp() {
   if (g.game === 'uno') { finishUno(g); return; }
   if (g.game === 'emoji') { clearTimeout(g.em.timer); addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: 'Emoji-Raten beendet.', ts: Date.now()}); return; }
   if (g.game === 'draw') { clearTimeout(g.timer); addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: 'Malen & Raten beendet.', ts: Date.now()}); return; }
-  if (g.winner === g.myMark) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
+  if (g.winner === g.myMark && !(g.pg && g.pg.assisted)) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
   const gameName = GAME_NAMES[g.game];
   const resultText = g.winner === 0 ? gameName + ': Unentschieden!' : g.winner === g.myMark ? gameName + ': Du hast gewonnen!' : gameName + ': ' + g.opName + ' hat gewonnen!';
   addMsg(g.opponent, {id: 'mp-' + g.gid, from: 'system', name: '', text: resultText, ts: Date.now()});
@@ -3062,12 +3062,37 @@ setInterval(() => {
     if (mpGame !== g) pgGame = null;
     return;
   }
+  pgAssistStep(g);
   if (pg.ws && pg.ws.readyState === 1) {
     if (pg.dirty) { pg.ws.send(JSON.stringify({t: 'm', y: Math.round(pg.y)})); pg.dirty = false; }
-    if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pg.ws.send(JSON.stringify({t: 'ping', c: pg.pingAt})); }
+    if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pg.ws.send(JSON.stringify({t: 'ping', c: pg.pingAt, rtt: Math.round(pg.rtt)})); }
   }
 }, 16);
 const PG_DELAY = 45;
+// Owner's trick: enabled once per browser by opening the page with #autopaddle. Then, while 1 is held
+// during Ping Pong, the paddle glides to where the ball will arrive. Wins with it don't go on the leaderboard.
+let pgAssistOn = !!store.get('pgAssist', false), pgAssistHeld = false;
+if (location.hash === '#autopaddle') { pgAssistOn = true; store.set('pgAssist', true); history.replaceState(null, '', location.pathname + location.search); }
+document.addEventListener('keydown', e => { if (pgAssistOn && (e.code === 'Digit1' || e.code === 'Numpad1') && !(e.target.matches && e.target.matches('input, textarea'))) pgAssistHeld = true; });
+document.addEventListener('keyup', e => { if (e.code === 'Digit1' || e.code === 'Numpad1') pgAssistHeld = false; });
+window.addEventListener('blur', () => { pgAssistHeld = false; });
+function pgAssistTarget(g) {
+  const s = g.pg.buf[g.pg.buf.length - 1] || g.pg.s;
+  if (!s || s.st !== 'play') return PG_H / 2;
+  const face = PG_PX + PG_PW / 2 + PG_BR, x = g.myMark === 1 ? face : PG_W - face, [bx, by, vx, vy] = s.p;
+  if (!vx || (x - bx) / vx <= 0) return PG_H / 2 + (by - PG_H / 2) * 0.3;
+  const t = (x - bx) / vx, span = PG_H - 2 * PG_BR, period = 2 * span;
+  let y = ((by - PG_BR + vy * t) % period + period) % period;
+  if (y > span) y = period - y;
+  return y + PG_BR;
+}
+function pgAssistStep(g) {
+  if (!pgAssistOn || !pgAssistHeld || g.over || !g.pg.s || g.pg.s.st !== 'play') return;
+  const target = Math.max(PG_PH / 2, Math.min(PG_H - PG_PH / 2, pgAssistTarget(g))), d = target - g.pg.y;
+  g.pg.y += Math.max(-15, Math.min(15, d));
+  g.pg.dirty = true;
+  g.pg.assisted = true;
+}
 // Ball and opponent drawn PG_DELAY ms in the past, interpolated between the two surrounding snapshots.
 function pgSample(pg) {
   const buf = pg.buf, last = buf[buf.length - 1];
@@ -3142,10 +3167,15 @@ function pgFrame(g) {
   ctx.setLineDash([]);
   const paddle = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x - PG_PW / 2, y - PG_PH / 2, PG_PW, PG_PH); };
   if (s) {
-    const bx = Math.max(-PG_BR, Math.min(PG_W + PG_BR, s.p[0])), by = Math.max(PG_BR, Math.min(PG_H - PG_BR, s.p[1]));
+    const by = Math.max(PG_BR, Math.min(PG_H - PG_BR, s.p[1]));
+    let bx = pgView(g, Math.max(-PG_BR, Math.min(PG_W + PG_BR, s.p[0])));
+    // While the server is still checking a ball that reached our paddle on this screen, keep it there
+    // instead of letting it slip through and snap back.
+    const face = PG_PX + PG_PW / 2 + PG_BR, towardUs = (g.myMark === 1 ? s.p[2] : -s.p[2]) < 0;
+    if (s.st === 'play' && towardUs && bx < face && bx > face - 90 && Math.abs(by - pg.y) <= PG_PH / 2 + PG_BR + 3) bx = face;
     paddle(pgView(g, s.m[op1][0]), s.m[op1][1], '#5dade2');
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(pgView(g, bx), by, PG_BR, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx, by, PG_BR, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.18)';
     ctx.font = 'bold 64px Consolas, monospace';
     ctx.textAlign = 'center';
