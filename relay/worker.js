@@ -11,6 +11,8 @@ const enc = new TextEncoder(), dec = new TextDecoder();
 export default {
   async fetch(req, env) {
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('ok\n', {headers: {'content-type': 'text/plain'}});
+    const game = new URL(req.url).pathname.match(/^\/game\/([A-Za-z0-9]{8,48})$/);
+    if (game) return env.ARENA.get(env.ARENA.idFromName(game[1])).fetch(req);
     return env.HUB.get(env.HUB.idFromName('main')).fetch(req);
   }
 };
@@ -162,4 +164,129 @@ export class Hub {
   }
 
   async webSocketError(ws) { await this.gone(ws); }
+}
+
+// Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
+// their paddle is; the page draws its own paddle right away and the rest from these updates.
+const W = 640, H = 360, PH = 70, PW = 10, PX = 24, BR = 7, WIN = 7, V0 = 380, VMAX = 1150, PADDLE_V = 1600, TICK = 1000 / 60;
+
+export class Arena {
+  constructor(ctx) {
+    this.ctx = ctx;
+    this.key = '';
+    this.seats = [null, null];
+    this.names = ['', ''];
+    this.left = [0, 0];
+    this.timer = 0;
+    this.b = {x: W / 2, y: H / 2, vx: 0, vy: 0};
+    this.pad = [{y: H / 2, ty: H / 2}, {y: H / 2, ty: H / 2}];
+    this.sc = [0, 0];
+    this.st = 'wait';
+    this.until = 0;
+    this.w = 0;
+    this.n = 0;
+    this.dir = Math.random() < 0.5 ? -1 : 1;
+  }
+
+  async fetch(req) {
+    const u = new URL(req.url), seat = Number(u.searchParams.get('seat')), key = u.searchParams.get('key') || '';
+    if ((seat !== 1 && seat !== 2) || !/^[a-z0-9]{12,40}$/.test(key)) return new Response('bad request', {status: 400});
+    if (this.key && this.key !== key) return new Response('forbidden', {status: 403});
+    this.key = key;
+    const [client, server] = Object.values(new WebSocketPair());
+    server.accept();
+    const i = seat - 1, old = this.seats[i];
+    if (old) { this.seats[i] = null; try { old.close(1000, 'replaced'); } catch (e) {} }
+    this.seats[i] = server;
+    this.names[i] = (u.searchParams.get('name') || '').slice(0, 24);
+    server.addEventListener('message', e => this.onMessage(i, e.data));
+    const gone = () => { if (this.seats[i] === server) { this.seats[i] = null; this.left[i] = Date.now(); } };
+    server.addEventListener('close', gone);
+    server.addEventListener('error', gone);
+    if (this.st === 'wait' && this.seats[0] && this.seats[1]) this.serve('count', 3000);
+    if (!this.timer) this.timer = setInterval(() => this.tick(), TICK);
+    return new Response(null, {status: 101, webSocket: client});
+  }
+
+  onMessage(i, data) {
+    let msg;
+    try { msg = JSON.parse(data); } catch (e) { return; }
+    if (msg.t === 'm' && Number.isFinite(msg.y)) this.pad[i].ty = Math.max(PH / 2, Math.min(H - PH / 2, msg.y));
+    else if (msg.t === 'quit' && this.st !== 'over') this.finish(2 - i);
+  }
+
+  serve(st, ms) {
+    this.st = st;
+    this.until = Date.now() + ms;
+    Object.assign(this.b, {x: W / 2, y: H / 2, vx: 0, vy: 0});
+  }
+
+  launch() {
+    const a = (Math.random() * 2 - 1) * Math.PI / 6;
+    this.b.vx = this.dir * V0 * Math.cos(a);
+    this.b.vy = V0 * Math.sin(a);
+  }
+
+  finish(winnerSeat) {
+    this.st = 'over';
+    this.w = winnerSeat;
+    this.until = Date.now() + 8000;
+  }
+
+  tick() {
+    const now = Date.now();
+    if (this.st === 'over') {
+      if (now > this.until || (!this.seats[0] && !this.seats[1])) { clearInterval(this.timer); this.timer = 0; }
+    } else if (this.st !== 'wait') {
+      for (let i = 0; i < 2; i++) if (!this.seats[i] && now - this.left[i] > 10000) this.finish(2 - i);
+      if (this.st !== 'over' && this.seats[0] && this.seats[1]) {
+        if ((this.st === 'count' || this.st === 'goal') && now >= this.until) { this.st = 'play'; this.launch(); }
+        if (this.st === 'play') this.physics(TICK / 1000);
+      }
+    } else if (!this.seats[0] && !this.seats[1] && now - Math.max(...this.left) > 60000) {
+      clearInterval(this.timer);
+      this.timer = 0;
+    }
+    if (++this.n % 2 === 0 || this.st === 'over') this.broadcast(now);
+  }
+
+  physics(dt) {
+    const steps = 4, h = dt / steps, b = this.b, maxStep = PADDLE_V * h;
+    for (let k = 0; k < steps; k++) {
+      for (const p of this.pad) p.y += Math.max(-maxStep, Math.min(maxStep, p.ty - p.y));
+      const px = b.x;
+      b.x += b.vx * h;
+      b.y += b.vy * h;
+      if (b.y < BR) { b.y = BR; b.vy = Math.abs(b.vy); }
+      if (b.y > H - BR) { b.y = H - BR; b.vy = -Math.abs(b.vy); }
+      for (let i = 0; i < 2; i++) {
+        const face = i === 0 ? PX + PW / 2 : W - PX - PW / 2, s = i === 0 ? -1 : 1;
+        const crossed = s < 0 ? b.vx < 0 && px - BR >= face - 1 && b.x - BR < face : b.vx > 0 && px + BR <= face + 1 && b.x + BR > face;
+        if (!crossed || Math.abs(b.y - this.pad[i].y) > PH / 2 + BR) continue;
+        // Where the ball meets the paddle sets the angle; every return is a bit faster.
+        const rel = Math.max(-1, Math.min(1, (b.y - this.pad[i].y) / (PH / 2))), a = rel * Math.PI / 3;
+        const v = Math.min(VMAX, Math.hypot(b.vx, b.vy) * 1.06);
+        b.vx = -s * v * Math.cos(a);
+        b.vy = v * Math.sin(a);
+        b.x = face - s * BR;
+      }
+      if (b.x < -BR) return this.point(1);
+      if (b.x > W + BR) return this.point(0);
+    }
+  }
+
+  point(scorer) {
+    this.sc[scorer]++;
+    if (this.sc[scorer] >= WIN) return this.finish(scorer + 1);
+    this.dir = scorer === 0 ? 1 : -1;
+    this.serve('goal', 1200);
+  }
+
+  broadcast(now) {
+    const r = v => Math.round(v);
+    const s = JSON.stringify({t: 's', st: this.st, c: Math.max(0, this.until - now), w: this.w, sc: this.sc, names: this.names,
+      on: [!!this.seats[0], !!this.seats[1]], p: [r(this.b.x), r(this.b.y), r(this.b.vx), r(this.b.vy)],
+      m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]]});
+    for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
+  }
 }

@@ -8,6 +8,14 @@ preview_urls = false
 name = "HUB"
 class_name = "Hub"
 
+[[durable_objects.bindings]]
+name = "ARENA"
+class_name = "Arena"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Hub"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Arena"]
