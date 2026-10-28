@@ -1706,7 +1706,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 12;
+const APP_VERSION = 13;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -3009,14 +3009,14 @@ function renderUno() {
 /* Ping Pong: the ball runs on our own server (relay/worker.js, class Arena). Each side sends where its
    paddle is and draws it immediately; ball and opponent come from the server, drawn slightly in the past. */
 const PG_W = 640, PG_H = 360, PG_PH = 70, PG_PW = 10, PG_PX = 24, PG_BR = 7, PG_FACE = PG_PX + PG_PW / 2 + PG_BR, PG_DELAY = 45;
-const PG_ITEMS = {big: {icon: '🟩', name: 'Riesen-Schläger', color: '#2ecc71'}, shield: {icon: '🛡️', name: 'Schutzwand', color: '#5dade2'},
-  magnet: {icon: '🧲', name: 'Magnet-Schuss', color: '#e056fd'}};
+const PG_ITEMS = {big: {icon: '🟨', name: 'Riesen-Schläger', color: '#b6ff3b', hue: 85}, shield: {icon: '🛡️', name: 'Schutzwand', color: '#b388ff', hue: 265},
+  magnet: {icon: '🧲', name: 'Magnet-Schuss', color: '#ff3b5c', hue: 350}};
 let pgGame = null;
 function pgKey() { return [...crypto.getRandomValues(new Uint8Array(14))].map(b => (b % 36).toString(36)).join(''); }
 function pgInit(g, key) {
   g.key = /^[a-z0-9]{12,40}$/.test(key || '') ? key : '';
   g.pg = {ws: null, s: null, at: 0, y: PG_H / 2, aimY: PG_H / 2, dirty: true, conn: 'connecting', raf: 0, tries: 0, buf: [], offs: [], off: 0,
-    rtt: 0, pingAt: 0, ev: 0, trail: [], flash: 0, shake: 0, toast: null};
+    rtt: 0, pingAt: 0, ev: 0, trail: [], flash: 0, shake: 0, toast: null, parts: [], rings: [], burstAt: null, wasTurbo: false, frameAt: 0};
   pgGame = g;
   pgConnect(g);
 }
@@ -3047,6 +3047,11 @@ function pgConnect(g) {
       pg.offs.push(Date.now() - s.ts);
       if (pg.offs.length > 120) pg.offs.shift();
       pg.off = Math.min(...pg.offs);
+      // How late snapshots arrive on top of that: the drawing delay follows it, short on a steady line and
+      // longer on a shaky one, so the ball neither lags needlessly nor stutters.
+      const late = Date.now() - s.ts - pg.off;
+      pg.jit = Math.max(late, (pg.jit === undefined ? 25 : pg.jit) * 0.985);
+      pg.delay = Math.max(22, Math.min(90, 12 + pg.jit));
       pg.buf.push(s);
       if (pg.buf.length > 40) pg.buf.shift();
     }
@@ -3065,14 +3070,6 @@ function pgConnect(g) {
     if (mpGame === g && !g.over && pg.tries++ < 30) setTimeout(() => pgConnect(g), 1000);
   };
 }
-function pgEvent(g, ev) {
-  const pg = g.pg, mine = ev.i === g.myMark - 1, who = mine ? 'Du' : g.opName;
-  if (ev.k === 'get' && PG_ITEMS[ev.kind]) pg.toast = {text: PG_ITEMS[ev.kind].icon + ' ' + who + ': ' + PG_ITEMS[ev.kind].name + '!', color: PG_ITEMS[ev.kind].color, until: performance.now() + 1800};
-  if (ev.k === 'catch') { pg.toast = {text: mine ? '🧲 Gefangen! Zielen & klicken' : '🧲 ' + g.opName + ' zielt…', color: '#e056fd', until: performance.now() + 1500}; pg.fireAt = 0; }
-  if (ev.k === 'fire') { pg.flash = 1; pg.shake = 1; pg.trail = []; }
-  if (ev.k === 'shield') pg.toast = {text: '🛡️ ' + (mine ? 'Deine' : g.opName + 's') + ' Schutzwand hält!', color: '#5dade2', until: performance.now() + 1500};
-}
-function pgQuit(g) { pgSend(g, {t: 'quit'}); }
 setInterval(() => {
   const g = pgGame;
   if (!g) return;
@@ -3095,11 +3092,11 @@ setInterval(() => {
   }
 }, 16);
 
-// Ball and opponent drawn PG_DELAY ms in the past, interpolated between the two surrounding snapshots.
+// Ball and opponent drawn a little in the past (pg.delay, PG_DELAY until measured), interpolated between the two surrounding snapshots.
 function pgSample(pg) {
   const buf = pg.buf, last = buf[buf.length - 1];
   if (!last) return pg.s;
-  const t = Date.now() - pg.off - PG_DELAY;
+  const t = Date.now() - pg.off - (pg.delay || PG_DELAY);
   let i = buf.length - 1;
   while (i > 0 && buf[i - 1].ts > t) i--;
   const b = buf[i], a = buf[i - 1];
@@ -3219,89 +3216,527 @@ function renderPong() {
     : el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
   if (!g.pg.raf) g.pg.raf = requestAnimationFrame(() => pgFrame(g));
 }
+// Visual effects for Ping Pong, in the game's own retro look: hard 4px pixels, no transparency, one colour per
+// power-up (never a player's colour), a pixel font, and effects that do something to the table. Picture faults
+// only ever touch the background, so paddles, ball and score stay readable. Screen coordinates, own side left.
+const PGX = v => Math.round(v / 4) * 4;
+const PG_COL = {me: '#f5b041', op: '#5dade2', mag: '#ff3b5c', wall: '#b388ff',
+  hot: ['#ffffff', '#fff3b0', '#ffd23f', '#ff9f1c', '#ff6b1a', '#e8401c', '#a62a1c', '#6e1f1a'],
+  burn: ['#fff3b0', '#ffd23f', '#ff9f1c', '#ff6b1a', '#e8401c', '#b8301c', '#7a2418']};
+// 9x9 icons: letters pick the colour (W white, R magnet red, L lime, V violet).
+const PG_ICONS = {
+  big: ['....L....', '...LLL...', '..LLLLL..', '....W....', '....W....', '....W....', '..LLLLL..', '...LLL...', '....L....'],
+  shield: ['.VVVVVVV.', 'VVVVVVVVV', 'VVVWWWVVV', 'VVVWWWVVV', 'VVVVWVVVV', '.VVVVVVV.', '..VVVVV..', '...VVV...', '....V....'],
+  magnet: ['WW.....WW', 'WW.....WW', 'RR.....RR', 'RW.....RR', 'RW.....RD', 'RRR...RRD', '.RRRRRRD.', '..DDDDD..', '.........']
+};
+const PG_ICON_COL = {W: '#ffffff', R: '#ff3b5c', D: '#a3152f', L: '#b6ff3b', V: '#b388ff'};
+const PG_DARK = {'#ff3b5c': '#8a1830', '#b388ff': '#4a2d85', '#b6ff3b': '#4f7a14', '#ffffff': '#6b7079'};
+const PG_LABEL = {big: 'RIESEN-SCHLÄGER', shield: 'SCHUTZWAND', magnet: 'MAGNET'};
+// 5x7 pixel font for the banner and the score.
+const PG_FONT = {
+  A: '.###.#...##...#######...##...##...#', B: '####.#...##...#####.#...##...#####.', C: '.#####....#....#....#....#.....####',
+  D: '####.#...##...##...##...##...#####.', E: '######....#....####.#....#....#####', F: '######....#....####.#....#....#....',
+  G: '.#####....#....#..###...##...#.####', H: '#...##...##...#######...##...##...#', I: '#####..#....#....#....#....#..#####',
+  J: '..###...#....#....#....##..#..##...', K: '#...##..#.#.#..##...#.#..#..#.#...#', L: '#....#....#....#....#....#....#####',
+  M: '#...###.###.#.##.#.##...##...##...#', N: '#...###..##.#.##..###...##...##...#', O: '.###.#...##...##...##...##...#.###.',
+  P: '####.#...##...#####.#....#....#....', Q: '.###.#...##...##...##.#.##..#..##.#', R: '####.#...##...#####.#.#..#..#.#...#',
+  S: '.#####....#.....###.....#....#####.', T: '#####..#....#....#....#....#....#..', U: '#...##...##...##...##...##...#.###.',
+  V: '#...##...##...##...##...#.#.#...#..', W: '#...##...##...##.#.##.#.###.###...#', X: '#...##...#.#.#...#...#.#.#...##...#',
+  Y: '#...##...#.#.#...#....#....#....#..', Z: '#####....#...#...#...#...#....#####', 'Ä': '#...#.###.#...##...#######...##...#',
+  'Ö': '#...#.###.#...##...##...##...#.###.', 'Ü': '#...#.....#...##...##...##...#.###.', 0: '.###.#...##...##...##...##...#.###.',
+  1: '..#...##....#....#....#....#...###.', 2: '.###.#...#....#...#...#...#...#####', 3: '####.....#....#.###.....#....#####.',
+  4: '#...##...##...######....#....#....#', 5: '######....#....####.....#....#####.', 6: '.###.#....#....####.#...##...#.###.',
+  7: '#####....#...#...#...#....#....#...', 8: '.###.#...##...#.###.#...##...#.###.', 9: '.###.#...##...#.####....#....#.###.',
+  ' ': '...................................', '·': '...............#...................', '-': '...............###.................',
+  '&': '.##..#..#..##...#...#.#.##..#..##.#', '!': '..#....#....#....#....#.........#..', '?': '.###.#...#....#...#...#.........#..',
+  '.': '................................#..', ':': '.......#..................#........'
+};
+const pgUp = t => String(t).toUpperCase().replace(/ß/g, 'SS');
+function pgTextWidth(text, px) { return pgUp(text).length * 6 * px - px; }
+// Draws [[text, colour], ...] centred on cx.
+function pgText(ctx, parts, cx, y, px) {
+  let x = Math.round(cx - pgTextWidth(parts.map(p => p[0]).join(''), px) / 2);
+  for (const [text, color] of parts) {
+    ctx.fillStyle = color;
+    for (const ch of pgUp(text)) {
+      const gl = PG_FONT[ch] || PG_FONT['?'];
+      for (let i = 0; i < 35; i++) if (gl[i] === '#') ctx.fillRect(x + (i % 5) * px, y + Math.floor(i / 5) * px, px, px);
+      x += 6 * px;
+    }
+  }
+}
+function pgOwn(g, i) { return i === g.myMark - 1 ? PG_COL.me : PG_COL.op; }
+function pgFx(pg) {
+  if (!pg.fx) {
+    const bg = document.createElement('canvas');
+    bg.width = PG_W; bg.height = PG_H;
+    pg.fx = {parts: [], waves: [], blasts: [], burn: [], bg, net: [], glitch: 0, tint: null, shake: 0, recoil: [0, 0], hitFlash: [0, 0],
+      scoreJump: [0, 0], banner: null, half: [PG_PH / 2, PG_PH / 2], hitStop: 0, frozen: null, pad: [[PG_PX, PG_H / 2], [PG_W - PG_PX, PG_H / 2]],
+      shOn: [0, 0], wallGhost: null, iconFlash: null};
+  }
+  return pg.fx;
+}
+function fxDebris(pg, x, y, n, colors, o = {}) {
+  const fx = pgFx(pg);
+  for (let i = 0; i < n && fx.parts.length < 700; i++) {
+    const a = o.dir === undefined ? Math.random() * Math.PI * 2 : o.dir + (Math.random() - 0.5) * (o.spread || 1.4);
+    const v = (o.speed || 300) * (0.3 + Math.random() * 0.7);
+    fx.parts.push({x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: (o.life || 0.45) * (0.6 + Math.random() * 0.6),
+      c: colors[Math.floor(Math.random() * colors.length)], s: o.size || (Math.random() < 0.4 ? 8 : 4), grav: o.gravity === undefined ? 300 : o.gravity,
+      shrink: o.shrink, home: o.home, grp: o.grp, ramp: o.ramp});
+  }
+}
+function fxWave(pg, x, y, color, max, life, thick) { pgFx(pg).waves.push({x, y, color, max: max || 60, life: life || 0.25, t: 0, thick: thick || 4}); }
+function fxBlast(pg, x, y, max, life, cone) {
+  const r0 = Math.random() * Math.PI;
+  pgFx(pg).blasts.push({x, y, max, t: 0, life: life || 0.36, cone, rays: [0, 1, 2, 3, 4, 5].map(k => r0 + k * Math.PI / 3 + (Math.random() - 0.5) * 0.5)});
+}
+function fxBanner(pg, parts, border) { pgFx(pg).banner = {parts, border, t: 0}; }
+function pgIcon(ctx, kind, x, y, px, white) {
+  PG_ICONS[kind].forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch === '.') return;
+    ctx.fillStyle = white ? '#ffffff' : PG_ICON_COL[ch];
+    ctx.fillRect(x + (c - 4.5) * px, y + (r - 4.5) * px, px, px);
+  }));
+}
+// The magnet shot's path from the ball to the opponent's side, folded at the walls like the server does.
+function pgShotPath(bx, by, ay, mine) {
+  const tx = mine ? PG_W - PG_FACE : PG_FACE, dx = tx - bx, a = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, Math.atan2(ay - by, Math.abs(dx))));
+  const ux = Math.sign(dx) * Math.cos(a), pts = [];
+  let x = bx, y = by, vy = Math.sin(a);
+  for (let k = 0; k < 600 && (mine ? x < tx : x > tx); k++) {
+    x += ux * 4; y += vy * 4;
+    if (y < PG_BR) { y = 2 * PG_BR - y; vy = -vy; }
+    if (y > PG_H - PG_BR) { y = 2 * (PG_H - PG_BR) - y; vy = -vy; }
+    if (k % 4 === 3) pts.push([PGX(x), PGX(y)]);
+  }
+  return pts;
+}
+function pgEvent(g, ev) {
+  const pg = g.pg, me1 = g.myMark - 1, mine = ev.i === me1, who = mine ? 'DU' : g.opName, s = pg.s, fx = pgFx(pg);
+  const own = pgOwn(g, ev.i), bx = s ? pgView(g, s.p[0]) : PG_W / 2, by = s ? s.p[1] : PG_H / 2, name = mine ? 'DU' : String(g.opName).slice(0, 8);
+  const pad = fx.pad[ev.i], dir = ev.i === me1 ? 1 : -1;
+  if (ev.k === 'get' && PG_ICONS[ev.kind]) {
+    // The icon flashes white, bursts in its own colour, and the pieces fly into the paddle that took it.
+    const p = pg.lastItem || {x: PG_W / 2, y: PG_H / 2}, it = PG_ITEMS[ev.kind];
+    fx.iconFlash = {kind: ev.kind, x: p.x, y: p.y, f: 3};
+    fxDebris(pg, p.x, p.y, 6, [it.color, it.color, '#ffffff'], {speed: 300, life: 1.2, gravity: 0, size: 8, home: ev.i, grp: {}});
+    fxWave(pg, p.x, p.y, it.color, 50, 0.18, 8);
+    fx.tint = {c: it.color, f: 2};
+    fxBanner(pg, [[name, own], [' · ' + PG_LABEL[ev.kind], it.color]], it.color);
+  }
+  if (ev.k === 'catch') {
+    fxBanner(pg, mine ? [['ZIELEN & KLICKEN', own]] : [[name, own], [' LÄDT', PG_COL.mag]], PG_COL.mag);
+  }
+  if (ev.k === 'fire') {
+    fx.hitStop = performance.now() + 50;
+    fx.glitch = 2;
+    fx.tint = {c: '#ffffff', f: 1};
+    fx.shake = 1;
+    fx.recoil[ev.i] = 1;
+    pg.shooter = ev.i;
+    // Muzzle flash right on the paddle, an orange ring, and sparks thrown forward.
+    fxBlast(pg, pad[0] + dir * 12, pad[1], 44, 0.2, mine ? 0 : Math.PI);
+    fxWave(pg, pad[0] + dir * 12, pad[1], 'fire', 70, 0.28, 8);
+    fxDebris(pg, pad[0] + dir * 16, pad[1], 26, ['#ffffff', '#fff3b0', '#ffd23f', '#ff9f1c'], {dir: mine ? 0 : Math.PI, spread: 1.2, speed: 700, life: 0.3, gravity: 0, size: 4});
+    pg.trail = [];
+  }
+  if (ev.k === 'shield') {
+    // The wall flashes white, then its bricks blow out into the field.
+    const x = ev.i === me1 ? 12 : PG_W - 12;
+    fx.wallGhost = {i: ev.i, f: 4};
+    for (let y = 4; y < PG_H; y += 12) {
+      const near = Math.max(0, 1 - Math.abs(y - by) / 140);
+      fx.parts.push({x, y, vx: dir * (60 + near * 380 + Math.random() * 80), vy: (y - by) * near * 1.5, life: 0, max: 0.25 + near * 0.25, c: Math.random() < 0.3 ? '#ffffff' : PG_COL.wall, s: 8, grav: 0, shrink: true});
+    }
+    fx.shake = Math.max(fx.shake, 0.6);
+    fxBanner(pg, [[mine ? 'DEINE' : name + 'S', own], [' WAND HÄLT', PG_COL.wall]], PG_COL.wall);
+  }
+}
+function pgQuit(g) { pgSend(g, {t: 'quit'}); }
+
 function pgFrame(g) {
   g.pg.raf = 0;
   const cv = $('pgcanvas');
   if (mpGame !== g || !cv || $('cmpboard').hidden) return;
-  const pg = g.pg, s = pgSample(pg), ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1, now = performance.now();
-  ctx.save();
-  if (pg.shake > 0.02) { ctx.translate((Math.random() - 0.5) * 14 * pg.shake, (Math.random() - 0.5) * 14 * pg.shake); pg.shake *= 0.88; }
-  ctx.fillStyle = '#10161f';
-  ctx.fillRect(-10, -10, PG_W + 20, PG_H + 20);
-  ctx.strokeStyle = 'rgba(255,255,255,.35)';
-  ctx.lineWidth = 3;
-  ctx.setLineDash([12, 12]);
-  ctx.beginPath(); ctx.moveTo(PG_W / 2, 0); ctx.lineTo(PG_W / 2, PG_H); ctx.stroke();
-  ctx.setLineDash([]);
-  const paddle = (x, y, h, c, glow) => {
-    if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 18; }
-    ctx.fillStyle = c;
-    ctx.fillRect(x - PG_PW / 2, y - h / 2, PG_PW, h);
-    ctx.shadowBlur = 0;
-  };
-  if (s) {
-    ctx.fillStyle = 'rgba(255,255,255,.18)';
-    ctx.font = 'bold 64px Consolas, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(s.sc[me1]), PG_W / 4, 76);
-    ctx.fillText(String(s.sc[op1]), PG_W * 3 / 4, 76);
-    // Shields light up the back line they protect.
-    for (const [i, x] of [[me1, 3], [op1, PG_W - 3]]) {
-      if (!s.sh || !s.sh[i]) continue;
-      ctx.strokeStyle = '#5dade2'; ctx.lineWidth = 5; ctx.shadowColor = '#5dade2'; ctx.shadowBlur = 14;
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, PG_H); ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
-    if (s.item && PG_ITEMS[s.item.k]) {
-      const it = PG_ITEMS[s.item.k], x = pgView(g, s.item.x), y = s.item.y, pulse = 1 + Math.sin(now / 180) * 0.08;
-      ctx.fillStyle = it.color + '33'; ctx.strokeStyle = it.color; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, 17 * pulse, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.font = '18px "Segoe UI Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(it.icon, x, y + 1);
-      ctx.textBaseline = 'alphabetic';
-    }
-    const opHalf = pgHalf(g, s, op1), myHalf = pgHalf(g, s, me1);
-    paddle(pgView(g, s.m[op1][0]), s.m[op1][1], opHalf * 2, '#5dade2', s.mg && s.mg[op1] ? '#e056fd' : null);
-    const myY = pgMine(g, s) ? s.m[me1][1] : pg.y;
-    paddle(PG_PX, myY, myHalf * 2, '#f5b041', s.mg && s.mg[me1] ? '#e056fd' : null);
+  const pg = g.pg, ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1, now = performance.now(), fx = pgFx(pg);
+  // Hit-stop: on a big hit the picture holds for a few frames.
+  let s = pgSample(pg);
+  if (now < fx.hitStop && fx.frozen) s = fx.frozen; else fx.frozen = s;
+  const dt = now < fx.hitStop ? 0 : Math.min(0.05, pg.frameAt ? (now - pg.frameAt) / 1000 : 0.016);
+  pg.frameAt = now;
+  ctx.imageSmoothingEnabled = false;
 
+  // Background layer: table, burn marks and net. Only this layer is ever tinted or torn.
+  const bgc = fx.bg.getContext('2d');
+  bgc.fillStyle = '#0e1116';
+  bgc.fillRect(0, 0, PG_W, PG_H);
+  if (fx.tint && fx.tint.f > 0) { bgc.globalAlpha = 0.3; bgc.fillStyle = fx.tint.c; bgc.fillRect(0, 0, PG_W, PG_H); bgc.globalAlpha = 1; fx.tint.f--; }
+  // The fireball's path glows: white-hot, then orange and red, thinning out and flickering away.
+  const burnAge = b => (now - b.t + (fx.burnOut ? Math.max(0, now - fx.burnOut) * 3 : 0)) / 420;
+  fx.burn = fx.burn.filter(b => burnAge(b) < 1);
+  if (!fx.burn.length) fx.burnOut = 0;
+  for (const b of fx.burn) {
+    const a = burnAge(b);
+    if (a > 0.5 && Math.random() < (a - 0.4) * 1.5) continue;
+    bgc.fillStyle = PG_COL.burn[Math.min(PG_COL.burn.length - 1, Math.floor(a * PG_COL.burn.length))];
+    const z = a < 0.25 ? 12 : a < 0.6 ? 8 : 4;
+    bgc.fillRect(b.x - z / 2, b.y - z / 2, z, z);
+  }
+  for (let i = 0, y = 0; y < PG_H; i++, y += 24) {
+    const n = fx.net[i];
+    let off = 0;
+    if (n) { const t = (now - n.t) / 1000; off = n.a * Math.cos(t * 26) * Math.exp(-t * 4); if (t > 1.5) fx.net[i] = null; }
+    bgc.fillStyle = '#3a3f47';
+    bgc.fillRect(PGX(PG_W / 2 - 2 + off), y, 4, 12);
+  }
+
+  ctx.save();
+  if (fx.shake > 0.03) { const k = 6 * fx.shake; ctx.translate(PGX((Math.random() - 0.5) * k), PGX((Math.random() - 0.5) * k)); fx.shake *= Math.pow(0.0005, dt || 0.016); }
+  ctx.fillStyle = '#0e1116';
+  ctx.fillRect(-40, -40, PG_W + 80, PG_H + 80);
+  if (fx.glitch > 0) {
+    // Torn picture for a couple of frames: the background is shifted in 4px bands.
+    for (let y = 0; y < PG_H;) {
+      const h = PGX(8 + Math.random() * 28), dx = Math.random() < 0.5 ? PGX((Math.random() - 0.5) * 48) : 0;
+      ctx.drawImage(fx.bg, 0, y, PG_W, h, dx, y, PG_W, h);
+      y += h;
+    }
+    fx.glitch--;
+  } else ctx.drawImage(fx.bg, 0, 0);
+
+  if (!s) {
+    ctx.fillStyle = PG_COL.me;
+    ctx.fillRect(PG_PX - PG_PW / 2, PGX(pg.y - PG_PH / 2), PG_PW, PG_PH);
+  } else {
+    const charge = s.stuck >= 0 ? 1 - s.su / 3000 : 0, full = charge > 0.8, hot = s.turbo && s.stuck < 0;
     const by = Math.max(PG_BR, Math.min(PG_H - PG_BR, s.p[1]));
     let bx = pgView(g, Math.max(-PG_BR, Math.min(PG_W + PG_BR, s.p[0])));
-    // While the server is still checking a ball that reached our paddle on this screen, keep it there
-    // instead of letting it slip through and snap back.
-    const towardUs = (g.myMark === 1 ? s.p[2] : -s.p[2]) < 0;
-    if (s.st === 'play' && s.stuck < 0 && towardUs && bx < PG_FACE && bx > PG_FACE - 90 && Math.abs(by - pg.y) <= myHalf + PG_BR + 3) bx = PG_FACE;
+    const dvx = g.myMark === 1 ? s.p[2] : -s.p[2], dvy = s.p[3];
+    const mineAim = s.stuck === me1, path = s.stuck >= 0 ? pgShotPath(bx, by, mineAim ? pg.aimY : s.aim, mineAim) : [];
+    pg.lastPath = path;
 
-    if (s.stuck >= 0) {
-      const mine = s.stuck === me1, ay = mine ? pg.aimY : s.aim, tx = mine ? PG_W - PG_FACE : PG_FACE;
-      ctx.strokeStyle = 'rgba(224,86,253,.8)'; ctx.lineWidth = 2; ctx.setLineDash([8, 7]);
-      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ay); ctx.stroke(); ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(tx, ay, 10, 0, Math.PI * 2); ctx.stroke();
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(bx, by, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (s.su / 3000)); ctx.stroke();
+    // Points: the digit jumps; a fireball goal holds the picture, tears it and blows up in front of the goal.
+    const total = s.sc[0] + s.sc[1];
+    if (pg.prevTotal !== undefined && total > pg.prevTotal && s.st !== 'over') {
+      const mineScored = s.sc[me1] > pg.prevMine, x = mineScored ? PG_W - 36 : 36, y = pg.lastBall ? pg.lastBall[1] : PG_H / 2;
+      fx.scoreJump[mineScored ? 0 : 1] = 1;
+      fx.serveAt = now;
+      if (now - (pg.hotAt || 0) < 500) {
+        fx.hitStop = now + 60; fx.glitch = 2; fx.tint = {c: '#ff6b1a', f: 2}; fx.shake = 1.2;
+        fx.hitFlash[mineScored ? op1 : me1] = 0.12; fx.recoil[mineScored ? op1 : me1] = 1;
+        const bx0 = mineScored ? PG_W - 60 : 60;
+        fx.burnOut = now;
+        fxBlast(pg, bx0, y, 84, 0.45);
+        fxWave(pg, bx0, y, 'fire', 150, 0.4, 12);
+        fxDebris(pg, bx0, y, 14, [mineScored ? PG_COL.op : PG_COL.me], {dir: mineScored ? Math.PI : 0, spread: 2, speed: 500, life: 0.5, gravity: 300, size: 4});
+        fxDebris(pg, bx0, y, 60, PG_COL.hot.slice(0, 6), {speed: 750, life: 0.5, gravity: 0, size: 4});
+        fxDebris(pg, bx0, y, 10, ['#3a3f47', '#2c3038'], {speed: 90, life: 0.8, gravity: -60, size: 12});
+      } else fxDebris(pg, x, y, 12, ['#ffffff', mineScored ? PG_COL.me : PG_COL.op], {dir: mineScored ? Math.PI : 0, spread: 2, speed: 300, life: 0.35, size: 4});
     }
-    if (s.turbo && s.stuck < 0) {
-      pg.trail.push([bx, by]);
-      if (pg.trail.length > 14) pg.trail.shift();
-      pg.trail.forEach(([x, y], i) => {
-        const k = (i + 1) / pg.trail.length;
-        ctx.fillStyle = `rgba(255,${Math.round(120 + 100 * k)},40,${0.15 + 0.5 * k})`;
-        ctx.beginPath(); ctx.arc(x, y, PG_BR * (0.5 + k), 0, Math.PI * 2); ctx.fill();
+    pg.prevTotal = total;
+    pg.prevMine = s.sc[me1];
+    // The score steps back whenever play happens up in its corner.
+    const dim = by < 100 || path.some(p => p[1] < 90) || fx.burn.some(b => b.y < 90);
+    for (const [k, i, x] of [[0, me1, PG_W / 4], [1, op1, PG_W * 3 / 4]]) {
+      const j = fx.scoreJump[k];
+      pgText(ctx, [[String(s.sc[i]), j > 0.1 ? '#ffffff' : dim ? '#181c22' : '#2c313a']], x, 28 - PGX(16 * j), 8);
+      fx.scoreJump[k] *= Math.pow(0.02, dt);
+    }
+
+    // Net kick when the ball crosses the middle.
+    if (pg.prevBx !== undefined && Math.sign(bx - PG_W / 2) !== Math.sign(pg.prevBx - PG_W / 2) && s.st === 'play') {
+      for (let i = 0, y = 0; y < PG_H; i++, y += 24) {
+        const d = Math.abs(y + 6 - by);
+        if (d < 60) fx.net[i] = {a: Math.sign(dvx) * (hot ? 14 : 5) * (1 - d / 60), t: now};
+      }
+    }
+    pg.prevBx = bx;
+
+    // Shields: a solid brick wall on the back line, built from the middle out, with a light running down it
+    // and an edge in the owner's colour.
+    for (const [i, x0] of [[me1, 4], [op1, PG_W - 16]]) {
+      if (s.sh && s.sh[i]) {
+        if (!fx.shOn[i]) {
+          fx.shOn[i] = now;
+          for (let y = 8; y < PG_H; y += 16) fx.parts.push({x: x0 + 6, y, vx: (i === me1 ? 1 : -1) * (60 + Math.random() * 60), vy: 0, life: 0, max: 0.3, c: '#d9c2ff', s: 4, grav: 0});
+        }
+      } else { fx.shOn[i] = 0; continue; }
+      // 12px brick wall: dark outer rim, bricks with mortar, a bright edge towards the field with glints in
+      // front of it, and a light band running up.
+      const reach = Math.min(1, (now - fx.shOn[i]) / 220) * PG_H / 2, shine = PG_H - ((now / 900) % 1) * (PG_H + 60), out = i === me1 ? 0 : 2;
+      for (let y = 0; y < PG_H; y += 4) {
+        if (Math.abs(y + 2 - PG_H / 2) > reach) continue;
+        const r = y / 4, course = Math.floor(r / 3), lit = Math.abs(y - shine) < 12;
+        for (let c = 0; c < 3; c++) {
+          let col;
+          if (c === out) col = '#4a2d85';
+          else if (c === 2 - out) col = lit ? '#ffffff' : '#e6d6ff';
+          else col = r % 3 === 2 ? '#5b3a9e' : lit ? '#e6d6ff' : course % 2 ? '#b388ff' : '#9466e8';
+          ctx.fillStyle = col;
+          ctx.fillRect(x0 + c * 4, y, 4, 4);
+        }
+        if (r % 6 === (Math.floor(now / 120) + course) % 6) { ctx.fillStyle = '#b388ff'; ctx.fillRect(i === me1 ? x0 + 16 : x0 - 8, y, 4, 4); }
+      }
+    }
+    if (fx.wallGhost && fx.wallGhost.f-- > 0) { ctx.fillStyle = '#ffffff'; ctx.fillRect(fx.wallGhost.i === me1 ? 4 : PG_W - 16, 0, 12, PG_H); }
+
+    // Power-up: big icon bobbing in a marching frame of its own colour.
+    if (s.item && PG_ICONS[s.item.k]) {
+      const it = PG_ITEMS[s.item.k], x = PGX(pgView(g, s.item.x)), y = PGX(s.item.y) + PGX(Math.sin(now / 260) * 4);
+      pg.lastItem = {x, y};
+      ctx.fillStyle = PG_DARK[it.color] || '#333';
+      for (let gx = -44; gx < 44; gx += 4) for (let gy = -44; gy < 44; gy += 4) {
+        const d = Math.max(Math.abs(gx + 2), Math.abs(gy + 2));
+        if (d > 38 && d < 44 && ((gx + gy) / 4) % 2 === 0) ctx.fillRect(x + gx, y + gy, 4, 4);
+      }
+      ctx.fillStyle = '#0e1116';
+      ctx.fillRect(x - 36, y - 36, 72, 72);
+      ctx.fillStyle = it.color;
+      const m = Math.floor(now / 70) % 4;
+      for (let k = -36; k < 36; k += 4) {
+        if (((k + 36) / 4 + m) % 4 > 1) continue;
+        ctx.fillRect(x + k, y - 36, 4, 4); ctx.fillRect(x - k - 4, y + 32, 4, 4); ctx.fillRect(x - 36, y - k - 4, 4, 4); ctx.fillRect(x + 32, y + k, 4, 4);
+      }
+      pgIcon(ctx, s.item.k, x, y, 6);
+      const tw = Math.floor(now / 160) % 6;
+      if (tw < 2) { ctx.fillStyle = '#ffffff'; const sx = x + (tw ? 20 : -28), sy = y - 36; ctx.fillRect(sx, sy, 4, 4); ctx.fillRect(sx - 4, sy + 4, 12, 4); ctx.fillRect(sx, sy + 8, 4, 4); }
+    }
+    if (fx.iconFlash && fx.iconFlash.f-- > 0) pgIcon(ctx, fx.iconFlash.kind, fx.iconFlash.x, fx.iconFlash.y, 6, true);
+
+    // Shockwaves, behind the paddles: a ring of pixels growing out, thinning, and cooling from yellow to red.
+    fx.waves = fx.waves.filter(w => (w.t += dt) < w.life);
+    for (const w of fx.waves) {
+      const q = w.t / w.life, r = 8 + w.max * (1 - (1 - q) * (1 - q)), thick = Math.max(4, PGX(w.thick * (1 - q)));
+      ctx.fillStyle = w.color === 'fire' ? (q < 0.35 ? '#fff3b0' : q < 0.6 ? '#ffd23f' : q < 0.8 ? '#ff9f1c' : '#e8401c') : q > 0.7 ? (PG_DARK[w.color] || w.color) : w.color;
+      const n = Math.max(12, Math.floor(r / 2.5));
+      for (let k = 0; k < n; k++) {
+        const a = k / n * Math.PI * 2;
+        for (let d = 0; d < thick; d += 4) ctx.fillRect(PGX(w.x + Math.cos(a) * (r - d)) - 2, PGX(w.y + Math.sin(a) * (r - d)) - 2, 4, 4);
+      }
+    }
+
+    // Explosions: a white flash that cools from the rim inwards, with rays shooting out; a muzzle flash is a cone.
+    fx.blasts = fx.blasts.filter(b => (b.t += dt) < b.life);
+    for (const b of fx.blasts) {
+      const q = b.t / b.life, r = 8 + b.max * 0.55 * Math.min(1, q / 0.25 + 0.3), cx = PGX(b.x), cy = PGX(b.y);
+      const inCone = (x, y) => b.cone === undefined || Math.abs(((Math.atan2(y, x) - b.cone + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) < 0.55;
+      for (let x = -r; x <= r; x += 4) for (let y = -r; y <= r; y += 4) {
+        const d = Math.hypot(x, y);
+        if (d > r * (b.cone === undefined ? 1 : 0.5 + 0.5 * Math.cos(Math.atan2(y, x) - b.cone) ** 8) || (d > 8 && !inCone(x, y))) continue;
+        if (q > 0.55 && ((x + y) / 4) % 2 === 0) continue;
+        ctx.fillStyle = q < 0.12 ? '#ffffff' : PG_COL.hot[Math.min(5, Math.floor(q * 3 + (d / r) * 2.2))];
+        ctx.fillRect(cx + PGX(x) - 2, cy + PGX(y) - 2, 4, 4);
+      }
+      if (b.cone === undefined && q < 0.6) {
+        for (const a of b.rays) for (let d = r; d < r + b.max * 0.9 * Math.min(1, q * 4); d += 4) {
+          ctx.fillStyle = d < r + 16 ? '#fff3b0' : '#ffd23f';
+          ctx.fillRect(PGX(cx + Math.cos(a) * d) - 2, PGX(cy + Math.sin(a) * d) - 2, 4, 4);
+        }
+      }
+    }
+    // Paddles. Big ones grow in steps; an armed magnet sends field arcs into the paddle and a tether to the ball;
+    // a charging magnet bends the paddle back like a slingshot, with a charge gauge behind it.
+    const halves = [pgHalf(g, s, me1), pgHalf(g, s, op1)];
+    const myY = pgMine(g, s) ? s.m[me1][1] : pg.y, opY = s.m[op1][1];
+    for (const [k, i, baseX, y, dir, color] of [[0, me1, PG_PX, myY, 1, PG_COL.me], [1, op1, pgView(g, s.m[op1][0]), opY, -1, PG_COL.op]]) {
+      fx.pad[i] = [baseX, y];
+      if (halves[k] > fx.half[k] + 1 && !pg['grow' + k]) { pg['grow' + k] = 1; fx.hitFlash[i] = 0.1; fxWave(pg, baseX, y, '#b6ff3b', 60, 0.25); }
+      if (halves[k] <= PG_PH / 2 + 1) pg['grow' + k] = 0;
+      fx.half[k] += Math.sign(halves[k] - fx.half[k]) * Math.min(Math.abs(halves[k] - fx.half[k]), 4);
+      const half = fx.half[k];
+      fx.recoil[i] *= Math.pow(0.002, dt || 0.016);
+      fx.hitFlash[i] = Math.max(0, fx.hitFlash[i] - (dt || 0.016));
+      const snap = Math.sin(fx.recoil[i] * Math.PI * 3) * 10 * fx.recoil[i];
+      const bend = s.stuck === i ? PGX(4 + 8 * charge) : 0, jit = s.stuck === i && charge > 0.4 ? PGX((Math.random() - 0.5) * 8 * charge) : 0;
+      ctx.fillStyle = fx.hitFlash[i] > 0 ? '#ffffff' : color;
+      for (let yy = -half; yy < half; yy += 4) {
+        const q = (yy + 2) / half, off = PGX(-dir * bend * (1 - q * q)) + dir * snap + jit;
+        ctx.fillRect(PGX(baseX - PG_PW / 2 + off), PGX(y + yy) + jit, 12, 4);
+      }
+      if (s.mg && s.mg[i] && s.stuck < 0) {
+        ctx.fillStyle = PG_COL.mag;
+        for (let r = 0; r < 3; r++) {
+          const rad = 60 - ((now / 12 + r * 20) % 60);
+          if (rad < 14) continue;
+          for (let a = -1.1; a <= 1.1; a += 4 / rad) {
+            const ay = PGX(y + Math.sin(a) * rad) - 2;
+            if (ay >= 0 && ay <= PG_H - 4) ctx.fillRect(PGX(baseX + dir * Math.cos(a) * rad) - 2, ay, 4, 4);
+          }
+        }
+        const toward = (k === 0 ? dvx < 0 : dvx > 0) && s.st === 'play';
+        if (toward && Math.abs(bx - baseX) < 320) {
+          // A crackling bolt between ball and paddle, redrawn every frame, its pixels marching into the paddle.
+          const len = Math.hypot(bx - baseX, by - y), n = Math.max(3, Math.floor(len / 8)), nx = -(by - y) / len, ny = (bx - baseX) / len;
+          const pts = [];
+          for (let q = 0; q <= n; q++) {
+            const f = q / n, h = Math.sin((q + 1) * 12.9898 + Math.floor(now / 60) * 78.233) * 43758.5453, j = q === 0 || q === n ? 0 : PGX(((h - Math.floor(h)) - 0.5) * 20) * Math.min(1, Math.sin(f * Math.PI) * 2);
+            pts.push([baseX + dir * 10 + (bx - baseX - dir * 10) * f + nx * j, y + (by - y) * f + ny * j]);
+          }
+          for (const [off, c] of [[4, PG_COL.mag], [-4, PG_COL.mag], [0, '#ffffff']]) {
+            ctx.fillStyle = c;
+            for (let q = 1; q < pts.length; q++) {
+              const [ax, ay] = pts[q - 1], [qx, qy] = pts[q], steps = Math.max(1, Math.round(Math.hypot(qx - ax, qy - ay) / 4));
+              for (let k = 1; k <= steps; k++) ctx.fillRect(PGX(ax + (qx - ax) * k / steps + nx * off) - 2, PGX(ay + (qy - ay) * k / steps + ny * off) - 2, 4, 4);
+            }
+          }
+        }
+      }
+      if (s.stuck === i) {
+        // Charge gauge: a horizontal bar over the paddle (under it near the top edge), filling yellow to red.
+        const cells = 12, w = cells * 4 + 8, gy = PGX(y - half) - 24 >= 4 ? PGX(y - half) - 24 : PGX(y + half) + 8;
+        const gx = dir > 0 ? PGX(baseX - 8) : PGX(baseX + 8) - w, filled = Math.round(cells * charge);
+        ctx.fillStyle = color;
+        ctx.fillRect(gx, gy, w, 16);
+        ctx.fillStyle = '#0e1116';
+        ctx.fillRect(gx + 4, gy + 4, w - 8, 8);
+        for (let c = 0; c < filled; c++) {
+          const f = c / cells, x = dir > 0 ? gx + 4 + c * 4 : gx + w - 8 - c * 4;
+          ctx.fillStyle = full && (c === filled - 1 || Math.floor(now / 66) % 2) ? '#ffffff' : f < 0.4 ? '#ffd23f' : f < 0.7 ? '#ff9f1c' : PG_COL.mag;
+          ctx.fillRect(x, gy + 4, 4, 8);
+        }
+        bx = PGX(dir > 0 ? baseX + 13 - bend : baseX - 11 + bend) + jit;
+        if (full && dt) {
+          for (let n = 0; n < 2; n++) {
+            const a = Math.random() * Math.PI * 2;
+            fx.parts.push({x: bx + Math.cos(a) * 40, y: by + Math.sin(a) * 40, vx: -Math.cos(a) * 330, vy: -Math.sin(a) * 330, life: 0, max: 0.11, c: n ? '#ffffff' : '#ffd23f', s: 4, grav: 0});
+          }
+        }
+      }
+    }
+
+    // While the server is still checking a ball that reached our paddle on this screen, keep it there.
+    if (s.st === 'play' && s.stuck < 0 && dvx < 0 && bx < PG_FACE && bx > PG_FACE - 90 && Math.abs(by - pg.y) <= halves[0] + PG_BR + 3) bx = PG_FACE;
+
+    // Hits: a few paddle-coloured pixels; a returned fireball holds the picture and explodes on the paddle.
+    if (s.st === 'play' && s.stuck < 0 && pg.prevDvx !== undefined && Math.sign(dvx) !== Math.sign(pg.prevDvx) && dvx !== 0) {
+      const side = dvx > 0 ? me1 : op1;
+      if (pg.wasHot) {
+        fx.hitStop = now + 50;
+        fx.hitFlash[side] = 0.12;
+        fx.recoil[side] = 1;
+        fx.glitch = 2;
+        fx.shake = Math.max(fx.shake, 1);
+        fxBlast(pg, bx + (dvx > 0 ? 28 : -28), by, 52);
+        fxWave(pg, bx, by, 'fire', 100, 0.32, 8);
+        fxDebris(pg, bx, by, 12, [side === me1 ? PG_COL.me : PG_COL.op], {dir: dvx > 0 ? Math.PI : 0, spread: 2, speed: 400, life: 0.45, gravity: 300, size: 4});
+        fxDebris(pg, bx, by, 30, PG_COL.hot.slice(0, 6), {dir: dvx > 0 ? 0 : Math.PI, spread: 2.2, speed: 600, life: 0.4, gravity: 200});
+      } else fxDebris(pg, bx, by, 6, [side === me1 ? PG_COL.me : PG_COL.op, '#ffffff'], {dir: dvx > 0 ? 0 : Math.PI, spread: 1.6, speed: 240, life: 0.22, size: 4});
+    }
+    pg.prevDvx = dvx;
+    if (pg.wasHot && !hot) pg.coolAt = now;
+    pg.wasHot = hot;
+    if (hot) pg.hotAt = now;
+    if (s.st === 'play') pg.lastBall = [bx, by];
+
+    // Aiming: the predicted path, walls included, as marching pixels and a blinking target; white-hot when full.
+    if (path.length) {
+      const march = Math.floor(now / (full ? 35 : 70)) % 3, own = pgOwn(g, s.stuck);
+      path.forEach(([x, y], k) => {
+        if (k % 3 === march) return;
+        const z = full ? 8 : 4;
+        ctx.fillStyle = full ? (k % 2 ? '#ffffff' : '#ffd23f') : charge > 0.55 ? '#ff6b1a' : charge > 0.3 ? '#ffd23f' : own;
+        ctx.fillRect(x - z / 2, y - z / 2, z, z);
       });
-      ctx.shadowColor = '#ff9f1a'; ctx.shadowBlur = 22;
-    } else pg.trail = [];
-    ctx.fillStyle = s.turbo ? '#fff3c4' : '#fff';
-    ctx.beginPath(); ctx.arc(bx, by, PG_BR, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
-  } else paddle(PG_PX, pg.y, PG_PH, '#f5b041');
-  if (pg.toast && now < pg.toast.until) {
-    ctx.font = 'bold 18px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
-    ctx.fillStyle = pg.toast.color; ctx.globalAlpha = Math.min(1, (pg.toast.until - now) / 400);
-    ctx.fillText(pg.toast.text, PG_W / 2, PG_H - 22);
-    ctx.globalAlpha = 1;
+      const end = path[path.length - 1], o = Math.floor(now / 120) % 2 ? 16 : 12;
+      ctx.fillStyle = '#ffffff';
+      for (const [ux, uy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) for (const d of [o, o + 4]) ctx.fillRect(end[0] + ux * d - 2, end[1] + uy * d - 2, 4, 4);
+      ctx.fillStyle = full ? PG_COL.mag : '#ffffff';
+      ctx.fillRect(end[0] - 2, end[1] - 2, 4, 4);
+    }
+
+    // The fireball: a flickering pixel sun with a white core, a solid tapering tail, sparks, and a burning path.
+    if (hot) {
+      const sp = Math.hypot(dvx, dvy) || 1, ux = dvx / sp, uy = dvy / sp, last = pg.trail[pg.trail.length - 1];
+      if (last && dt) {
+        const n = Math.ceil(Math.hypot(bx - last[0], by - last[1]) / 4);
+        for (let q = 1; q <= n; q++) fx.burn.push({x: PGX(last[0] + (bx - last[0]) * q / n), y: PGX(last[1] + (by - last[1]) * q / n), t: now});
+        if (fx.burn.length > 500) fx.burn.splice(0, fx.burn.length - 500);
+        if (Math.random() < 0.6) {
+          const side = Math.random() < 0.5 ? 1 : -1, v = 80 + Math.random() * 140;
+          fx.parts.push({x: bx - ux * 16, y: by - uy * 16, vx: -ux * 120 - uy * side * v, vy: -uy * 120 + ux * side * v, life: 0, max: 0.3, ramp: PG_COL.burn, s: 4, grav: 0});
+        }
+      }
+      if (dt) pg.trail.push([bx, by]);
+      if (pg.trail.length > 2) pg.trail.shift();
+      for (let k = 10; k >= 1; k--) {
+        const z = k <= 2 ? 20 : k <= 4 ? 16 : k <= 6 ? 12 : k <= 8 ? 8 : 4;
+        ctx.fillStyle = PG_COL.hot[Math.min(7, 2 + Math.floor(k / 2))];
+        ctx.fillRect(PGX(bx - ux * k * 7) - z / 2, PGX(by - uy * k * 7) - z / 2, z, z);
+      }
+      const r = Math.floor(now / 50) % 2 ? 14 : 12, cx = PGX(bx), cy = PGX(by);
+      for (let x = -r; x <= r; x += 4) for (let y = -r; y <= r; y += 4) {
+        const d = Math.hypot(x + 2, y + 2);
+        if (d > r) continue;
+        ctx.fillStyle = d < 6 ? '#ffffff' : d < 10 ? '#fff3b0' : '#ffd23f';
+        ctx.fillRect(cx + x, cy + y, 4, 4);
+      }
+    } else {
+      pg.trail = [];
+      // A new serve after a goal blinks in so it never reads as a second ball next to the explosion.
+      const since = now - (fx.serveAt || 0);
+      if (since > 700 || (since > 300 && Math.floor(since / 80) % 2)) {
+        const cool = now - (pg.coolAt || 0), heat = s.stuck >= 0 ? (full ? '#e8401c' : charge > 0.55 ? '#ff9f1c' : charge > 0.25 ? '#ffd23f' : null) : cool < 200 ? '#ff6b1a' : cool < 450 ? '#ffd23f' : null;
+        if (heat) { ctx.fillStyle = heat; ctx.fillRect(PGX(bx) - 10, PGX(by) - 10, 20, 20); }
+        ctx.fillStyle = s.stuck < 0 && cool < 200 ? '#fff3b0' : '#ffffff';
+        ctx.fillRect(PGX(bx) - 6, PGX(by) - 6, 12, 12);
+      }
+    }
+  }
+
+  // Explosions: a disc of hot pixels that hollows out into a ring.
+  // Pixel debris: solid until the end, then they blink out. Pick-up pieces fly into the collecting paddle.
+  fx.parts = fx.parts.filter(p => {
+    if ((p.life += dt) >= p.max) return false;
+    if (p.home !== undefined && p.life > 0.06) {
+      const tx = fx.pad[p.home][0] + (p.home === g.myMark - 1 ? 10 : -10), ty = fx.pad[p.home][1], dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+      if (d < 18) {
+        fx.hitFlash[p.home] = 0.05;
+        if (!p.grp.done) { p.grp.done = 1; fxWave(pg, tx, ty, p.c, 34, 0.2); }
+        return false;
+      }
+      const k = Math.min(1, dt * 9);
+      p.vx += (dx / d * 1300 - p.vx) * k; p.vy += (dy / d * 1300 - p.vy) * k;
+    } else {
+      const drag = Math.pow(0.9, dt * 60);
+      p.vx *= drag; p.vy = p.vy * drag + p.grav * dt;
+    }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    return true;
+  });
+  for (const p of fx.parts) {
+    const q = p.life / p.max;
+    if (p.home === undefined && q > 0.75 && Math.floor(now / 40) % 2) continue;
+    ctx.fillStyle = p.ramp ? p.ramp[Math.min(p.ramp.length - 1, Math.floor(q * p.ramp.length))] : p.c;
+    const z = p.shrink && p.life > 0.12 ? 4 : p.s;
+    ctx.fillRect(PGX(p.x) - z / 2, PGX(p.y) - z / 2, z, z);
+    if (p.home !== undefined) {
+      const sp = Math.hypot(p.vx, p.vy) || 1;
+      for (let k = 1; k <= 4; k++) {
+        ctx.fillStyle = k < 3 ? p.c : PG_DARK[p.c] || p.c;
+        ctx.fillRect(PGX(p.x - p.vx / sp * k * 6) - 2, PGX(p.y - p.vy / sp * k * 6) - 2, 4, 4);
+      }
+    }
+  }
+
+  // Arcade banner in pixel font, blinking in.
+  if (fx.banner && (fx.banner.t += dt || 0.016) < 1.8) {
+    const b = fx.banner;
+    // It sits in whichever half the ball and the aim are not in.
+    if (b.y === undefined) b.y = (pg.lastBall ? pg.lastBall[1] : PG_H / 2) < PG_H / 2 ? 216 : 96;
+    if (!b.flipped && ((pg.lastBall && Math.abs(pg.lastBall[1] - b.y - 22) < 40) || (pg.lastPath || []).some(p => Math.abs(p[1] - b.y - 22) < 30 && Math.abs(p[0] - PG_W / 2) < 200))) { b.flipped = 1; b.y = b.y === 96 ? 216 : 96; }
+    if (b.t > 0.4 || Math.floor(b.t / 0.08) % 2 === 0) {
+      const str = b.parts.map(p => p[0]).join(''), px = pgTextWidth(str, 4) + 32 <= PG_W - 16 ? 4 : 3;
+      const w = PGX(pgTextWidth(str, px) + 32), x0 = PGX(PG_W / 2 - w / 2);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(x0, b.y, w, 44);
+      ctx.fillStyle = b.border;
+      ctx.fillRect(x0, b.y, w, 4);
+      ctx.fillRect(x0, b.y + 40, w, 4);
+      pgText(ctx, b.parts, PG_W / 2, b.y + (px === 4 ? 8 : 12), px);
+    }
   }
   ctx.restore();
-  if (pg.flash > 0.02) { ctx.fillStyle = `rgba(255,240,200,${pg.flash * 0.7})`; ctx.fillRect(0, 0, PG_W, PG_H); pg.flash *= 0.85; }
 
   const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis 7)' : 'Du 0 : 0 ' + g.opName) + (pg.rtt ? '   ·   Ping ' + Math.round(pg.rtt) + (pgAssistOn ? 'ms' : ' ms') : '');
   if ($('pgscore').textContent !== score) $('pgscore').textContent = score;
