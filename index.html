@@ -3078,20 +3078,36 @@ document.addEventListener('keyup', e => { if (e.code === 'Digit1' || e.code === 
 window.addEventListener('blur', () => { pgAssistHeld = false; });
 function pgAssistTarget(g) {
   const s = g.pg.buf[g.pg.buf.length - 1] || g.pg.s;
-  if (!s || s.st !== 'play') return PG_H / 2;
+  if (!s || s.st !== 'play') return {y: PG_H / 2, t: 0, toward: false};
   const face = PG_PX + PG_PW / 2 + PG_BR, x = g.myMark === 1 ? face : PG_W - face, [bx, by, vx, vy] = s.p;
-  if (!vx || (x - bx) / vx <= 0) return PG_H / 2 + (by - PG_H / 2) * 0.3;
+  if (!vx || (x - bx) / vx <= 0) return {y: PG_H / 2 + (by - PG_H / 2) * 0.35, t: 0, toward: false};
   const t = (x - bx) / vx, span = PG_H - 2 * PG_BR, period = 2 * span;
   let y = ((by - PG_BR + vy * t) % period + period) % period;
   if (y > span) y = period - y;
-  return y + PG_BR;
+  return {y: y + PG_BR, t, toward: true};
 }
+// Made to look like a person: a short reaction time, eased movement with a little tremor, and the ball
+// taken anywhere on the paddle so returns come back at varying angles. It still always gets there.
 function pgAssistStep(g) {
-  if (!pgAssistOn || !pgAssistHeld || g.over || !g.pg.s || g.pg.s.st !== 'play') return;
-  const target = Math.max(PG_PH / 2, Math.min(PG_H - PG_PH / 2, pgAssistTarget(g))), d = target - g.pg.y;
-  g.pg.y += Math.max(-15, Math.min(15, d));
-  g.pg.dirty = true;
-  g.pg.assisted = true;
+  const pg = g.pg;
+  if (!pgAssistOn || !pgAssistHeld || g.over || !pg.s || pg.s.st !== 'play') { pg.aDir = null; return; }
+  const now = performance.now(), aim = pgAssistTarget(g);
+  if (aim.toward !== pg.aDir) {
+    pg.aDir = aim.toward;
+    pg.aim = (Math.random() * 2 - 1) * (PG_PH / 2 - 12);
+    const latest = aim.toward ? Math.max(0, (aim.t - Math.abs(aim.y - pg.y) / 900) * 1000 - 60) : 400;
+    pg.reactAt = now + Math.min(150 + Math.random() * 100, latest);
+  }
+  if (now < pg.reactAt) return;
+  const target = Math.max(PG_PH / 2, Math.min(PG_H - PG_PH / 2, aim.y + (aim.toward ? pg.aim : pg.aim * 0.5)));
+  const d = target - pg.y, dist = Math.abs(d);
+  if (dist < 0.8) return;
+  let step = Math.max(1.2, dist * (aim.toward ? 0.2 : 0.06));
+  if (aim.toward) step = Math.max(step, dist / Math.max(1, (aim.t - 0.04) * 60) * 1.25);
+  step = Math.min(step, dist, aim.toward ? 22 : 6);
+  pg.y = Math.max(PG_PH / 2, Math.min(PG_H - PG_PH / 2, pg.y + Math.sign(d) * step + (Math.random() - 0.5) * 0.9));
+  pg.dirty = true;
+  pg.assisted = true;
 }
 // Ball and opponent drawn PG_DELAY ms in the past, interpolated between the two surrounding snapshots.
 function pgSample(pg) {
