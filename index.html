@@ -1818,6 +1818,8 @@ if (!validId(me.id)) { me.id = (Math.random().toString(36).slice(2, 10) + Date.n
 try { localStorage.removeItem('chatLog'); localStorage.removeItem('chatUnread'); } catch (e) {}
 const people = new Map(), peers = new Map(), pins = store.get('chatPins', {});
 let log = {}, unread = {}, room = null, ident = null, conv = ALL, mq = null, brokerIdx = 0;
+// Everyone seen online in this room (name, last seen), so they can be written to while offline.
+let known = {}, knownSaved = 0;
 const typing = new Map();
 let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
@@ -1928,6 +1930,8 @@ async function useRoom(saved) {
   room = {tag: saved.tag, key: await crypto.subtle.importKey('raw', unb64(saved.k), 'AES-GCM', false, ['encrypt', 'decrypt'])};
   log = store.get('chatLog-' + room.tag, {});
   unread = store.get('chatUnread-' + room.tag, {});
+  known = store.get('chatKnown-' + room.tag, {});
+  for (const id in known) if (Date.now() - known[id].seen > 60 * 86400000) delete known[id];
   lb = store.get('lb-' + room.tag, {});
   mpGame = null;
   mpInvites = [];
@@ -1978,7 +1982,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2036,7 +2040,7 @@ function connectLink(kind) {
       linksOpen.add(kind);
       retries[kind] = 0;
       diag.set(host, 'verbunden');
-      c.sub(['p/+', ALL, 'dm/' + me.id, 'hello', 'typing/+', 'read/+', 'hs/+'].map(t => base + t));
+      c.sub(['p/+', ALL, 'dm/' + me.id, 'mail/' + me.id + '/+', 'hello', 'typing/+', 'read/+', 'hs/+'].map(t => base + t));
       const first = !mq;
       mq = facade;
       announce();
@@ -2160,6 +2164,7 @@ async function incoming(t, payload) {
     if (people.delete(id)) { renderPeople(); if (id === conv) renderMsgs(); }
     return;
   }
+  if (!payload) return;
   const box = await unseal(r.key, JSON.parse(payload));
   if (sub === 'hello') { if (box.hello !== me.id) { announce(); broadcastScores(); } return; }
   if (sub.startsWith('typing/')) {
@@ -2186,6 +2191,12 @@ async function incoming(t, payload) {
     if (!body || room !== r || body.kind !== 'p' || body.from !== sub.slice(2) || !cleanName(body.name) || !(Date.now() - body.t < STALE)) return;
     const v = Number.isInteger(body.v) ? body.v : 0;
     people.set(body.from, {name: cleanName(body.name), seen: Date.now(), v});
+    const kn = known[body.from];
+    if (!kn || kn.name !== cleanName(body.name) || Date.now() - knownSaved > 60000) {
+      known[body.from] = {name: cleanName(body.name), seen: Date.now()};
+      knownSaved = Date.now();
+      store.set('chatKnown-' + r.tag, known);
+    }
     if (v > APP_VERSION && v < 1000) {
       offerUpdate(v);
       addMsg(ALL, {id: 'upd-' + v, from: 'system', name: '', text: 'Es gibt eine neuere Version dieser Seite – unten auf „Jetzt neu laden“ klicken, damit alle Spiele funktionieren.', ts: Date.now()});
@@ -2206,19 +2217,39 @@ async function incoming(t, payload) {
     addMsg(ALL, m);
   } else if (sub === 'dm/' + me.id) {
     if (!validId(box.from) || box.from === me.id) return;
+    handleDm(box.from, await unseal(await dmKey(box.from), box.box), r);
+  } else if (sub.startsWith('mail/' + me.id + '/')) {
+    // Kept on the server for us while we were offline: take it, then remove it there.
+    if (mq) mq.pub(t, '', true);
+    if (!validId(box.from) || box.from === me.id) return;
     const dm = await unseal(await dmKey(box.from), box.box);
-    if (dm.kind === 'mp') { if (room === r && dm.to === me.id) handleMp(box.from, dm); return; }
-    if (dm.kind === 'troll') { if (room === r && dm.to === me.id) recvTroll(dm); return; }
-    if (room === r && dm.to === me.id && dm.kind === 'del') { applyDelete(box.from, box.from, dm.id); return; }
-    if (room === r && dm.to === me.id && dm.kind === 'react') { applyReact(box.from, box.from, String(dm.owner || ''), dm.id, dm.e); return; }
-    if (room === r && dm.to === me.id && dm.kind === 'img') { imgMeta(box.from, box.from, cleanName(dm.name) || nameOf(box.from), dm); return; }
-    if (room === r && dm.to === me.id && dm.kind === 'imgc') { imgChunk(box.from, box.from, dm); return; }
-    if (room === r && dm.to === me.id && dm.kind === 'imgreq') { if (Array.isArray(dm.miss)) resendImg(box.from, String(dm.id || ''), dm.miss, !!dm.meta); return; }
-    if (room !== r || dm.to !== me.id || typeof dm.text !== 'string' || !dm.text.trim()) return;
-    const m = {id: String(dm.id || '').slice(0, 40), from: box.from, name: cleanName(dm.name) || nameOf(box.from), text: dm.text.slice(0, MAXLEN), ts: Date.now()};
-    if (dm.re) m.re = {id: String(dm.re.id || '').slice(0, 40), name: String(dm.re.name || '').slice(0, 24), text: String(dm.re.text || '').slice(0, 100)};
-    addMsg(box.from, m);
+    if (!['del', 'react'].includes(dm.kind) && dm.kind !== undefined) return;
+    const ts = Number.isFinite(dm.ts) ? Math.max(Date.now() - 30 * 86400000, Math.min(Date.now(), dm.ts)) : Date.now();
+    handleDm(box.from, dm, r, ts);
   }
+}
+
+function handleDm(from, dm, r, ts) {
+  if (dm.kind === 'mp') { if (room === r && dm.to === me.id) handleMp(from, dm); return; }
+  if (dm.kind === 'troll') { if (room === r && dm.to === me.id) recvTroll(dm); return; }
+  if (room === r && dm.to === me.id && dm.kind === 'del') { applyDelete(from, from, dm.id); return; }
+  if (room === r && dm.to === me.id && dm.kind === 'react') { applyReact(from, from, String(dm.owner || ''), dm.id, dm.e); return; }
+  if (room === r && dm.to === me.id && dm.kind === 'img') { imgMeta(from, from, cleanName(dm.name) || nameOf(from), dm); return; }
+  if (room === r && dm.to === me.id && dm.kind === 'imgc') { imgChunk(from, from, dm); return; }
+  if (room === r && dm.to === me.id && dm.kind === 'imgreq') { if (Array.isArray(dm.miss)) resendImg(from, String(dm.id || ''), dm.miss, !!dm.meta); return; }
+  if (room !== r || dm.to !== me.id || typeof dm.text !== 'string' || !dm.text.trim()) return;
+  const m = {id: String(dm.id || '').slice(0, 40), from, name: cleanName(dm.name) || nameOf(from), text: dm.text.slice(0, MAXLEN), ts: ts || Date.now()};
+  if (dm.re) m.re = {id: String(dm.re.id || '').slice(0, 40), name: String(dm.re.name || '').slice(0, 24), text: String(dm.re.text || '').slice(0, 100)};
+  addMsg(from, m);
+}
+
+// A direct message: straight to the person while they are online, otherwise into their mailbox on the
+// servers, where it waits (still end-to-end encrypted) until they come online.
+async function sendDm(to, payload) {
+  const box = {from: me.id, box: await seal(await dmKey(to), {...payload, to})};
+  if (people.has(to)) await publish('dm/' + to, box);
+  // Named by send time, so a mailbox (which servers hand out sorted by name) arrives in the order it was written.
+  else await publish('mail/' + to + '/' + Date.now().toString(36).padStart(9, '0') + '-' + (payload.kind || 'm') + '-' + Math.random().toString(36).slice(2, 8), box, true);
 }
 
 function chatVisible() { return showing && current === chatDoc && document.visibilityState === 'visible'; }
@@ -2269,7 +2300,7 @@ async function deleteMsg(c, m) {
   markDeleted(c, m);
   try {
     if (c === ALL) await publish(ALL, await signed({kind: 'del', id: m.id}));
-    else await publish('dm/' + c, {from: me.id, box: await seal(await dmKey(c), {kind: 'del', id: m.id, to: c})});
+    else await sendDm(c, {kind: 'del', id: m.id});
   } catch (e) {}
 }
 
@@ -5246,7 +5277,7 @@ function nameOf(id) {
   if (id === ALL) return 'Alle';
   if (people.has(id)) return people.get(id).name;
   const last = (log[id] || []).filter(m => m.from === id).pop();
-  return last ? last.name : 'Unbekannt';
+  return last ? last.name : known[id] ? known[id].name : 'Unbekannt';
 }
 
 function renderBadge() {
@@ -5269,7 +5300,9 @@ function selectConv(id) {
 
 function renderPeople() {
   const online = [...people.keys()].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-  const offline = Object.keys(log).filter(id => id !== ALL && !people.has(id) && validId(id));
+  const offline = [...new Set([...Object.keys(log), ...Object.keys(known)])]
+    .filter(id => id !== ALL && id !== me.id && !people.has(id) && validId(id) && pins[id])
+    .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   const ids = [ALL, ...online, ...offline];
   if (!ids.includes(conv)) conv = ALL;
   cpeople.replaceChildren(...ids.map(id => {
@@ -5301,7 +5334,9 @@ function renderMsgs() {
         const t = cmsgs.querySelector('[data-mid="' + CSS.escape(m.re.id) + '"]');
         if (t) { t.style.background = '#fff3cd'; setTimeout(() => t.style.background = '', 1200); t.scrollIntoView({block: 'center'}); }
       }}, el('span', {class: 'crname', text: m.re.name}), el('span', {class: 'crtext', text: gifUrl(m.re.text) ? 'GIF' : m.re.text})) : null;
-      const checks = mine && !m.deleted && c !== ALL ? el('span', {class: 'ccheck ' + (m.readBy && m.readBy.length ? 'read' : 'sent'), text: m.readBy && m.readBy.length ? '✓✓' : '✓'}) : null;
+      const queued = m.queued && !people.has(c) && !(m.readBy && m.readBy.length);
+      const checks = mine && !m.deleted && c !== ALL ? queued ? el('span', {class: 'ccheck sent', text: '🕓', title: 'Kommt an, sobald ' + nameOf(c) + ' online ist'})
+        : el('span', {class: 'ccheck ' + (m.readBy && m.readBy.length ? 'read' : 'sent'), text: m.readBy && m.readBy.length ? '✓✓' : '✓'}) : null;
       const replyBtn = !m.deleted && mq ? el('button', {class: 'creplyBtn', type: 'button', text: '↩', title: 'Antworten', onclick: e => { e.stopPropagation(); setReply(m); }}) : null;
       const reactBtn = !m.deleted && mq ? el('button', {class: 'creactBtn', type: 'button', text: '☺', title: 'Reagieren', onclick: e => { e.stopPropagation(); toggleReactBar(c, m); }}) : null;
       return el('div', {class: 'cmsg' + (mine ? ' me' : '') + kind, 'data-mid': m.id, onclick: e => toggleReactBar(c, m, e)},
@@ -5338,8 +5373,8 @@ function renderMsgs() {
 
 function updateComposer() {
   const offline = conv !== ALL && !people.has(conv);
-  cin.disabled = !mq || offline;
-  cin.placeholder = !mq ? 'Keine Verbindung' : offline ? nameOf(conv) + ' ist offline' : 'Nachricht schreiben';
+  cin.disabled = !mq;
+  cin.placeholder = !mq ? 'Keine Verbindung' : offline ? nameOf(conv) + ' ist offline – kommt an, sobald ' + nameOf(conv) + ' online ist' : 'Nachricht schreiben';
   $('cemojiBtn').disabled = $('cgifBtn').disabled = cin.disabled;
   $('cmpbtn').hidden = !mq || mpRunning() || (conv !== ALL && !people.has(conv));
   for (const id of ['cmpTtt', 'cmpC4', 'cmpDraw', 'cmpReact', 'cmpEmoji']) $(id).hidden = conv === ALL;
@@ -5427,11 +5462,12 @@ async function sendText(raw) {
   const re = replyTo ? {id: replyTo.id, name: replyTo.name, text: String(replyTo.text).slice(0, 100)} : undefined;
   const m = {id, from: me.id, name: me.name, text, ts: Date.now()};
   if (re) m.re = re;
+  if (to !== ALL && !people.has(to)) m.queued = true;
   clearReply();
   addMsg(to, m);
   try {
     if (to === ALL) await publish(ALL, await signed({kind: 'msg', id, text, re}));
-    else await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {id, to, name: me.name, text, re})});
+    else await sendDm(to, {id, name: me.name, text, re, ts: m.ts});
   } catch (err) {}
 }
 
@@ -5448,7 +5484,7 @@ function sendReact(c, m, e) {
   if (c === conv) renderMsgs();
   (async () => {
     if (c === ALL) await publish(ALL, await signed({kind: 'react', id: m.id, owner: m.from, e: next}));
-    else await publish('dm/' + c, {from: me.id, box: await seal(await dmKey(c), {kind: 'react', id: m.id, owner: m.from, e: next, to: c})});
+    else await sendDm(c, {kind: 'react', id: m.id, owner: m.from, e: next});
   })().catch(() => {});
 }
 function applyReact(c, from, owner, id, e) {
@@ -5560,6 +5596,11 @@ document.addEventListener('paste', async e => {
   const item = [...(e.clipboardData ? e.clipboardData.items : [])].find(i => i.kind === 'file' && /^image\//.test(i.type));
   if (!item) return;
   e.preventDefault();
+  if (conv !== ALL && !people.has(conv)) {
+    $('cimgbar').hidden = false; pendingImg = null; $('cimgthumb').removeAttribute('src');
+    $('cimginfo').textContent = 'Bilder gehen nur an Leute, die gerade online sind.';
+    return;
+  }
   const file = item.getAsFile();
   if (!file) return;
   try { showImgBar(await shrinkImage(file)); }
@@ -5570,7 +5611,7 @@ $('cimgsend').addEventListener('click', () => { const img = pendingImg; showImgB
 
 async function sendImage(img) {
   const to = conv;
-  if (!mq || cin.disabled) return;
+  if (!mq || cin.disabled || (to !== ALL && !people.has(to))) return;
   const id = me.id + Date.now().toString(36), key = me.id + '|' + id;
   const chunks = [];
   for (let i = 0; i < img.data.length; i += IMG_CHUNK) chunks.push(img.data.slice(i, i + IMG_CHUNK));
