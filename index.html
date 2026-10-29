@@ -1706,7 +1706,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 15;
+const APP_VERSION = 16;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -3047,12 +3047,12 @@ function pgConnect(g) {
     if (Number.isFinite(s.ts)) {
       // The smallest gap between server and local clock over the last few seconds is the best estimate of
       // their offset; snapshots are then drawn a little in the past, between two real positions.
-      pg.offs.push(Date.now() - s.ts);
+      pg.offs.push(pgMs() - s.ts);
       if (pg.offs.length > 240) pg.offs.shift();
       pg.off = Math.min(...pg.offs);
       // How late snapshots arrive on top of that: the drawing delay follows it, short on a steady line and
       // longer on a shaky one, so the ball neither lags needlessly nor stutters.
-      const late = Date.now() - s.ts - pg.off;
+      const late = pgMs() - s.ts - pg.off;
       pg.jit = Math.max(late, (pg.jit === undefined ? 25 : pg.jit) * 0.985);
       pg.delay = Math.max(16, Math.min(90, 10 + pg.jit));
       // A correction from the server (say our return was judged a little differently) is eased out over a
@@ -3112,7 +3112,7 @@ function pgPush(g) {
   pg.dirty = false;
   pg.sentAt = performance.now();
   // Where our paddle will be on the server, by server time, for predicting our own returns.
-  pg.hist.push([Date.now() - pg.off + pgLeadMax(pg), pg.y]);
+  pg.hist.push([pgMs() - (pg.offS === undefined ? pg.off : pg.offS) + (pg.leadS || pgLeadMax(pg)), pg.y]);
   if (pg.hist.length > 200) pg.hist.shift();
 }
 function pgPadAt(pg, t) {
@@ -3125,9 +3125,20 @@ function pgPadAt(pg, t) {
 // exactly as the server had it) and about one round trip ahead near our paddle, so it reaches our paddle on
 // screen when our paddle report reaches the server. In between the lead changes gradually.
 function pgLeadMax(pg) { return Math.min(120, pg.rtt || 60); }
+const pgMs = () => performance.timeOrigin + performance.now();
+// One steady clock per frame, taken from the frame's own timestamp. The clock offset, the jitter buffer and
+// the lead follow new measurements a little per frame, so a change never shows as a hitch.
+function pgClock(pg, frameMs) {
+  const ease = (cur, target, down, up = down) => cur === undefined || Math.abs(target - cur) > 250 ? target : cur + Math.max(-down, Math.min(up, target - cur));
+  pg.offS = ease(pg.offS, pg.off, 0.5);
+  // The buffer grows quickly when the line gets shaky (or the ball would stall) and shrinks back slowly.
+  pg.delayS = ease(pg.delayS, pg.delay || PG_DELAY, 0.3, 2);
+  pg.leadS = ease(pg.leadS, pgLeadMax(pg), 0.4);
+  pg.nowS = frameMs - pg.offS;
+}
 function pgLead(g, x) {
-  const pg = g.pg, d = pg.delay || PG_DELAY, k = Math.max(0, Math.min(1, 1 - (pgView(g, x) - PG_FACE) / (PG_W - 2 * PG_FACE)));
-  return -d + (pgLeadMax(pg) + d) * k;
+  const pg = g.pg, d = pg.delayS || pg.delay || PG_DELAY, k = Math.max(0, Math.min(1, 1 - (pgView(g, x) - PG_FACE) / (PG_W - 2 * PG_FACE)));
+  return -d + ((pg.leadS || pgLeadMax(pg)) + d) * k;
 }
 // Ball [x, y, vx, vy] at server time T: interpolated between snapshots, and past the newest one run forward
 // with the server's rules, including a return off our paddle where our paddle will be. The opponent's
@@ -3179,7 +3190,7 @@ function pgBallAt(g, T) {
 function pgSample(pg) {
   const buf = pg.buf, last = buf[buf.length - 1];
   if (!last) return pg.s;
-  const t = Date.now() - pg.off - (pg.delay || PG_DELAY);
+  const t = pg.nowS !== undefined ? pg.nowS - pg.delayS : pgMs() - pg.off - (pg.delay || PG_DELAY);
   let i = buf.length - 1;
   while (i > 0 && buf[i - 1].ts > t) i--;
   const b = buf[i], a = buf[i - 1];
@@ -3251,9 +3262,11 @@ function pgAssistStep(g) {
 const pgResize = new ResizeObserver(() => {
   const st = $('pgstage'), cv = $('pgcanvas');
   if (!st || !cv) return;
-  const w = Math.max(120, Math.min(st.clientWidth, st.clientHeight * PG_W / PG_H));
+  const w = Math.max(120, Math.min(st.clientWidth, st.clientHeight * PG_W / PG_H)), bw = Math.round(w * Math.min(3, window.devicePixelRatio || 1));
   cv.style.width = w + 'px';
   cv.style.height = w * PG_H / PG_W + 'px';
+  // Drawn at the screen's own resolution, so nothing is blurred by scaling and movement isn't tied to a grid.
+  if (cv.width !== bw) { cv.width = bw; cv.height = Math.round(bw * PG_H / PG_W); }
 });
 function buildPong(g) {
   const grid = $('cmpgrid');
@@ -3298,7 +3311,7 @@ function renderPong() {
   res.replaceChildren(g.over
     ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
     : el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
-  if (!g.pg.raf) g.pg.raf = requestAnimationFrame(() => pgFrame(g));
+  if (!g.pg.raf) g.pg.raf = requestAnimationFrame(ts => pgFrame(g, ts));
 }
 // Visual effects for Ping Pong, in the game's own retro look: hard 4px pixels, no transparency, one colour per
 // power-up (never a player's colour), a pixel font, and effects that do something to the table. Picture faults
@@ -3444,15 +3457,32 @@ function pgEvent(g, ev) {
 }
 function pgQuit(g) { pgSend(g, {t: 'quit'}); }
 
-function pgFrame(g) {
+// Game coordinates (640x360) onto a canvas at screen resolution: every rectangle's edges are rounded to whole
+// screen pixels, so the pixel art stays sharp while moving things go exactly where they are, not to a grid.
+function pgPixels(ctx, k) {
+  if (!ctx.pgRaw) {
+    ctx.pgRaw = ctx.fillRect.bind(ctx);
+    ctx.fillRect = (x, y, w, h) => {
+      const m = ctx.pgK, X = (x + ctx.pgOx) * m, Y = (y + ctx.pgOy) * m, x0 = Math.round(X), y0 = Math.round(Y);
+      ctx.pgRaw(x0, y0, Math.round(X + w * m) - x0, Math.round(Y + h * m) - y0);
+    };
+  }
+  ctx.pgK = k;
+  ctx.pgOx = ctx.pgOy = 0;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+}
+function pgFrame(g, ts) {
   g.pg.raf = 0;
   const cv = $('pgcanvas');
   if (mpGame !== g || !cv || $('cmpboard').hidden) return;
-  const pg = g.pg, ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1, now = performance.now(), fx = pgFx(pg);
+  const pg = g.pg, ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1, now = ts || performance.now(), fx = pgFx(pg), k = cv.width / PG_W;
+  pgClock(pg, performance.timeOrigin + now);
+  pgPixels(ctx, k);
   // Hit-stop: on a big hit the picture holds for a few frames.
   let s = pgSample(pg);
   if (s && s.st === 'play' && s.stuck < 0 && pg.buf.length) {
-    const ball = pgBallAt(g, pg.ballT = Date.now() - pg.off + pgLead(g, pg.ballX !== undefined ? pg.ballX : s.p[0]));
+    const ball = pgBallAt(g, pg.ballT = pg.nowS + pgLead(g, pg.ballX !== undefined ? pg.ballX : s.p[0]));
     const ease = Math.exp(-Math.min(0.05, pg.frameAt ? (now - pg.frameAt) / 1000 : 0.016) / 0.07);
     pg.sm.ex *= ease;
     pg.sm.ey *= ease;
@@ -3462,10 +3492,11 @@ function pgFrame(g) {
   if (now < fx.hitStop && fx.frozen) s = fx.frozen; else fx.frozen = s;
   const dt = now < fx.hitStop ? 0 : Math.min(0.05, pg.frameAt ? (now - pg.frameAt) / 1000 : 0.016);
   pg.frameAt = now;
-  ctx.imageSmoothingEnabled = false;
 
   // Background layer: table, burn marks and net. Only this layer is ever tinted or torn.
+  if (fx.bg.width !== cv.width || fx.bg.height !== cv.height) { fx.bg.width = cv.width; fx.bg.height = cv.height; }
   const bgc = fx.bg.getContext('2d');
+  pgPixels(bgc, k);
   bgc.fillStyle = '#0e1116';
   bgc.fillRect(0, 0, PG_W, PG_H);
   if (fx.tint && fx.tint.f > 0) { bgc.globalAlpha = 0.3; bgc.fillStyle = fx.tint.c; bgc.fillRect(0, 0, PG_W, PG_H); bgc.globalAlpha = 1; fx.tint.f--; }
@@ -3488,23 +3519,23 @@ function pgFrame(g) {
     bgc.fillRect(PGX(PG_W / 2 - 2 + off), y, 4, 12);
   }
 
-  ctx.save();
-  if (fx.shake > 0.03) { const k = 6 * fx.shake; ctx.translate(PGX((Math.random() - 0.5) * k), PGX((Math.random() - 0.5) * k)); fx.shake *= Math.pow(0.0005, dt || 0.016); }
+  if (fx.shake > 0.03) { const a = 6 * fx.shake; ctx.pgOx = PGX((Math.random() - 0.5) * a); ctx.pgOy = PGX((Math.random() - 0.5) * a); fx.shake *= Math.pow(0.0005, dt || 0.016); }
   ctx.fillStyle = '#0e1116';
   ctx.fillRect(-40, -40, PG_W + 80, PG_H + 80);
   if (fx.glitch > 0) {
     // Torn picture for a couple of frames: the background is shifted in 4px bands.
     for (let y = 0; y < PG_H;) {
       const h = PGX(8 + Math.random() * 28), dx = Math.random() < 0.5 ? PGX((Math.random() - 0.5) * 48) : 0;
-      ctx.drawImage(fx.bg, 0, y, PG_W, h, dx, y, PG_W, h);
+      const y0 = Math.round(y * k), y1 = Math.round((y + h) * k);
+      ctx.drawImage(fx.bg, 0, y0, cv.width, y1 - y0, Math.round((dx + ctx.pgOx) * k), y0 + Math.round(ctx.pgOy * k), cv.width, y1 - y0);
       y += h;
     }
     fx.glitch--;
-  } else ctx.drawImage(fx.bg, 0, 0);
+  } else ctx.drawImage(fx.bg, Math.round(ctx.pgOx * k), Math.round(ctx.pgOy * k));
 
   if (!s) {
     ctx.fillStyle = PG_COL.me;
-    ctx.fillRect(PG_PX - PG_PW / 2, PGX(pg.y - PG_PH / 2), PG_PW, PG_PH);
+    ctx.fillRect(PG_PX - PG_PW / 2, pg.y - PG_PH / 2, PG_PW, PG_PH);
   } else {
     const charge = s.stuck >= 0 ? 1 - s.su / 3000 : 0, full = charge > 0.8, hot = s.turbo && s.stuck < 0;
     const by = Math.max(PG_BR, Math.min(PG_H - PG_BR, s.p[1]));
@@ -3679,7 +3710,7 @@ function pgFrame(g) {
       for (let yy = -half; yy < half; yy += 4) {
         const q = (yy + 2) / half, off = PGX(-dir * bend * (1 - q * q)) + dir * snap + jit;
         if (halves[k] < PG_PH / 2 - 1 && fx.hitFlash[i] <= 0) ctx.fillStyle = yy < -half + 4 || yy >= half - 4 ? '#ffd23f' : color;
-        ctx.fillRect(PGX(baseX - PG_PW / 2 + off), PGX(y + yy) + jit, 12, 4);
+        ctx.fillRect(baseX - PG_PW / 2 + off, y + yy + jit, 12, 4);
       }
       if (s.mg && s.mg[i] && s.stuck < 0) {
         ctx.fillStyle = PG_COL.mag;
@@ -3687,8 +3718,8 @@ function pgFrame(g) {
           const rad = 60 - ((now / 12 + r * 20) % 60);
           if (rad < 14) continue;
           for (let a = -1.1; a <= 1.1; a += 4 / rad) {
-            const ay = PGX(y + Math.sin(a) * rad) - 2;
-            if (ay >= 0 && ay <= PG_H - 4) ctx.fillRect(PGX(baseX + dir * Math.cos(a) * rad) - 2, ay, 4, 4);
+            const ay = y + PGX(Math.sin(a) * rad) - 2;
+            if (ay >= 0 && ay <= PG_H - 4) ctx.fillRect(baseX + PGX(dir * Math.cos(a) * rad) - 2, ay, 4, 4);
           }
         }
         const toward = (k === 0 ? dvx < 0 : dvx > 0) && s.st === 'play';
@@ -3711,7 +3742,7 @@ function pgFrame(g) {
       }
       if (s.stuck === i) {
         // Charge gauge: a horizontal bar over the paddle (under it near the top edge), filling yellow to red.
-        const cells = 12, w = cells * 4 + 8, gy = PGX(y - half) - 24 >= 4 ? PGX(y - half) - 24 : PGX(y + half) + 8;
+        const cells = 12, w = cells * 4 + 8, gy = y - half - 24 >= 4 ? y - half - 24 : y + half + 8;
         const gx = dir > 0 ? PGX(baseX - 8) : PGX(baseX + 8) - w, filled = Math.round(cells * charge);
         ctx.fillStyle = color;
         ctx.fillRect(gx, gy, w, 16);
@@ -3754,6 +3785,7 @@ function pgFrame(g) {
     if (hot) pg.hotAt = now;
     if (s.st === 'play') pg.lastBall = [bx, by];
     pg.drawn = s.st === 'play' && s.stuck < 0 ? [pgView(g, bx), by] : null;
+    pg.shown = pg.drawn && [pgView(g, Math.round((bx - 6) * k) / k + 6), Math.round((by - 6) * k) / k + 6];
 
     // Aiming: the predicted path, walls included, as marching pixels and a blinking target; white-hot when full.
     if (path.length) {
@@ -3788,9 +3820,9 @@ function pgFrame(g) {
       for (let k = 10; k >= 1; k--) {
         const z = k <= 2 ? 20 : k <= 4 ? 16 : k <= 6 ? 12 : k <= 8 ? 8 : 4;
         ctx.fillStyle = PG_COL.hot[Math.min(7, 2 + Math.floor(k / 2))];
-        ctx.fillRect(PGX(bx - ux * k * 7) - z / 2, PGX(by - uy * k * 7) - z / 2, z, z);
+        ctx.fillRect(bx - PGX(ux * k * 7) - z / 2, by - PGX(uy * k * 7) - z / 2, z, z);
       }
-      const r = Math.floor(now / 50) % 2 ? 14 : 12, cx = PGX(bx), cy = PGX(by);
+      const r = Math.floor(now / 50) % 2 ? 14 : 12, cx = bx, cy = by;
       for (let x = -r; x <= r; x += 4) for (let y = -r; y <= r; y += 4) {
         const d = Math.hypot(x + 2, y + 2);
         if (d > r) continue;
@@ -3803,15 +3835,15 @@ function pgFrame(g) {
       const slowNow = s.sl && s.sl[pgView(g, bx) < PG_W / 2 ? 0 : 1] > 0;
       if (slowNow && s.stuck < 0) {
         if (!pg.ghosts || now - pg.ghostAt > 45) { pg.ghosts = [[bx, by], ...(pg.ghosts || [])].slice(0, 4); pg.ghostAt = now; }
-        pg.ghosts.forEach(([gx, gy], k) => { if (k) { ctx.fillStyle = k < 2 ? '#2ef2d0' : '#12695b'; ctx.fillRect(PGX(gx) - 4, PGX(gy) - 4, 8, 8); } });
+        pg.ghosts.forEach(([gx, gy], k) => { if (k) { ctx.fillStyle = k < 2 ? '#2ef2d0' : '#12695b'; ctx.fillRect(gx - 4, gy - 4, 8, 8); } });
       } else pg.ghosts = null;
       // A new serve after a goal blinks in so it never reads as a second ball next to the explosion.
       const since = now - (fx.serveAt || 0);
       if (since > 700 || (since > 300 && Math.floor(since / 80) % 2)) {
         const cool = now - (pg.coolAt || 0), heat = s.stuck >= 0 ? (full ? '#e8401c' : charge > 0.55 ? '#ff9f1c' : charge > 0.25 ? '#ffd23f' : null) : cool < 200 ? '#ff6b1a' : cool < 450 ? '#ffd23f' : null;
-        if (heat) { ctx.fillStyle = heat; ctx.fillRect(PGX(bx) - 10, PGX(by) - 10, 20, 20); }
+        if (heat) { ctx.fillStyle = heat; ctx.fillRect(bx - 10, by - 10, 20, 20); }
         ctx.fillStyle = s.stuck < 0 && cool < 200 ? '#fff3b0' : '#ffffff';
-        ctx.fillRect(PGX(bx) - 6, PGX(by) - 6, 12, 12);
+        ctx.fillRect(bx - 6, by - 6, 12, 12);
       }
     }
   }
@@ -3868,7 +3900,7 @@ function pgFrame(g) {
       pgText(ctx, b.parts, PG_W / 2, b.y + (px === 4 ? 8 : 12), px);
     }
   }
-  ctx.restore();
+  ctx.pgOx = ctx.pgOy = 0;
 
   const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis ' + pgTarget(s.sc) + ')' : 'Du 0 : 0 ' + g.opName) + (pg.rtt ? '   ·   Ping ' + Math.round(pg.rtt) + (pgAssistOn ? 'ms' : ' ms') : '');
   if ($('pgscore').textContent !== score) $('pgscore').textContent = score;
@@ -3898,7 +3930,7 @@ function pgFrame(g) {
   else if (s.st === 'goal') text = 'Punkt!';
   if (over.textContent !== text) over.textContent = text;
   over.hidden = !text;
-  pg.raf = requestAnimationFrame(() => pgFrame(g));
+  pg.raf = requestAnimationFrame(ts => pgFrame(g, ts));
 }
 
 /* Malen & Raten */
