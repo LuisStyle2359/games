@@ -320,7 +320,7 @@ export class Arena {
     if (it && this.last >= 0 && this.stuck < 0 && Math.hypot(b.x - it.x, b.y - it.y) < BR + ITEM_R) {
       const i = this.last;
       if (it.k === 'big') { this.ph[i] = BIG; this.bigUntil[i] = now + 10000; this.miniUntil[i] = 0; }
-      // Slow motion: for a few seconds the ball moves at half speed while it is on the taker's side.
+      // Slow motion: for a few seconds the ball moves at half speed while it comes toward the taker.
       if (it.k === 'slow') this.slow[i] = now + SLOW_MS;
       // Mini paddle: the opponent's paddle shrinks for a while.
       if (it.k === 'mini') { const j = 1 - i; this.ph[j] = MINI; this.miniUntil[j] = now + 8000; this.bigUntil[j] = 0; }
@@ -413,7 +413,7 @@ export class Arena {
         const cap = Math.max(250, Math.abs(b.vx) * 1.4);
         b.vy = Math.max(-cap, Math.min(cap, b.vy));
       }
-      const px = b.x, f = this.slowAt(b.x, now);
+      const px = b.x, f = this.slowAt(b.vx, now);
       b.x += b.vx * h * f;
       b.y += b.vy * h * f;
       if (b.y < BR) { b.y = BR; b.vy = Math.abs(b.vy); }
@@ -446,7 +446,8 @@ export class Arena {
     }
   }
 
-  slowAt(x, now) { return now < this.slow[x < W / 2 ? 0 : 1] ? SLOW_F : 1; }
+  // Slow motion only holds the ball back while it comes toward the taker; once it bounces off, it's full speed.
+  slowAt(vx, now) { return now < this.slow[vx < 0 ? 0 : 1] ? SLOW_F : 1; }
 
   // First to 7, but from 6:6 on a set needs a two-point lead, up to 10: at 9:9 the next point wins.
   point(scorer) {
@@ -458,7 +459,7 @@ export class Arena {
   }
 
   broadcast(now) {
-    const r = v => Math.round(v), f = this.st === 'play' && this.stuck < 0 ? this.slowAt(this.b.x, now) : 1;
+    const r = v => Math.round(v), f = this.st === 'play' && this.stuck < 0 ? this.slowAt(this.b.vx, now) : 1;
     const s = JSON.stringify({t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, sc: this.sc, names: this.names,
       on: [!!this.seats[0], !!this.seats[1]], p: [r(this.b.x), r(this.b.y), r(this.b.vx * f), r(this.b.vy * f)],
       sl: [Math.max(0, this.slow[0] - now), Math.max(0, this.slow[1] - now)],

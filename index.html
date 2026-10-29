@@ -1903,7 +1903,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -3370,14 +3370,15 @@ function pgBallAt(g, T) {
   if (last.st !== 'play' || last.stuck >= 0) return last.p;
   const me = g.myMark - 1, s = me === 0 ? -1 : 1, face = me === 0 ? PG_PX + PG_PW / 2 : PG_W - PG_PX - PG_PW / 2;
   const far = me === 0 ? PG_W - PG_PX - PG_PW / 2 : PG_PX + PG_PW / 2, half = pgHalf(g, last, me), end = Math.min(T, last.ts + 250);
-  // Snapshots carry the speed the ball moves at right now; slow motion halves it on the slowed side.
-  const slowF = (bx, at) => last.sl && last.sl[bx < PG_W / 2 ? 0 : 1] - (at - last.ts) > 0 ? 0.5 : 1;
+  // Snapshots carry the speed the ball moves at right now; slow motion halves it while the ball heads toward
+  // the player who took it.
+  const slowF = (bvx, at) => last.sl && last.sl[bvx < 0 ? 0 : 1] - (at - last.ts) > 0 ? 0.5 : 1;
   let [x, y, vx, vy] = last.p, t = last.ts;
-  const f0 = slowF(x, t);
+  const f0 = slowF(vx, t);
   vx /= f0;
   vy /= f0;
   while (t < end) {
-    const h = Math.min(4, end - t), px = x, f = slowF(x, t);
+    const h = Math.min(4, end - t), px = x, f = slowF(vx, t);
     t += h;
     x += vx * f * h / 1000;
     y += vy * f * h / 1000;
@@ -3395,7 +3396,7 @@ function pgBallAt(g, T) {
     }
     if (s < 0 ? vx > 0 && x + PG_BR > far : vx < 0 && x - PG_BR < far) return [far + s * PG_BR, y, vx * f, vy * f];
   }
-  const f = slowF(x, t);
+  const f = slowF(vx, t);
   return [x, y, vx * f, vy * f];
 }
 
@@ -3801,7 +3802,7 @@ function pgFrame(g, ts) {
     }
     pg.prevBx = bx;
 
-    // Slow motion: the slowed half gets a slowly marching teal frame, an hourglass and a draining time bar.
+    // Slow motion: the taker's half gets a slowly marching teal frame, an hourglass and a draining time bar.
     for (const j of [me1, op1]) {
       const left = s.sl ? s.sl[j] : 0;
       if (!left) continue;
@@ -4045,7 +4046,7 @@ function pgFrame(g, ts) {
     } else {
       pg.trail = [];
       // In slow motion the ball drags teal after-images behind it.
-      const slowNow = s.sl && s.sl[pgView(g, bx) < PG_W / 2 ? 0 : 1] > 0;
+      const slowNow = s.sl && s.sl[s.p[2] < 0 ? 0 : 1] > 0;
       if (slowNow && s.stuck < 0) {
         if (!pg.ghosts || now - pg.ghostAt > 45) { pg.ghosts = [[bx, by], ...(pg.ghosts || [])].slice(0, 4); pg.ghostAt = now; }
         pg.ghosts.forEach(([gx, gy], k) => { if (k) { ctx.fillStyle = k < 2 ? '#2ef2d0' : '#12695b'; ctx.fillRect(gx - 4, gy - 4, 8, 8); } });
