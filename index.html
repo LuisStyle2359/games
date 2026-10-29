@@ -380,6 +380,20 @@ tbody tr.sel td { background: var(--select); }
 .trollpoll .upddlg-row { justify-content: center; position: relative; }
 .trollpoll .upddlg-row .vbtn { min-width: 80px; }
 .trollno { transition: left .12s ease-out, top .12s ease-out; }
+.trollletter { position: fixed; left: 0; top: 0; z-index: 2100; pointer-events: none; white-space: pre; }
+.trollfly { position: fixed; left: 0; top: 0; width: 34px; z-index: 2050; touch-action: none; filter: drop-shadow(1px 2px 1.5px rgba(0, 0, 0, .35)); }
+.trollfly svg { display: block; width: 100%; height: auto; }
+.trollfly.air { filter: drop-shadow(8px 16px 5px rgba(0, 0, 0, .16)); }
+.trollfly.air .wings { animation: flybuzz .04s linear infinite alternate; }
+@keyframes flybuzz { from { opacity: .2; } to { opacity: .85; } }
+.trollsplat { position: fixed; left: 0; top: 0; z-index: 2040; pointer-events: none; transition: opacity 1s; }
+.vscan .upddlg-head.bad { color: #b3261e; }
+.vscanfile { font: 11px Consolas, monospace; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 2px 0 6px; }
+.vscancnt { font-weight: 600; }
+.vscancnt.bad { color: #b3261e; }
+.vscanlist { margin: 6px 0 12px; padding: 0; list-style: none; font-size: 12px; }
+.vscanlist li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid #eee; }
+.vscanlist b { color: #b3261e; font-weight: 600; }
 .adminpanel { position: fixed; top: 60px; right: 16px; z-index: 1500; width: 240px; background: var(--paper); border: 1px solid #c8922a; border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .25); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .adminpanel select, .adminpanel .vbtn { width: 100%; height: 28px; }
 .adminpanel .admstat { font-size: 11px; color: var(--muted); min-height: 14px; }
@@ -1943,7 +1957,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3656,8 +3670,173 @@ function coolPoll() {
   document.body.appendChild(dlg);
   yes.focus();
 }
+// Letters typed into the chat box fall off it to the bottom of the screen, for 12 s after the first one.
+let fallOn = false, fallStarted = false, fallTimer = 0, fallPrev = '';
+function letterFall() { fallOn = true; fallStarted = false; clearTimeout(fallTimer); fallTimer = setTimeout(() => { fallOn = false; }, 180000); }
+cin.addEventListener('beforeinput', () => { fallPrev = cin.value; });
+cin.addEventListener('input', () => {
+  if (!fallOn) return;
+  const v = cin.value, end = cin.selectionStart ?? v.length, start = end - (v.length - fallPrev.length);
+  if (v.length <= fallPrev.length || v.slice(0, start) + v.slice(end) !== fallPrev) return;
+  cin.value = fallPrev;
+  cin.setSelectionRange(start, start);
+  dropLetters(v.slice(start, end), start);
+  if (!fallStarted) {
+    fallStarted = true;
+    clearTimeout(fallTimer);
+    fallTimer = setTimeout(() => { fallOn = false; trollToast(); }, 12000);
+  }
+});
+function dropLetters(text, pos) {
+  const cs = getComputedStyle(cin), r = cin.getBoundingClientRect(), size = parseFloat(cs.fontSize);
+  const m = dropLetters.ctx || (dropLetters.ctx = document.createElement('canvas').getContext('2d'));
+  m.font = cs.font;
+  let x = r.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft) + m.measureText(cin.value.slice(0, pos)).width - cin.scrollLeft;
+  const y = r.top + (r.height - size * 1.2) / 2;
+  for (const ch of [...text].slice(0, 40)) {
+    const sp = el('span', {class: 'trollletter', text: ch});
+    sp.style.font = cs.font;
+    sp.style.color = cs.color;
+    sp.style.left = x + 'px';
+    sp.style.top = y + 'px';
+    document.body.appendChild(sp);
+    const fall = window.innerHeight - y + 40, drift = (Math.random() - 0.5) * 120, rot = (Math.random() - 0.5) * 540;
+    sp.animate([{transform: 'translate(0, 0) rotate(0)'}, {transform: `translate(${drift * 0.2}px, -14px) rotate(${rot * 0.1}deg)`, offset: 0.12},
+      {transform: `translate(${drift}px, ${fall}px) rotate(${rot}deg)`}], {duration: 1100 + Math.random() * 600, easing: 'cubic-bezier(.5, 0, .9, .5)'}).onfinish = () => sp.remove();
+    x += m.measureText(ch).width;
+  }
+}
+// A fake virus scan that finds 1.337 threats: too many baby pictures.
+function virusScan() {
+  const FILES = ['Bilder\\baby_####.jpg', 'Bilder\\Hischam_als_Baby_####.png', 'Desktop\\geheim\\babyfotos\\IMG_####.jpg', 'Downloads\\wie_werde_ich_cool.pdf',
+    'Dokumente\\liebesbrief_an_luis.docx', 'Bilder\\Schnuller\\nuckel_####.jpg', 'AppData\\Local\\Windeln\\cache_####.tmp', 'Musik\\schlaflieder_####.mp3'];
+  const path = () => 'C:\\Users\\Hischam\\' + FILES[Math.floor(Math.random() * FILES.length)].replace('####', String(Math.floor(Math.random() * 9999)).padStart(4, '0'));
+  const head = el('div', {class: 'upddlg-head', text: '🛡️ Sicherheitscenter – Schnellüberprüfung'});
+  const fill = el('div'), file = el('div', {class: 'vscanfile'}), cnt = el('div', {class: 'vscancnt', text: 'Keine Bedrohungen gefunden'});
+  const box = el('div', {class: 'upddlg-box vscan'}, head, el('p', {text: 'Ihr Gerät wird auf Bedrohungen überprüft. Das kann einen Moment dauern…'}), el('div', {class: 'trollbar'}, fill), file, cnt);
+  const dlg = el('div', {class: 'upddlg', role: 'alertdialog'}, box);
+  document.body.appendChild(dlg);
+  const close = () => { dlg.remove(); trollToast(); };
+  const t0 = performance.now();
+  let shown = 0;
+  const tick = () => {
+    const q = Math.min(1, (performance.now() - t0) / 7500), n = Math.floor(1337 * q ** 3);
+    fill.style.width = Math.floor(q * 100) + '%';
+    if (performance.now() - shown > 70) { shown = performance.now(); file.textContent = path(); }
+    if (n) { cnt.textContent = n.toLocaleString('de-DE') + ' Bedrohungen gefunden'; cnt.classList.add('bad'); }
+    if (q < 1) { requestAnimationFrame(tick); return; }
+    head.textContent = '⚠️ 1.337 Bedrohungen gefunden';
+    head.classList.add('bad');
+    const list = el('ul', {class: 'vscanlist'}, ...[['Trojan:Win32/Babyface.Hischam', 'Schwer'], ['Worm:JS/Uwu.👉👈', 'Schwer'], ['Adware:Luis.IstCool', 'Harmlos']]
+      .map(([n2, lv]) => el('li', {}, el('span', {text: n2}), el('b', {text: lv}))));
+    box.replaceChildren(head, el('p', {text: 'Ursache: Zu viele Babybilder 👶'}), list, el('div', {class: 'upddlg-row'},
+      el('button', {class: 'vbtn', type: 'button', text: 'Ignorieren', onclick: close}),
+      el('button', {class: 'vbtn upddlg-go', type: 'button', text: 'Alle entfernen', onclick: remove})));
+  };
+  const remove = () => {
+    const fill2 = el('div'), t1 = performance.now();
+    box.replaceChildren(head, el('p', {text: 'Bedrohungen werden entfernt…'}), el('div', {class: 'trollbar'}, fill2));
+    head.textContent = '🛡️ Sicherheitscenter';
+    head.classList.remove('bad');
+    const tick2 = () => {
+      const q = Math.min(1, (performance.now() - t1) / 2500);
+      fill2.style.width = Math.floor(64 * Math.sqrt(q)) + '%';
+      if (q < 1) { requestAnimationFrame(tick2); return; }
+      head.textContent = '❌ Fehler 0xBABY';
+      head.classList.add('bad');
+      box.replaceChildren(head, el('p', {text: 'Das Baby lässt sich nicht entfernen. Es ist zu stark.'}), el('img', {class: 'trollimg', src: HISCHAM_IMG, alt: ''}),
+        el('div', {class: 'upddlg-row'}, el('button', {class: 'vbtn upddlg-go', type: 'button', text: 'Schließen', onclick: close})));
+    };
+    requestAnimationFrame(tick2);
+  };
+  requestAnimationFrame(tick);
+}
+// A housefly crawls over the screen: short dashes, pauses, cleaning its legs, now and then a short flight.
+// Clicking it makes it fly off; the third click squashes it.
+const FLY_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120"><defs><radialGradient id="eye" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#b8644c"/><stop offset=".45" stop-color="#7a3322"/><stop offset="1" stop-color="#2e0f09"/></radialGradient><radialGradient id="th" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#8d8a84"/><stop offset=".6" stop-color="#55524d"/><stop offset="1" stop-color="#2a2825"/></radialGradient><radialGradient id="ab" cx="45%" cy="30%" r="75%"><stop offset="0" stop-color="#a08e6c"/><stop offset=".55" stop-color="#6a5a43"/><stop offset="1" stop-color="#2b241b"/></radialGradient><linearGradient id="wing" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aa0a4" stop-opacity=".55"/><stop offset=".5" stop-color="#a7adb1" stop-opacity=".35"/><stop offset="1" stop-color="#b8bec2" stop-opacity=".25"/></linearGradient></defs><g fill="none" stroke="#1e1915" stroke-linecap="round" stroke-linejoin="round"><g class="lf"><path d="M42 40 L30 30 L24 14 L22 8" stroke-width="1.5"/><path d="M58 40 L70 30 L76 14 L78 8" stroke-width="1.5"/></g><g class="lm"><path d="M41 48 L24 46 L12 52 L6 56" stroke-width="1.5"/><path d="M59 48 L76 46 L88 52 L94 56" stroke-width="1.5"/></g><g class="lh"><path d="M43 55 L30 66 L22 86 L19 96" stroke-width="1.5"/><path d="M57 55 L70 66 L78 86 L81 96" stroke-width="1.5"/></g></g><ellipse cx="50" cy="78" rx="15" ry="22" fill="url(#ab)"/><path d="M50 58 L50 98" stroke="#2a221a" stroke-width="3.5" opacity=".6"/><path d="M37 70 Q50 74 63 70 M36 81 Q50 85 64 81 M39 91 Q50 95 61 91" stroke="#2a221a" stroke-width="1.6" fill="none" opacity=".55"/><g class="wings"><path d="M46 47 C36 58 28 80 32 104 C34 112 40 113 43 106 C47 92 48 68 49 50 Z" fill="url(#wing)" stroke="#2a2a2a" stroke-opacity=".45" stroke-width=".7"/><path d="M54 47 C64 58 72 80 68 104 C66 112 60 113 57 106 C53 92 52 68 51 50 Z" fill="url(#wing)" stroke="#2a2a2a" stroke-opacity=".45" stroke-width=".7"/><path d="M47 52 C40 66 36 84 38 104 M48 56 C45 72 44 88 41 105 M53 52 C60 66 64 84 62 104 M52 56 C55 72 56 88 59 105" stroke="#333" stroke-opacity=".35" stroke-width=".6" fill="none"/><path d="M44 52 C38 62 34 74 34 86" stroke="#fff" stroke-opacity=".35" stroke-width="1.2" fill="none"/></g><ellipse cx="50" cy="45" rx="12.5" ry="12" fill="url(#th)"/><path d="M45 35 L45 55 M50 34 L50 56 M55 35 L55 55" stroke="#1d1b19" stroke-width="1.6" opacity=".65"/><g stroke="#111" stroke-width=".7" stroke-linecap="round"><path d="M40 40 l-3 -2 M60 40 l3 -2 M41 50 l-3 2 M59 50 l3 2 M46 36 l-1 -3 M54 36 l1 -3"/></g><path d="M38 30 Q50 22 62 30 Q60 36 50 36 Q40 36 38 30 Z" fill="#3a3632"/><ellipse cx="41" cy="27" rx="7.5" ry="8.5" fill="url(#eye)" transform="rotate(-18 41 27)"/><ellipse cx="59" cy="27" rx="7.5" ry="8.5" fill="url(#eye)" transform="rotate(18 59 27)"/><path d="M47 22 Q50 19 53 22 L52 31 Q50 32 48 31 Z" fill="#b9b3a6"/><ellipse cx="38.5" cy="23.5" rx="2.4" ry="1.5" fill="#fff" opacity=".45" transform="rotate(-25 38.5 23.5)"/><ellipse cx="56.5" cy="23.5" rx="2.4" ry="1.5" fill="#fff" opacity=".45" transform="rotate(-25 56.5 23.5)"/></svg>';
+function flyTroll() {
+  const f = el('div', {class: 'trollfly'}), SZ = 34;
+  f.innerHTML = FLY_SVG;
+  document.body.appendChild(f);
+  const [lf, lm, lh] = ['lf', 'lm', 'lh'].map(c => f.querySelector('.' + c));
+  const W = () => window.innerWidth, H = () => window.innerHeight, born = performance.now();
+  let x = Math.random() < 0.5 ? -40 : W() + 40, y = H() * (0.2 + Math.random() * 0.6), a = 0, mode, hits = 0, done = false, last = born;
+  const spot = (far) => {
+    for (let i = 0; ; i++) {
+      const p = [50 + Math.random() * (W() - 100), 70 + Math.random() * (H() - 140)];
+      if (!far || Math.hypot(p[0] - x, p[1] - y) > Math.min(W(), H()) * 0.45 || i > 30) return p;
+    }
+  };
+  const flyTo = ([tx, ty], dur) => {
+    mode = {k: 'fly', x0: x, y0: y, tx, ty, cx: (x + tx) / 2 + (Math.random() - 0.5) * 320, cy: (y + ty) / 2 + (Math.random() - 0.5) * 320, t: 0, dur};
+    f.classList.add('air');
+  };
+  const next = now => {
+    const r = Math.random();
+    if (r < 0.55) mode = {k: 'walk', until: now + 150 + Math.random() * 650, speed: 45 + Math.random() * 100, turn: (Math.random() - 0.5) * 4};
+    else if (r < 0.93) mode = {k: 'rest', until: now + 250 + Math.random() * 1700, groom: Math.random() < 0.45};
+    else flyTo(spot(false), 450 + Math.random() * 400);
+  };
+  flyTo(spot(false), 1100);
+  const turnTo = (want, k) => { let d = want - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; a += d * k; };
+  const step = now => {
+    if (done) return;
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    let pose = 0, groom = 0;
+    if (mode.k === 'fly') {
+      mode.t += dt * 1000;
+      const q = Math.min(1, mode.t / mode.dur), e = q < 0.5 ? 2 * q * q : 1 - (2 - 2 * q) ** 2 / 2;
+      const nx = (1 - e) ** 2 * mode.x0 + 2 * (1 - e) * e * mode.cx + e * e * mode.tx, ny = (1 - e) ** 2 * mode.y0 + 2 * (1 - e) * e * mode.cy + e * e * mode.ty;
+      if (Math.hypot(nx - x, ny - y) > 0.3) turnTo(Math.atan2(ny - y, nx - x) + Math.PI / 2, 0.5);
+      x = nx + Math.sin(now / 23) * 1.5;
+      y = ny + Math.cos(now / 29) * 1.5;
+      if (q >= 1) {
+        f.classList.remove('air');
+        if (mode.away) { done = true; f.remove(); trollToast(); return; }
+        next(now);
+      }
+    } else if (mode.k === 'walk') {
+      a += mode.turn * dt;
+      if (x < 40 || x > W() - 40 || y < 50 || y > H() - 50) turnTo(Math.atan2(H() / 2 - y, W() / 2 - x) + Math.PI / 2, Math.min(1, dt * 8));
+      x += Math.sin(a) * mode.speed * dt;
+      y -= Math.cos(a) * mode.speed * dt;
+      pose = Math.floor(now / 40) % 2 ? 1 : -1;
+      if (now > mode.until) next(now);
+    } else {
+      if (mode.groom) groom = Math.sin(now / 35);
+      if (now > mode.until) next(now);
+    }
+    if (now - born > 180000 && mode.k !== 'fly') { flyTo([W() + 80, -80], 900); mode.away = true; }
+    lf.setAttribute('transform', `translate(0 ${pose * 1.5 + groom * 3})`);
+    lm.setAttribute('transform', `rotate(${-pose * 5} 50 48)`);
+    lh.setAttribute('transform', `translate(0 ${pose * 1.5})`);
+    f.style.transform = `translate(${x - SZ / 2}px, ${y - SZ * 0.6}px) rotate(${a}rad)`;
+    requestAnimationFrame(step);
+  };
+  f.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (done || mode.away) return;
+    if (++hits < 3) { flyTo(spot(true), 380 + Math.random() * 200); return; }
+    // Squashed: flat and dark on a smear, then it fades away.
+    done = true;
+    f.style.transform += ' scale(1.15, 0.7)';
+    f.style.filter = 'brightness(.55) saturate(.6)';
+    const sp = el('div', {class: 'trollsplat'});
+    sp.innerHTML = '<svg width="48" height="48" viewBox="0 0 70 70"><path d="M35 18 C42 16 45 25 51 26 C57 28 52 34 54 38 C56 45 48 46 45 51 C42 56 37 51 33 53 C27 56 25 49 20 47 C15 44 19 39 18 34 C17 28 24 27 26 23 C29 18 31 19 35 18 Z" fill="#5a4630" fill-opacity=".38"/>' +
+      '<path d="M30 30 C34 27 40 29 41 34 C42 39 36 42 32 40 C28 38 27 33 30 30 Z" fill="#3a2a1a" fill-opacity=".45"/><path d="M48 44 C53 47 57 49 60 54" stroke="#5a4630" stroke-opacity=".35" stroke-width="2.5" stroke-linecap="round" fill="none"/>' +
+      '<circle cx="58" cy="20" r="1.6" fill="#5a4630" fill-opacity=".45"/><circle cx="14" cy="54" r="1.3" fill="#5a4630" fill-opacity=".45"/><circle cx="44" cy="40" r="2.2" fill="#8a2a1a" fill-opacity=".45"/></svg>';
+    sp.style.transform = `translate(${x - 24}px, ${y - 24}px)`;
+    document.body.insertBefore(sp, f);
+    setTimeout(() => { sp.style.opacity = 0; f.style.transition = 'opacity 1s'; f.style.opacity = 0; }, 1600);
+    setTimeout(() => { sp.remove(); f.remove(); trollToast(); }, 2700);
+  });
+  requestAnimationFrame(step);
+}
 const TROLLS = {hischam: hischamMode, poop: () => emojiRain('💩'), pig: () => emojiRain('🐷'),
-  uwu: () => store.set('trollUwu', true), baby: () => { trollBabyUntil = Date.now() + 600000; }, poll: coolPoll};
+  uwu: () => store.set('trollUwu', true), baby: () => { trollBabyUntil = Date.now() + 600000; }, poll: coolPoll,
+  fall: letterFall, virus: virusScan, fly: flyTroll};
 function runTroll(what) { if (TROLLS[what]) TROLLS[what](); }
 // Asks the game server for the divine item right now, signed with the admin key (the server checks it).
 async function adminGod() {
@@ -3681,6 +3860,7 @@ function toggleAdmin() {
   p = el('div', {class: 'adminpanel', id: 'adminpanel'}, el('div', {class: 'upddlg-head', text: 'Admin'}), who,
     go('hischam', 'HISCHAM-MODUS'), go('poop', '💩-Regen'), go('pig', '🐷-Regen'),
     go('uwu', 'uwu an nächste Nachricht'), go('baby', '👶 Baby-Ball (1 Punkt)'), go('poll', '📊 Umfrage: Ist Luis cool?'),
+    go('fall', '🍂 Buchstaben fallen runter'), go('virus', '🦠 Fake-Virenscan'), go('fly', '🪰 Fliege'),
     el('button', {class: 'vbtn', type: 'button', text: '⚡ Göttliches Item spawnen', onclick: () => {
       adminGod().then(ok => { stat.textContent = ok ? '⚡ Göttliches Item gespawnt' : 'Nur während eines laufenden Pong-Matches'; }).catch(() => { stat.textContent = 'Fehlgeschlagen'; });
     }}), stat);
