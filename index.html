@@ -1933,7 +1933,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 29;
+const APP_VERSION = 30;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3721,6 +3721,10 @@ const PG_ICONS = {
   mini: ['..GGGGG..', '...GGG...', '....G....', '.........', '..WWWWW..', '.........', '....G....', '...GGG...', '..GGGGG..'],
   god: ['.....GGG.', '....GGW..', '...GGW...', '..GGGGGG.', '.GGGGGG..', '....GWG..', '...GWG...', '..GW.....', '.G.......']
 };
+// The divine item's star jewel (O outline, G gold, W light gold, X white core).
+const PG_GOD_STAR = ['....O....', '...OXO...', '..OXWGO..', '.OXWGGGO.', 'OWWGGGGDO', '.OGGGGDO.', '..OGGDO..', '...ODO...', '....O....'];
+// An angel wing (upper one, pointing into the field, root at the bottom left); O gold outline, W white, G light gold.
+const PG_WING = ['..........OO', '........OOWO', '......OOWWWO', '....OOWWWWGO', '..OOWWWWWGO.', '.OWWWWWWGGO.', 'OWWWWWWGGOO.', 'OWWGOWGOWGO.', 'OGO.OGO.OGO.'];
 const PG_ICON_COL = {W: '#ffffff', R: '#ff3b5c', D: '#a3152f', L: '#b6ff3b', V: '#b388ff', T: '#2ef2d0', G: '#ffd23f'};
 const PG_DARK = {'#ff3b5c': '#8a1830', '#b388ff': '#4a2d85', '#b6ff3b': '#4f7a14', '#ffffff': '#6b7079', '#2ef2d0': '#12695b', '#ffd23f': '#7a5c10'};
 const PG_LABEL = {big: 'RIESEN-SCHLÄGER', shield: 'SCHUTZWAND', magnet: 'MAGNET', slow: 'ZEITLUPE', mini: 'MINI-SCHLÄGER', god: 'GÖTTLICH'};
@@ -3742,7 +3746,7 @@ const PG_FONT = {
   ' ': '...................................', '·': '...............#...................', '-': '...............###.................',
   '&': '.##..#..#..##...#...#.#.##..#..##.#', '!': '..#....#....#....#....#.........#..', '?': '.###.#...#....#...#...#.........#..',
   '.': '................................#..', ':': '.......#..................#........',
-  '⚡': '...##..##..##..#####..##..##..##...'
+  '⚡': '...##..##..##..#####..##..##..##...', '✦': '..#....#...###.#####.###...#....#..'
 };
 const pgUp = t => String(t).toUpperCase().replace(/ß/g, 'SS');
 function pgTextWidth(text, px) { return pgUp(text).length * 6 * px - px; }
@@ -3780,11 +3784,12 @@ function fxDebris(pg, x, y, n, colors, o = {}) {
   }
 }
 function fxWave(pg, x, y, color, max, life, thick) { pgFx(pg).waves.push({x, y, color, max: max || 60, life: life || 0.25, t: 0, thick: thick || 4}); }
-function fxBlast(pg, x, y, max, life, cone) {
+function fxBlast(pg, x, y, max, life, cone, pal) {
   const r0 = Math.random() * Math.PI;
-  pgFx(pg).blasts.push({x, y, max, t: 0, life: life || 0.36, cone, rays: [0, 1, 2, 3, 4, 5].map(k => r0 + k * Math.PI / 3 + (Math.random() - 0.5) * 0.5)});
+  pgFx(pg).blasts.push({x, y, max, t: 0, life: life || 0.36, cone, pal, rays: [0, 1, 2, 3, 4, 5].map(k => r0 + k * Math.PI / 3 + (Math.random() - 0.5) * 0.5)});
 }
-function fxBanner(pg, parts, border) { pgFx(pg).banner = {parts, border, t: 0}; }
+// A banner can be pinned to a height (y) and can fade to a dimmer colour after its first flash (dim).
+function fxBanner(pg, parts, border, y, dim) { pgFx(pg).banner = {parts, border, t: 0, y, fixed: y !== undefined, dim}; }
 function pgIcon(ctx, kind, x, y, px, white) {
   PG_ICONS[kind].forEach((row, r) => [...row].forEach((ch, c) => {
     if (ch === '.') return;
@@ -3817,19 +3822,20 @@ function pgEvent(g, ev) {
     return;
   }
   if (ev.k === 'get' && ev.kind === 'god') {
-    // Ascension: the picture stops, everything goes white, golden rays burst out of the item and a swarm of
-    // light flies into the chosen paddle.
+    // Ascension: the picture stops, everything goes white, a white-gold blast, and one thick beam of light
+    // carries the power into the chosen paddle.
     const p = pg.lastItem || {x: PG_W / 2, y: PG_H / 2};
     fx.hitStop = performance.now() + 240;
     fx.tint = {c: '#ffffff', f: 4};
     fx.shake = 1.5;
-    fx.godBurst = {x: p.x, y: p.y, t: performance.now()};
-    fxBlast(pg, p.x, p.y, 120, 0.6);
+    fx.godBeam = {x: p.x, y: p.y, i: ev.i, t: performance.now()};
+    fxBlast(pg, p.x, p.y, 120, 0.6, undefined, PG_COL.holy);
+    fx.blasts[fx.blasts.length - 1].cross = true;
+    fx.whiteout = 2;
     fxWave(pg, p.x, p.y, '#ffffff', 220, 0.5, 12);
-    fxWave(pg, p.x, p.y, '#ffd23f', 160, 0.7, 8);
-    fxDebris(pg, p.x, p.y, 40, ['#ffffff', '#fff3b0', '#ffd23f'], {speed: 520, life: 1.4, gravity: 0, size: 8, home: ev.i, grp: {}});
-    fxDebris(pg, p.x, p.y, 60, PG_COL.holy.slice(0, 5), {speed: 900, life: 0.7, gravity: 0, size: 4});
-    fxBanner(pg, mine ? [['⚡ DU BIST GÖTTLICH ⚡', '#ffe066']] : [['⚡ ', '#ffe066'], [name, own], [' IST GÖTTLICH ⚡', '#ffe066']], '#ffe066');
+    fxWave(pg, p.x, p.y, '#ffe066', 160, 0.7, 8);
+    fxDebris(pg, p.x, p.y, 28, ['#ffffff', '#ffffff', '#fff3b0', own], {speed: 700, life: 0.6, gravity: 0, size: 4});
+    fxBanner(pg, mine ? [['✦ DU BIST GÖTTLICH ✦', '#ffe066']] : [['✦ ', '#ffe066'], [name, own], [' IST GÖTTLICH ✦', '#ffe066']], '#ffe066', p.y < PG_H / 2 ? 276 : 40);
     return;
   }
   if (ev.k === 'godwall') {
@@ -3842,10 +3848,19 @@ function pgEvent(g, ev) {
     return;
   }
   if (ev.k === 'godend') {
-    // The wings fall apart into feathers drifting down.
-    const p = fx.pad[ev.i];
-    fxDebris(pg, p[0], p[1], 36, ['#ffffff', '#fff3b0', '#ffe066'], {speed: 160, life: 1.6, gravity: 90, size: 4});
-    fxBanner(pg, [['GÖTTLICH VORBEI', '#c8941a']], '#c8941a');
+    // The wings come apart into feathers that tumble down, the halo breaks, the holy trail cools off.
+    const p = fx.pad[ev.i], half = (fx.half && fx.half[ev.i === me1 ? 0 : 1]) || 35;
+    for (let k = 0; k < 8; k++) {
+      const e = k % 2 ? 1 : -1;
+      fx.parts.push({x: p[0] + (Math.random() - 0.3) * 40 * (ev.i === me1 ? 1 : -1), y: p[1] + e * (half + Math.random() * 30), vx: (Math.random() - 0.5) * 80, vy: -30 - Math.random() * 60,
+        life: 0, max: 1.8 + Math.random() * 0.8, feather: true, a: Math.random() * 6.3, spin: (Math.random() - 0.5) * 6, grav: 70, s: 4});
+    }
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4;
+      fx.parts.push({x: p[0], y: p[1] - half - 18, vx: Math.cos(a) * 70, vy: Math.sin(a) * 30 - 40, life: 0, max: 1.1, arc: true, a, s: 4, grav: 160});
+    }
+    fx.burnOut = performance.now();
+    fxBanner(pg, [['✦ GÖTTLICH VORBEI ✦', '#ffffff']], '#6b4e0c', undefined, '#9aa0a8');
     return;
   }
   if (ev.k === 'get' && PG_ICONS[ev.kind]) {
@@ -3940,9 +3955,11 @@ function pgFrame(g, ts) {
   for (const b of fx.burn) {
     const a = burnAge(b);
     if (a > 0.5 && Math.random() < (a - 0.4) * 1.5) continue;
+    // Holy fire leaves a trail of sparkles rather than a burning band.
+    if (b.holy && (((b.x + b.y) / 4) % 4 || Math.random() < 0.4)) continue;
     const ramp = b.holy ? PG_COL.holyBurn : PG_COL.burn;
     bgc.fillStyle = ramp[Math.min(ramp.length - 1, Math.floor(a * ramp.length))];
-    const z = a < 0.25 ? 12 : a < 0.6 ? 8 : 4;
+    const z = b.holy ? 4 : a < 0.25 ? 12 : a < 0.6 ? 8 : 4;
     bgc.fillRect(b.x - z / 2, b.y - z / 2, z, z);
   }
   for (let i = 0, y = 0; y < PG_H; i++, y += 24) {
@@ -4071,19 +4088,18 @@ function pgFrame(g, ts) {
     for (const i of [me1, op1]) {
       const left = s.gd ? s.gd[i] : 0;
       if (!left) continue;
-      const x0 = i === me1 ? 4 : PG_W - 16, inward = i === me1 ? 1 : -1, pulse = (now / 600) % 1;
+      const x0 = i === me1 ? 0 : PG_W - 8, pulse = (now / 600) % 1;
       for (let y = 0; y < PG_H; y += 4) {
         const band = Math.abs(((y / PG_H + pulse) % 1) - 0.5) < 0.06, rip = fx.godRipple && fx.godRipple.i === i && now - fx.godRipple.t < 500 && Math.abs(y - fx.godRipple.y) < (now - fx.godRipple.t) * 0.5;
-        for (let c = 0; c < 3; c++) {
-          ctx.fillStyle = rip || band ? '#ffffff' : c === 1 ? '#fff3b0' : '#ffd23f';
+        // A deep gold wall on the very edge with light running along it, well apart from the paddle.
+        for (let c = 0; c < 2; c++) {
+          const front = c === (i === me1 ? 1 : 0);
+          ctx.fillStyle = rip ? '#ffffff' : band ? '#ffe680' : front ? '#c8941a' : '#6b4e0c';
           ctx.fillRect(x0 + c * 4, y, 4, 4);
         }
-        // Glow: a dither that thins out into the field.
-        ctx.fillStyle = '#8a6510';
-        for (let g2 = 1; g2 <= 3; g2++) if ((y / 4 + g2 + Math.floor(now / 90)) % (g2 + 1) === 0) ctx.fillRect(i === me1 ? x0 + 8 + g2 * 4 : x0 - g2 * 4, y, 4, 4);
       }
       const hx = i === me1 ? 24 : PG_W / 2 + 24, w = PG_W / 2 - 48;
-      ctx.fillStyle = '#6b4e0c';
+      ctx.fillStyle = '#3a2c08';
       ctx.fillRect(hx, 24, w, 4);
       ctx.fillStyle = '#ffe066';
       ctx.fillRect(hx, 24, w * Math.min(1, left / 8000), 4);
@@ -4096,10 +4112,30 @@ function pgFrame(g, ts) {
         fx.godSpawn = now;
         fx.tint = {c: '#ffd23f', f: 4};
         fx.shake = Math.max(fx.shake, 1.2);
-        fxBanner(pg, [['⚡ GÖTTLICHES ITEM ⚡', '#ffe066']], '#ffe066');
+        fxBanner(pg, [['✦ GÖTTLICHES ITEM ✦', '#ffe066']], '#ffe066', s.item.y < PG_H / 2 ? 276 : 40);
+        fx.godImpact = {x: pgView(g, s.item.x), y: s.item.y, t: now};
+        fx.whiteout = 2;
         const x = pgView(g, s.item.x);
         fxWave(pg, x, s.item.y, '#ffffff', 140, 0.45, 8);
         fxWave(pg, x, s.item.y, '#ffd23f', 100, 0.6, 4);
+      }
+    }
+
+    // The pillar's flat impact ring when the divine item lands, and the beam that carries it into a paddle.
+    if (fx.godImpact && now - fx.godImpact.t > 60 && now - fx.godImpact.t < 460) {
+      const q = (now - fx.godImpact.t - 60) / 400, rx = 20 + 110 * q, ry = 4 + 16 * q;
+      ctx.fillStyle = q < 0.5 ? '#ffffff' : '#ffd23f';
+      for (let k = 0; k < 40; k++) { const a = k / 40 * Math.PI * 2; ctx.fillRect(fx.godImpact.x + PGX(Math.cos(a) * rx) - 2, fx.godImpact.y + 26 + PGX(Math.sin(a) * ry) - 2, 4, 4); }
+    }
+    if (fx.godBeam && now - fx.godBeam.t < 420) {
+      const b = fx.godBeam, [tx, ty] = fx.pad[b.i], n = Math.ceil(Math.hypot(tx - b.x, ty - b.y) / 4), q = (now - b.t) / 420;
+      for (let k = 0; k <= n; k++) {
+        const f = k / n, bx2 = b.x + (tx - b.x) * f, by2 = b.y + (ty - b.y) * f;
+        if (f > q * 2.5) break;
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(bx2 - 6, by2 - 6, 12, 12);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(bx2 - 2, by2 - 2, 4, 4);
       }
     }
 
@@ -4110,44 +4146,41 @@ function pgFrame(g, ts) {
       // In its last seconds an item nobody hit blinks, faster and faster, before it goes.
       const left = s.item.l === undefined ? 1e9 : s.item.l;
       if (s.item.k === 'god' && (left > 2500 || Math.floor(now / (left < 1000 ? 60 : 130)) % 2)) {
-        // The divine item: a pillar of light from the top of the table, a slowly turning sunburst, two halos,
-        // orbiting sparks, and the bolt in the middle, bigger than any other item.
-        const since = now - (fx.godSpawn || 0), drop = Math.min(1, since / 260), top = y - (y + 40) * drop;
-        for (let yy = y - 4; yy > top; yy -= 4) {
-          const w = 12 + 4 * Math.sin(yy / 18 + now / 120);
-          ctx.fillStyle = (yy / 4 + Math.floor(now / 70)) % 3 ? '#8a6510' : '#ffe066';
-          ctx.fillRect(x - w / 2, yy, w, 4);
-          ctx.fillStyle = '#fff3b0';
-          ctx.fillRect(x - 2, yy, 4, 4);
-        }
-        const rot = now / 1600;
-        for (let r = 0; r < 12; r++) {
-          const a = rot + r * Math.PI / 6, len = r % 2 ? 62 : 84 + 8 * Math.sin(now / 200 + r);
-          for (let d = 30; d < len; d += 6) {
-            ctx.fillStyle = d > len - 12 ? '#8a6510' : r % 2 ? '#ffd23f' : '#fff3b0';
-            ctx.fillRect(x + PGX(Math.cos(a) * d) - 2, y + PGX(Math.sin(a) * d) - 2, 4, 4);
+        // The divine item: a broad pillar of light from the top of the table, a clean eight-pointed sunburst
+        // turning slowly, a floating halo, and a golden star jewel in the middle.
+        const since = now - (fx.godSpawn || 0), drop = Math.min(1, since / 260), top = y - (y + 40) * drop, wide = since < 600 ? 56 : 32, landed = since > 600;
+        for (let yy = y - 24; yy > top; yy -= 4) {
+          for (let xx = -wide / 2; xx < wide / 2; xx += 4) {
+            const d = Math.abs(xx + 2) / (wide / 2);
+            if (d > 0.62 && ((xx + yy) / 4 + Math.floor(now / 80)) % 2) continue;
+            // Once the item has landed the pillar dims, so the jewel in front of it stands out.
+            ctx.fillStyle = landed ? (d < 0.2 ? '#fff3b0' : d < 0.55 ? '#c8941a' : '#6b4e0c') : d < 0.25 ? '#ffffff' : d < 0.55 ? '#fff3b0' : '#ffd23f';
+            ctx.fillRect(x + xx, yy, 4, 4);
           }
         }
-        for (const [rad, col, sp] of [[40 + 3 * Math.sin(now / 150), '#ffe066', 1], [52 + 4 * Math.sin(now / 190 + 1), '#ffffff', -1]]) {
-          const n = 28;
-          for (let k = 0; k < n; k++) {
-            if ((k + Math.floor(now / 80) * sp) % 3 === 0) continue;
-            const a = k / n * Math.PI * 2;
-            ctx.fillStyle = col;
-            ctx.fillRect(x + PGX(Math.cos(a) * rad) - 2, y + PGX(Math.sin(a) * rad) - 2, 4, 4);
+        if (landed) {
+          const rot = now / 2200;
+          for (let r = 0; r < 8; r++) {
+            const a = rot + r * Math.PI / 4, len = (r % 2 ? 50 : 74) + 6 * Math.sin(now / 220 + r);
+            for (let d = 28; d < len; d += 4) {
+              ctx.fillStyle = d > len - 10 ? '#8a6510' : d > len - 26 ? '#ffd23f' : '#fff3b0';
+              ctx.fillRect(x + PGX(Math.cos(a) * d) - 2, y + PGX(Math.sin(a) * d) - 2, 4, 4);
+            }
           }
-        }
-        for (let k = 0; k < 6; k++) {
-          const a = now / 400 + k * Math.PI / 3, sx = x + Math.cos(a) * 64, sy = y + Math.sin(a) * 44, big = (k + Math.floor(now / 150)) % 2;
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(sx - 2, sy - 2, 4, 4);
-          if (big) { ctx.fillRect(sx - 6, sy - 2, 12, 4); ctx.fillRect(sx - 2, sy - 6, 4, 12); }
         }
         ctx.fillStyle = '#1a1405';
-        ctx.fillRect(x - 32, y - 32, 64, 64);
-        ctx.fillStyle = (Math.floor(now / 100) % 2) ? '#ffe066' : '#ffffff';
-        for (let k = -32; k < 32; k += 4) { ctx.fillRect(x + k, y - 32, 4, 4); ctx.fillRect(x + k, y + 28, 4, 4); ctx.fillRect(x - 32, y + k, 4, 4); ctx.fillRect(x + 28, y + k, 4, 4); }
-        pgIcon(ctx, 'god', x, y, 6);
+        ctx.fillRect(x - 22, y - 22, 44, 44);
+        const hy = y - 34 + PGX(Math.sin(now / 240) * 3);
+        for (let k = 0; k < 28; k++) {
+          const a = k / 28 * Math.PI * 2;
+          ctx.fillStyle = Math.sin(a) < 0 ? '#ffffff' : '#ffe066';
+          ctx.fillRect(x + PGX(Math.cos(a) * 18) - 2, hy + PGX(Math.sin(a) * 5) - 2, 4, 4);
+        }
+        PG_GOD_STAR.forEach((row, r) => [...row].forEach((ch, c) => {
+          if (ch === '.') return;
+          ctx.fillStyle = ch === 'O' ? '#3a2a00' : ch === 'G' ? '#ffd23f' : ch === 'W' ? '#fff3b0' : ch === 'D' ? '#c8941a' : '#ffffff';
+          ctx.fillRect(x + (c - 4.5) * 4, y + (r - 4.5) * 4, 4, 4);
+        }));
       } else if (s.item.k !== 'god' && (left > 2500 || Math.floor(now / (left < 1000 ? 60 : 130)) % 2)) {
       ctx.fillStyle = PG_DARK[it.color] || '#333';
       for (let gx = -44; gx < 44; gx += 4) for (let gy = -44; gy < 44; gy += 4) {
@@ -4190,10 +4223,18 @@ function pgFrame(g, ts) {
         const d = Math.hypot(x, y);
         if (d > r * (b.cone === undefined ? 1 : 0.5 + 0.5 * Math.cos(Math.atan2(y, x) - b.cone) ** 8) || (d > 8 && !inCone(x, y))) continue;
         if (q > 0.55 && ((x + y) / 4) % 2 === 0) continue;
-        ctx.fillStyle = q < 0.12 ? '#ffffff' : PG_COL.hot[Math.min(5, Math.floor(q * 3 + (d / r) * 2.2))];
+        ctx.fillStyle = q < 0.12 ? '#ffffff' : (b.pal || PG_COL.hot)[Math.min(5, Math.floor(q * 3 + (d / r) * 2.2))];
         ctx.fillRect(cx + PGX(x) - 2, cy + PGX(y) - 2, 4, 4);
       }
-      if (b.cone === undefined && q < 0.6) {
+      if (b.cross && q < 0.55) {
+        for (let k = 0; k < 4; k++) {
+          const a = k * Math.PI / 2;
+          for (let d = r; d < r + 90 * Math.min(1, q * 5); d += 4) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(PGX(cx + Math.cos(a) * d) - 4, PGX(cy + Math.sin(a) * d) - 4, 8, 8);
+          }
+        }
+      } else if (b.cone === undefined && q < 0.6) {
         for (const a of b.rays) for (let d = r; d < r + b.max * 0.9 * Math.min(1, q * 4); d += 4) {
           ctx.fillStyle = d < r + 16 ? '#fff3b0' : '#ffd23f';
           ctx.fillRect(PGX(cx + Math.cos(a) * d) - 2, PGX(cy + Math.sin(a) * d) - 2, 4, 4);
@@ -4206,7 +4247,7 @@ function pgFrame(g, ts) {
     const myY = pgMine(g, s) ? s.m[me1][1] : pg.y, opY = s.m[op1][1];
     for (const [k, i, baseX, y, dir, color] of [[0, me1, PG_PX, myY, 1, PG_COL.me], [1, op1, pgView(g, s.m[op1][0]), opY, -1, PG_COL.op]]) {
       fx.pad[i] = [baseX, y];
-      if (halves[k] > fx.half[k] + 1 && !pg['grow' + k]) { pg['grow' + k] = 1; fx.hitFlash[i] = 0.1; fxWave(pg, baseX, y, '#b6ff3b', 60, 0.25); }
+      if (halves[k] > fx.half[k] + 1 && !pg['grow' + k]) { pg['grow' + k] = 1; fx.hitFlash[i] = 0.1; if (!(s.gd && s.gd[i] > 0)) fxWave(pg, baseX, y, '#b6ff3b', 60, 0.25); }
       if (halves[k] <= PG_PH / 2 + 1) pg['grow' + k] = 0;
       if (halves[k] < fx.half[k] - 1 && !pg['shrink' + k]) {
         pg['shrink' + k] = 1;
@@ -4223,25 +4264,34 @@ function pgFrame(g, ts) {
       const divine = s.gd && s.gd[i] > 0;
       if (divine) {
         // Wings behind the paddle, beating; a halo above it; light rising off it.
-        // Wings grow out of both ends of the paddle and spread into the field, beating.
+        // Angel wings out of both ends of the paddle, spread into the field and beating (the tips lift and drop).
         const flap = Math.sin(now / 110);
         for (const e of [-1, 1]) {
-          for (let f = 0; f < 7; f++) {
-            const fx0 = baseX + dir * (2 + f * 6), tip = y + e * (half + 2 + f * 4 + flap * (2 + f * 1.5)), len = 26 - f * 3;
-            ctx.fillStyle = f % 2 ? '#fff3b0' : '#ffffff';
-            ctx.fillRect(fx0 - 2, e < 0 ? tip - len : tip, 4, len);
-          }
+          PG_WING.forEach((row, r) => [...row].forEach((ch, c) => {
+            if (ch === '.') return;
+            // Drawn with 6px pixels so the wings read clearly next to the tall paddle.
+            const lift = Math.round(flap * 9 * c / 11), rr = e < 0 ? r : PG_WING.length - 1 - r;
+            ctx.fillStyle = ch === 'O' ? '#c8941a' : ch === 'W' ? '#ffffff' : '#ffe066';
+            ctx.fillRect(baseX + dir * (6 + c * 6) - (dir < 0 ? 6 : 0), e < 0 ? y - half - (PG_WING.length - rr) * 6 - lift : y + half + rr * 6 + lift, 6, 6);
+          }));
         }
-        ctx.fillStyle = Math.floor(now / 120) % 2 ? '#ffe066' : '#ffffff';
-        for (let a = 0; a < 16; a++) ctx.fillRect(baseX + PGX(Math.cos(a / 16 * Math.PI * 2) * 14) - 2, y - half - 14 + PGX(Math.sin(a / 16 * Math.PI * 2) * 4) - 2, 4, 4);
+        const hy = y - half - 18 + PGX(Math.sin(now / 240) * 3);
+        for (let a = 0; a < 18; a++) {
+          const an = a / 18 * Math.PI * 2;
+          ctx.fillStyle = Math.sin(an) > 0 ? '#ffffff' : '#ffe066';
+          ctx.fillRect(baseX + PGX(Math.cos(an) * 16) - 2, hy + PGX(Math.sin(an) * 5) - 2, 4, 4);
+        }
         if (dt && Math.random() < 0.7) fx.parts.push({x: baseX + (Math.random() - 0.5) * 12, y: y + (Math.random() - 0.5) * half * 2, vx: dir * 30 * Math.random(), vy: -60 - Math.random() * 120, life: 0, max: 0.6, c: Math.random() < 0.5 ? '#ffe066' : '#ffffff', s: 4, grav: 0});
       }
+      if (divine) { ctx.fillStyle = '#ffffff'; ctx.fillRect(baseX - PG_PW / 2 - 4 + dir * snap, y - half - 4, 20, half * 2 + 8); }
+      const godBand = (now / 700) % 1;
       ctx.fillStyle = fx.hitFlash[i] > 0 ? '#ffffff' : color;
       for (let yy = -half; yy < half; yy += 4) {
         const q = (yy + 2) / half, off = PGX(-dir * bend * (1 - q * q)) + dir * snap + jit;
         if (halves[k] < PG_PH / 2 - 1 && fx.hitFlash[i] <= 0) ctx.fillStyle = yy < -half + 4 || yy >= half - 4 ? '#ffd23f' : color;
-        if (divine && fx.hitFlash[i] <= 0) ctx.fillStyle = Math.abs(((yy + half) / (2 * half) - (now / 700) % 1)) < 0.12 ? '#ffffff' : (yy / 4) % 2 ? '#ffd23f' : '#ffe066';
+        if (divine && fx.hitFlash[i] <= 0) ctx.fillStyle = Math.abs((yy + half) / (2 * half) - godBand) < 0.1 ? '#ffffff' : '#ffd24a';
         ctx.fillRect(baseX - PG_PW / 2 + off, y + yy + jit, 12, 4);
+        if (divine && fx.hitFlash[i] <= 0) { ctx.fillStyle = color; ctx.fillRect(baseX - 2 + off, y + yy + jit, 4, 4); }
       }
       if (s.mg && s.mg[i] && s.stuck < 0) {
         ctx.fillStyle = PG_COL.mag;
@@ -4350,16 +4400,31 @@ function pgFrame(g, ts) {
       }
       if (dt) pg.trail.push([bx, by]);
       if (pg.trail.length > 2) pg.trail.shift();
-      for (let k = 10; k >= 1; k--) {
+      if (holy) {
+        // Holy tail: one unbroken chain of squares shrinking from the ball's size, white to gold to dark gold.
+        for (let k = 12; k >= 1; k--) {
+          const z = Math.max(4, PGX(32 - k * 2.4));
+          ctx.fillStyle = PG_COL.holy[Math.min(7, Math.floor(k * 0.6))];
+          ctx.fillRect(bx - ux * k * 6 - z / 2, by - uy * k * 6 - z / 2, z, z);
+        }
+      } else for (let k = 10; k >= 1; k--) {
         const z = k <= 2 ? 20 : k <= 4 ? 16 : k <= 6 ? 12 : k <= 8 ? 8 : 4;
         ctx.fillStyle = fire[Math.min(7, 2 + Math.floor(k / 2))];
         ctx.fillRect(bx - PGX(ux * k * 7) - z / 2, by - PGX(uy * k * 7) - z / 2, z, z);
       }
-      const r = Math.floor(now / 50) % 2 ? 14 : 12, cx = bx, cy = by;
+      const r = holy ? (Math.floor(now / 50) % 2 ? 20 : 18) : Math.floor(now / 50) % 2 ? 14 : 12, cx = bx, cy = by;
+      if (holy) {
+        // A holy shot is an eight-pointed star: four long rays and four short diagonal ones, flickering.
+        const long = Math.floor(now / 70) % 2 ? 40 : 36;
+        for (let k = 0; k < 8; k++) {
+          const a = k * Math.PI / 4, len = k % 2 ? 30 : long;
+          for (let d = 20; d < len; d += 4) { ctx.fillStyle = d < len - 8 ? '#ffffff' : '#ffe680'; ctx.fillRect(cx + PGX(Math.cos(a) * d) - 2, cy + PGX(Math.sin(a) * d) - 2, 4, 4); }
+        }
+      }
       for (let x = -r; x <= r; x += 4) for (let y = -r; y <= r; y += 4) {
         const d = Math.hypot(x + 2, y + 2);
         if (d > r) continue;
-        ctx.fillStyle = d < 6 ? '#ffffff' : d < 10 ? '#fff3b0' : holy ? '#ffe680' : '#ffd23f';
+        ctx.fillStyle = holy ? (d < 8 ? '#ffffff' : d < 13 ? '#fff3b0' : '#ffd23f') : d < 6 ? '#ffffff' : d < 10 ? '#fff3b0' : '#ffd23f';
         ctx.fillRect(cx + x, cy + y, 4, 4);
       }
     } else {
@@ -4397,6 +4462,7 @@ function pgFrame(g, ts) {
     } else {
       const drag = Math.pow(0.9, dt * 60);
       p.vx *= drag; p.vy = p.vy * drag + p.grav * dt;
+      if (p.feather) p.vx += Math.sin(p.life * 5 + p.a) * 60 * dt;
     }
     p.x += p.vx * dt; p.y += p.vy * dt;
     return true;
@@ -4404,6 +4470,26 @@ function pgFrame(g, ts) {
   for (const p of fx.parts) {
     const q = p.life / p.max;
     if (p.home === undefined && q > 0.75 && Math.floor(now / 40) % 2) continue;
+    if (p.feather) {
+      // A feather: a white vane two pixels wide around a golden quill, tumbling as it falls.
+      const a = p.a + p.life * p.spin, ux = Math.cos(a) * 4, uy = Math.sin(a) * 4;
+      for (let k = -2; k <= 2; k++) {
+        ctx.fillStyle = k === -2 ? '#ffd23f' : '#ffffff';
+        ctx.fillRect(PGX(p.x + ux * k) - 2, PGX(p.y + uy * k) - 2, 4, 4);
+        if (k > -2 && k < 2) { ctx.fillStyle = '#fff3b0'; ctx.fillRect(PGX(p.x + ux * k - uy) - 2, PGX(p.y + uy * k + ux) - 2, 4, 4); }
+      }
+      continue;
+    }
+    if (p.arc) {
+      // A piece of the broken halo: a short golden arc that flies off and blinks out.
+      if (q > 0.6 && Math.floor(now / 50) % 2) continue;
+      for (let k = -2; k <= 2; k++) {
+        const a = p.a + k * 0.22;
+        ctx.fillStyle = k ? '#ffe066' : '#ffffff';
+        ctx.fillRect(PGX(p.x + Math.cos(a) * 16) - 2, PGX(p.y + Math.sin(a) * 5) - 2, 4, 4);
+      }
+      continue;
+    }
     ctx.fillStyle = p.ramp ? p.ramp[Math.min(p.ramp.length - 1, Math.floor(q * p.ramp.length))] : p.c;
     const z = p.shrink && p.life > 0.12 ? 4 : p.s;
     ctx.fillRect(PGX(p.x) - z / 2, PGX(p.y) - z / 2, z, z);
@@ -4416,12 +4502,15 @@ function pgFrame(g, ts) {
     }
   }
 
+  // A hard full-screen white flash for the biggest moments.
+  if (fx.whiteout > 0) { fx.whiteout--; ctx.fillStyle = '#ffffff'; ctx.fillRect(-40, -40, PG_W + 80, PG_H + 80); }
+
   // Arcade banner in pixel font, blinking in.
   if (fx.banner && (fx.banner.t += dt || 0.016) < 1.8) {
     const b = fx.banner;
     // It sits in whichever half the ball and the aim are not in.
     if (b.y === undefined) b.y = (pg.lastBall ? pg.lastBall[1] : PG_H / 2) < PG_H / 2 ? 216 : 96;
-    if (!b.flipped && ((pg.lastBall && Math.abs(pg.lastBall[1] - b.y - 22) < 40) || (pg.lastPath || []).some(p => Math.abs(p[1] - b.y - 22) < 30 && Math.abs(p[0] - PG_W / 2) < 200))) { b.flipped = 1; b.y = b.y === 96 ? 216 : 96; }
+    if (!b.fixed && !b.flipped && ((pg.lastBall && Math.abs(pg.lastBall[1] - b.y - 22) < 40) || (pg.lastPath || []).some(p => Math.abs(p[1] - b.y - 22) < 30 && Math.abs(p[0] - PG_W / 2) < 200))) { b.flipped = 1; b.y = b.y === 96 ? 216 : 96; }
     if (b.t > 0.4 || Math.floor(b.t / 0.08) % 2 === 0) {
       const str = b.parts.map(p => p[0]).join(''), px = pgTextWidth(str, 4) + 32 <= PG_W - 16 ? 4 : 3;
       const w = PGX(pgTextWidth(str, px) + 32), x0 = PGX(PG_W / 2 - w / 2);
@@ -4430,7 +4519,7 @@ function pgFrame(g, ts) {
       ctx.fillStyle = b.border;
       ctx.fillRect(x0, b.y, w, 4);
       ctx.fillRect(x0, b.y + 40, w, 4);
-      pgText(ctx, b.parts, PG_W / 2, b.y + (px === 4 ? 8 : 12), px);
+      pgText(ctx, b.dim && b.t > 0.35 ? b.parts.map(([s2]) => [s2, b.dim]) : b.parts, PG_W / 2, b.y + (px === 4 ? 8 : 12), px);
     }
   }
   ctx.pgOx = ctx.pgOy = 0;
