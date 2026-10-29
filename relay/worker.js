@@ -170,7 +170,7 @@ export class Hub {
 // Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
 // their paddle is; the page draws its own paddle right away and the rest from these updates.
 const W = 640, H = 360, PH = 70, BIG = 105, MINI = 44, PW = 10, PX = 24, BR = 7, WIN = 7, CAP = 10, V0 = 330, VFAST = 1150, VMAX = 1600,
-  TURBO = 1700, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini'], SLOW_MS = 4000, SLOW_F = 0.5;
+  TURBO = 1700, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000;
 
 export class Arena {
   constructor(ctx) {
@@ -195,6 +195,7 @@ export class Arena {
     this.coin = false;
     this.item = null;
     this.nextItem = 0;
+    this.since = ITEMS.map(() => 0);
     this.ph = [PH, PH];
     this.bigUntil = [0, 0];
     this.miniUntil = [0, 0];
@@ -314,7 +315,13 @@ export class Arena {
     }
     if (!this.pu) return;
     if (!this.item && now > this.nextItem) {
-      this.item = {k: ITEMS[Math.floor(Math.random() * ITEMS.length)], x: W / 2 + (Math.random() * 2 - 1) * 110, y: 50 + Math.random() * (H - 100)};
+      this.item = {k: this.pickItem(), x: W / 2 + (Math.random() * 2 - 1) * 110, y: 50 + Math.random() * (H - 100), t: now};
+    }
+    // An item nobody hits goes away after a while and makes room for a new one.
+    if (this.item && now - this.item.t > ITEM_LIFE) {
+      this.event('gone', -1, this.item.k);
+      this.item = null;
+      this.nextItem = now + 1500 + Math.random() * 1500;
     }
     const it = this.item, b = this.b;
     if (it && this.last >= 0 && this.stuck < 0 && Math.hypot(b.x - it.x, b.y - it.y) < BR + ITEM_R) {
@@ -330,6 +337,16 @@ export class Arena {
       this.item = null;
       this.nextItem = now + 7000 + Math.random() * 5000;
     }
+  }
+
+  // Power-ups that haven't come for a while are more likely: each one's weight is (items since it last came + 1)²,
+  // so the one that just came drops to the bottom and the others climb. Starts even every match.
+  pickItem() {
+    const w = this.since.map(s => (s + 1) ** 2);
+    let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0;
+    while (i < w.length - 1 && r >= w[i]) r -= w[i++];
+    this.since = this.since.map((s, j) => j === i ? 0 : s + 1);
+    return ITEMS[i];
   }
 
   // A player sees the ball a little late but their own paddle at once, so a miss on the server can be a hit
@@ -437,7 +454,9 @@ export class Arena {
           b.x = i === 0 ? BR : W - BR;
           b.vx = i === 0 ? Math.abs(b.vx) : -Math.abs(b.vx);
           this.turbo = false;
-          b.vx = Math.sign(b.vx) * Math.min(Math.abs(b.vx), VMAX);
+          // A fireball bounced off a shield goes back as a normal ball: overall speed capped, direction kept.
+          const sp = Math.hypot(b.vx, b.vy);
+          if (sp > VMAX) { b.vx *= VMAX / sp; b.vy *= VMAX / sp; }
           this.event('shield', i);
           continue;
         }
@@ -464,7 +483,7 @@ export class Arena {
       on: [!!this.seats[0], !!this.seats[1]], p: [r(this.b.x), r(this.b.y), r(this.b.vx * f), r(this.b.vy * f)],
       sl: [Math.max(0, this.slow[0] - now), Math.max(0, this.slow[1] - now)],
       m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]], ph: this.ph,
-      votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y)},
+      votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
       sh: this.shield, mg: this.magnet, stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
       aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}

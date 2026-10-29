@@ -1924,7 +1924,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 25;
+const APP_VERSION = 26;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2174,12 +2174,17 @@ function saveChat() {
   store.set('chatUnread-' + room.tag, unread);
 }
 
+// While the tab is in the background, new messages show as "(1) Document Viewer", like any web mail does.
+let tabUnread = 0;
+function showTabUnread() { document.title = (tabUnread ? '(' + tabUnread + ') ' : '') + 'Document Viewer'; }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && tabUnread) { tabUnread = 0; showTabUnread(); } });
 function addMsg(c, m) {
   const list = log[c] || (log[c] = []);
   if (m.id && list.some(x => x.id === m.id)) return;
   list.push(m);
   if (list.length > 200) list.splice(0, list.length - 200).forEach(x => { if (x.img) forgetImg(x); });
   if (m.from !== me.id && !(chatVisible() && conv === c)) unread[c] = (unread[c] || 0) + 1;
+  if (m.from !== me.id && m.from !== 'system' && document.hidden) { tabUnread++; showTabUnread(); }
   saveChat();
   renderPeople();
   if (c === conv) renderMsgs();
@@ -3684,6 +3689,13 @@ function pgEvent(g, ev) {
   const pg = g.pg, me1 = g.myMark - 1, mine = ev.i === me1, who = mine ? 'DU' : g.opName, s = pg.s, fx = pgFx(pg);
   const own = pgOwn(g, ev.i), bx = s ? pgView(g, s.p[0]) : PG_W / 2, by = s ? s.p[1] : PG_H / 2, name = mine ? 'DU' : String(g.opName).slice(0, 8);
   const pad = fx.pad[ev.i], dir = ev.i === me1 ? 1 : -1;
+  if (ev.k === 'gone') {
+    // An item nobody hit puffs away in grey.
+    const p = pg.lastItem || {x: PG_W / 2, y: PG_H / 2};
+    fxDebris(pg, p.x, p.y, 14, ['#6b7079', '#3a3f47', '#ffffff'], {speed: 160, life: 0.4, gravity: 0, size: 4});
+    fxWave(pg, p.x, p.y, '#6b7079', 34, 0.2);
+    return;
+  }
   if (ev.k === 'get' && PG_ICONS[ev.kind]) {
     // The icon flashes white, bursts in its own colour, and the pieces fly into the paddle that took it.
     const p = pg.lastItem || {x: PG_W / 2, y: PG_H / 2}, it = PG_ITEMS[ev.kind];
@@ -3904,7 +3916,10 @@ function pgFrame(g, ts) {
     // Power-up: big icon bobbing in a marching frame of its own colour.
     if (s.item && PG_ICONS[s.item.k]) {
       const it = PG_ITEMS[s.item.k], x = PGX(pgView(g, s.item.x)), y = PGX(s.item.y) + PGX(Math.sin(now / 260) * 4);
-      pg.lastItem = {x, y};
+      pg.lastItem = {x, y, k: s.item.k};
+      // In its last seconds an item nobody hit blinks, faster and faster, before it goes.
+      const left = s.item.l === undefined ? 1e9 : s.item.l;
+      if (left > 2500 || Math.floor(now / (left < 1000 ? 60 : 130)) % 2) {
       ctx.fillStyle = PG_DARK[it.color] || '#333';
       for (let gx = -44; gx < 44; gx += 4) for (let gy = -44; gy < 44; gy += 4) {
         const d = Math.max(Math.abs(gx + 2), Math.abs(gy + 2));
@@ -3921,6 +3936,7 @@ function pgFrame(g, ts) {
       pgIcon(ctx, s.item.k, x, y, 6);
       const tw = Math.floor(now / 160) % 6;
       if (tw < 2) { ctx.fillStyle = '#ffffff'; const sx = x + (tw ? 20 : -28), sy = y - 36; ctx.fillRect(sx, sy, 4, 4); ctx.fillRect(sx - 4, sy + 4, 12, 4); ctx.fillRect(sx, sy + 8, 4, 4); }
+      }
     }
     if (fx.iconFlash && fx.iconFlash.f-- > 0) pgIcon(ctx, fx.iconFlash.kind, fx.iconFlash.x, fx.iconFlash.y, 6, true);
 
