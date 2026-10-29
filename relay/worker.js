@@ -169,8 +169,8 @@ export class Hub {
 
 // Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
 // their paddle is; the page draws its own paddle right away and the rest from these updates.
-const W = 640, H = 360, PH = 70, BIG = 105, PW = 10, PX = 24, BR = 7, WIN = 7, V0 = 330, VFAST = 1150, VMAX = 1600,
-  TURBO = 1700, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet'];
+const W = 640, H = 360, PH = 70, BIG = 105, MINI = 44, PW = 10, PX = 24, BR = 7, WIN = 7, CAP = 10, V0 = 330, VFAST = 1150, VMAX = 1600,
+  TURBO = 1700, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini'], SLOW_MS = 4000, SLOW_F = 0.5;
 
 export class Arena {
   constructor(ctx) {
@@ -197,6 +197,8 @@ export class Arena {
     this.nextItem = 0;
     this.ph = [PH, PH];
     this.bigUntil = [0, 0];
+    this.miniUntil = [0, 0];
+    this.slow = [0, 0];
     this.shield = [false, false];
     this.magnet = [false, false];
     this.stuck = -1;
@@ -306,7 +308,10 @@ export class Arena {
   }
 
   powers(now) {
-    for (let i = 0; i < 2; i++) if (this.bigUntil[i] && now > this.bigUntil[i]) { this.bigUntil[i] = 0; this.ph[i] = PH; }
+    for (let i = 0; i < 2; i++) {
+      if (this.bigUntil[i] && now > this.bigUntil[i]) { this.bigUntil[i] = 0; this.ph[i] = PH; }
+      if (this.miniUntil[i] && now > this.miniUntil[i]) { this.miniUntil[i] = 0; this.ph[i] = PH; }
+    }
     if (!this.pu) return;
     if (!this.item && now > this.nextItem) {
       this.item = {k: ITEMS[Math.floor(Math.random() * ITEMS.length)], x: W / 2 + (Math.random() * 2 - 1) * 110, y: 50 + Math.random() * (H - 100)};
@@ -314,7 +319,11 @@ export class Arena {
     const it = this.item, b = this.b;
     if (it && this.last >= 0 && this.stuck < 0 && Math.hypot(b.x - it.x, b.y - it.y) < BR + ITEM_R) {
       const i = this.last;
-      if (it.k === 'big') { this.ph[i] = BIG; this.bigUntil[i] = now + 10000; }
+      if (it.k === 'big') { this.ph[i] = BIG; this.bigUntil[i] = now + 10000; this.miniUntil[i] = 0; }
+      // Slow motion: for a few seconds the ball moves at half speed while it is on the taker's side.
+      if (it.k === 'slow') this.slow[i] = now + SLOW_MS;
+      // Mini paddle: the opponent's paddle shrinks for a while.
+      if (it.k === 'mini') { const j = 1 - i; this.ph[j] = MINI; this.miniUntil[j] = now + 8000; this.bigUntil[j] = 0; }
       if (it.k === 'shield') this.shield[i] = true;
       if (it.k === 'magnet') this.magnet[i] = true;
       this.event('get', i, it.k);
@@ -404,9 +413,9 @@ export class Arena {
         const cap = Math.max(250, Math.abs(b.vx) * 1.4);
         b.vy = Math.max(-cap, Math.min(cap, b.vy));
       }
-      const px = b.x;
-      b.x += b.vx * h;
-      b.y += b.vy * h;
+      const px = b.x, f = this.slowAt(b.x, now);
+      b.x += b.vx * h * f;
+      b.y += b.vy * h * f;
       if (b.y < BR) { b.y = BR; b.vy = Math.abs(b.vy); }
       if (b.y > H - BR) { b.y = H - BR; b.vy = -Math.abs(b.vy); }
       for (let i = 0; i < 2; i++) {
@@ -437,17 +446,22 @@ export class Arena {
     }
   }
 
+  slowAt(x, now) { return now < this.slow[x < W / 2 ? 0 : 1] ? SLOW_F : 1; }
+
+  // First to 7, but from 6:6 on a set needs a two-point lead, up to 10: at 9:9 the next point wins.
   point(scorer) {
     this.sc[scorer]++;
-    if (this.sc[scorer] >= WIN) return this.finish(scorer + 1);
+    const a = this.sc[scorer], o = this.sc[1 - scorer];
+    if (a >= CAP || (a >= WIN && a - o >= 2)) return this.finish(scorer + 1);
     this.dir = scorer === 0 ? 1 : -1;
     this.serve('goal', 1200);
   }
 
   broadcast(now) {
-    const r = v => Math.round(v);
+    const r = v => Math.round(v), f = this.st === 'play' && this.stuck < 0 ? this.slowAt(this.b.x, now) : 1;
     const s = JSON.stringify({t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, sc: this.sc, names: this.names,
-      on: [!!this.seats[0], !!this.seats[1]], p: [r(this.b.x), r(this.b.y), r(this.b.vx), r(this.b.vy)],
+      on: [!!this.seats[0], !!this.seats[1]], p: [r(this.b.x), r(this.b.y), r(this.b.vx * f), r(this.b.vy * f)],
+      sl: [Math.max(0, this.slow[0] - now), Math.max(0, this.slow[1] - now)],
       m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]], ph: this.ph,
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y)},
       sh: this.shield, mg: this.magnet, stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
