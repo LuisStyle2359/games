@@ -1373,6 +1373,13 @@ function makePongBot() {
     ball.vx = dir * speed * Math.cos(a);
     ball.vy = speed * Math.sin(a);
   }
+  // A new best goes on the leaderboard during the run (at most every 2 s), when the page is left and at the end,
+  // not only after the last life.
+  let reportedAt = 0;
+  function report(now) {
+    reportedAt = now;
+    if (!assisted && top > 0 && typeof reportScore === 'function') reportScore('pongbot', Math.round(top));
+  }
   const trickHeld = () => typeof pgAssistOn !== 'undefined' && pgAssistOn && pgAssistHeld;
   function update(dt, now) {
     const half = PADH / 2, clampPad = y => Math.max(GY + half, Math.min(GY + FH - half, y));
@@ -1403,11 +1410,13 @@ function makePongBot() {
       if (ball.y < GY + R) { ball.y = 2 * (GY + R) - ball.y; ball.vy = Math.abs(ball.vy); streak.push([ball.x, ball.y]); }
       if (ball.y > GY + FH - R) { ball.y = 2 * (GY + FH - R) - ball.y; ball.vy = -Math.abs(ball.vy); streak.push([ball.x, ball.y]); }
       if (ball.vx < 0 && px - R >= FACE_YOU && ball.x - R < FACE_YOU && Math.abs(ball.y - you) <= half + R) {
-        top = Math.max(top, speed);
         ball.x = FACE_YOU + R;
         bounce(you, 1);
         streak.push([ball.x, ball.y]);
+        // What counts is the speed the ball leaves your paddle with, the number shown right after your hit.
+        top = Math.max(top, speed);
         if (!assisted && top > best) { best = top; store.set('pongbotBest', Math.round(best)); }
+        if (now - reportedAt > 2000) report(now);
       } else if (ball.vx > 0 && px + R <= FACE_BOT && ball.x + R > FACE_BOT && Math.abs(ball.y - bot) <= half + R) {
         ball.x = FACE_BOT - R;
         bounce(bot, -1);
@@ -1418,7 +1427,7 @@ function makePongBot() {
         flash = {text: lives ? 'Missed' : 'Game over', at: now};
         if (!lives) {
           state = 'over';
-          if (!assisted && top > 0 && typeof reportScore === 'function') reportScore('pongbot', Math.round(top));
+          report(now);
           return;
         }
         serve(-1, V0);
@@ -1441,7 +1450,7 @@ function makePongBot() {
   return {
     pw: FW + 2 * GX,
     ph: GY + FH + 40,
-    pause() { if (state === 'play') paused = true; held = 0; },
+    pause() { if (state === 'play') { paused = true; report(performance.now()); } held = 0; },
     stats: () => ['Speed: ' + fmt(state === 'play' ? speed : top) + ' px/s', 'Max: ' + fmt(best) + ' px/s'],
     step(now) {
       const dt = Math.min(0.033, (now - last) / 1000);
@@ -1894,7 +1903,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 18;
+const APP_VERSION = 19;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
