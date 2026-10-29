@@ -1374,18 +1374,18 @@ function makeFlappy() {
 
 /* ---------- Pong vs bot ---------- */
 // One endless rally against a bot on a landscape page: every return makes the ball 7 % faster, with no limit.
-// If the bot misses, it serves again at the same speed; if you miss, you lose one of three lives and the speed
-// starts over. The score is the fastest ball you returned. Mouse or W/S, arrow keys.
+// The bot returns everything; if you miss, you lose one of three lives and the speed starts over. The score is
+// the fastest ball you returned. Mouse or W/S, arrow keys.
 function makePongBot() {
-  const FW = 720, FH = 370, PADH = 70, PADW = 8, R = 5, V0 = 380, UP = 1.07, LIVES = 3;
+  const FW = 720, FH = 370, PADH = 70, PADW = 8, R = 5, V0 = 380, UP = 1.07, LIVES = 3, VCAP = 1e15;
   const YOU = GX + 24, BOT = GX + FW - 24, FACE_YOU = YOU + PADW / 2, FACE_BOT = BOT - PADW / 2;
-  let ball, you, bot, speed, top, lives, state, paused, waitUntil, flash, last = 0, held = 0, assisted, botAim, botReact, streak, babyOn = false;
-  let best = store.get('pongbotBest', 0);
+  let ball, you, bot, speed, top, lives, state, paused, waitUntil, flash, last = 0, held = 0, assisted, botAim, botReact, botOff, streak, babyOn = false;
+  let best = store.get('pongbotBest', 0), runBest = best, recordShown = false;
   const fmt = v => Math.round(v).toLocaleString('de-DE');
 
   function serve(dir, v, x, y) {
     const a = (Math.random() * 2 - 1) * 0.45;
-    ball = {x: x ?? GX + FW / 2, y: y ?? GY + FH / 2, vx: dir * v * Math.cos(a), vy: v * Math.sin(a)};
+    ball = {x: x ?? GX + FW / 2, y: y ?? GY + FH / 2, vx: dir * v * Math.cos(a), vy: v * Math.sin(a), past: false};
     speed = v;
     botAim = null;
     streak = [[ball.x, ball.y]];
@@ -1400,6 +1400,8 @@ function makePongBot() {
     flash = null;
     assisted = false;
     babyOn = false;
+    runBest = best;
+    recordShown = false;
     serve(-1, V0);
   }
   function start() {
@@ -1418,7 +1420,7 @@ function makePongBot() {
   }
   function bounce(paddleY, dir) {
     const rel = Math.max(-1, Math.min(1, (ball.y - paddleY) / (PADH / 2))), a = rel * 0.9;
-    speed *= UP;
+    speed = Math.min(VCAP, speed * UP);
     ball.vx = dir * speed * Math.cos(a);
     ball.vy = speed * Math.sin(a);
   }
@@ -1427,55 +1429,63 @@ function makePongBot() {
   let reportedAt = 0;
   function report(now) {
     reportedAt = now;
-    if (!assisted && top > 0 && typeof reportScore === 'function') reportScore('pongbot', Math.round(top));
+    if (top > 0 && typeof reportScore === 'function') reportScore('pongbot', Math.round(top));
   }
   const trickHeld = () => typeof pgAssistOn !== 'undefined' && pgAssistOn && pgAssistHeld;
+  // Time until the ball reaches the paddle line x (Infinity if it is moving away).
+  const arrival = x => { const t = (x - ball.x) / ball.vx; return t > 0 ? t : Infinity; };
   function update(dt, now) {
     const half = PADH / 2, clampPad = y => Math.max(GY + half, Math.min(GY + FH - half, y));
-    // Your paddle: the mouse sets it directly, keys move it; the owner's trick (1 held) plays perfectly but
-    // the run then doesn't count.
+    // Your paddle: the mouse sets it directly, keys move it; the owner's trick (1 held) plays perfectly, at any speed.
     if (trickHeld()) {
       assisted = true;
-      const target = ball.vx < 0 ? landing(FACE_YOU + R) : GY + FH / 2;
-      you += Math.max(-3000 * dt, Math.min(3000 * dt, target - you));
+      const target = ball.vx < 0 ? landing(FACE_YOU + R) : GY + FH / 2, t = arrival(FACE_YOU + R);
+      const v = Math.max(3000, Math.abs(target - you) * 1.3 / Math.max(0.001, t === Infinity ? 1 : t));
+      you += Math.max(-v * dt, Math.min(v * dt, target - you));
     } else if (held) you += held * 560 * dt;
     you = clampPad(you);
-    // The bot reacts after a moment, moves at a limited (but growing) speed and aims less precisely the faster
-    // the ball is, so very fast balls get past it too.
+    // The bot glides to where the ball will arrive, hitting it off-centre by a random amount so the angles vary,
+    // fast enough to get there in time however fast the ball is. On slow balls it reacts after a short moment.
     if (ball.vx > 0) {
-      if (!botAim) { botReact = now + 110; botAim = landing(FACE_BOT - R) + (Math.random() * 2 - 1) * half * 1.1 * Math.min(1, speed / 4000) ** 1.5; }
-      // It moves straight to its target at its top speed and stops there, never past it.
-      if (now > botReact) { const step = (560 + speed * 0.45) * dt; bot += Math.max(-step, Math.min(step, botAim - bot)); }
+      if (botAim === null) {
+        botReact = now + (speed < 1500 ? 110 : 0);
+        botOff = (Math.random() * 2 - 1) * half * 0.6;
+      }
+      botAim = clampPad(landing(FACE_BOT - R) - botOff);
+      if (now > botReact) {
+        const t = arrival(FACE_BOT - R), v = Math.max(560 + speed * 0.45, Math.abs(botAim - bot) * 1.3 / Math.max(0.001, t));
+        bot += Math.max(-v * dt, Math.min(v * dt, botAim - bot));
+      }
     } else {
       botAim = null;
       bot += Math.max(-220 * dt, Math.min(220 * dt, GY + FH / 2 - bot));
     }
     bot = clampPad(bot);
     if (now < waitUntil) return;
-    const steps = Math.max(1, Math.ceil(speed * dt / 3)), h = dt / steps;
-    for (let i = 0; i < steps; i++) {
-      const px = ball.x;
-      ball.x += ball.vx * h;
-      ball.y += ball.vy * h;
-      if (ball.y < GY + R) { ball.y = 2 * (GY + R) - ball.y; ball.vy = Math.abs(ball.vy); streak.push([ball.x, ball.y]); }
-      if (ball.y > GY + FH - R) { ball.y = 2 * (GY + FH - R) - ball.y; ball.vy = -Math.abs(ball.vy); streak.push([ball.x, ball.y]); }
-      if (ball.vx < 0 && px - R >= FACE_YOU && ball.x - R < FACE_YOU && Math.abs(ball.y - you) <= half + R) {
-        ball.x = FACE_YOU + R;
-        bounce(you, 1);
+    // The ball moves from event to event (wall, paddle line, out), so it stays exact at any speed. Past about
+    // 100.000 px/s a frame holds at most two returns (the rest of that frame's time is dropped), so the speed
+    // keeps climbing at a pace you can watch instead of jumping to billions at once.
+    const lo = GY + R, hi = GY + FH - R;
+    let left = dt, hits = 0;
+    for (let n = 0; left > 0 && n < 48 && hits < 2; n++) {
+      const tw = Math.max(0, ball.vy < 0 ? (lo - ball.y) / ball.vy : ball.vy > 0 ? (hi - ball.y) / ball.vy : Infinity);
+      const lineX = ball.past ? (ball.vx < 0 ? GX - R : GX + FW + R) : ball.vx < 0 ? FACE_YOU + R : FACE_BOT - R;
+      const tx = Math.max(0, (lineX - ball.x) / ball.vx), t = Math.min(tw, tx);
+      if (t > left) { ball.x += ball.vx * left; ball.y += ball.vy * left; break; }
+      ball.x += ball.vx * t;
+      ball.y += ball.vy * t;
+      left -= t;
+      if (tw <= tx) {
+        ball.y = ball.vy < 0 ? lo : hi;
+        ball.vy = -ball.vy;
         streak.push([ball.x, ball.y]);
-        // What counts is the speed the ball leaves your paddle with, the number shown right after your hit.
-        top = Math.max(top, speed);
-        if (!assisted && top > best) { best = top; store.set('pongbotBest', Math.round(best)); }
-        if (now - reportedAt > 2000) report(now);
-      } else if (ball.vx > 0 && px + R <= FACE_BOT && ball.x + R > FACE_BOT && Math.abs(ball.y - bot) <= half + R) {
-        ball.x = FACE_BOT - R;
-        bounce(bot, -1);
-        streak.push([ball.x, ball.y]);
+        continue;
       }
-      if (ball.x < GX - R) {
+      ball.x = lineX;
+      if (ball.past) {
         lives--;
         babyOn = false;
-        flash = {text: lives ? 'Missed' : 'Game over', at: now};
+        flash = {text: lives ? 'Missed · ' + lives + (lives === 1 ? ' life' : ' lives') + ' left' : 'Game over', at: now};
         if (!lives) {
           state = 'over';
           report(now);
@@ -1485,14 +1495,23 @@ function makePongBot() {
         waitUntil = now + 900;
         return;
       }
-      if (ball.x > GX + FW + R) {
-        // The bot serves the next ball itself, from its paddle, so it never starts a point already beaten.
-        flash = {text: 'Bot missed', at: now};
-        babyOn = false;
-        serve(-1, speed, FACE_BOT - R, bot);
-        waitUntil = now + 700;
-        return;
+      if (ball.vx < 0) {
+        if (trickHeld() && Math.abs(ball.y - you) > half + R - 2) you = clampPad(ball.y + (Math.random() * 2 - 1) * 12);
+        if (Math.abs(ball.y - you) > half + R) { ball.past = true; continue; }
+        bounce(you, 1);
+        hits++;
+        // What counts is the speed the ball leaves your paddle with, the number shown right after your hit.
+        top = Math.max(top, speed);
+        if (top > best) { best = top; store.set('pongbotBest', Math.round(best)); }
+        if (top > runBest && runBest > 0 && !recordShown) { recordShown = true; flash = {text: 'New record!', at: now, record: true}; }
+        if (now - reportedAt > 2000) report(now);
+      } else {
+        if (Math.abs(ball.y - bot) > half + R - 1) bot = clampPad(ball.y - botOff);
+        bounce(bot, -1);
+        hits++;
+        botAim = null;
       }
+      streak.push([ball.x, ball.y]);
     }
     streak.push([ball.x, ball.y]);
     if (streak.length > 8) streak.splice(0, streak.length - 8);
@@ -1548,10 +1567,12 @@ function makePongBot() {
       ctx.fillStyle = C.ink;
       if (babyOn) babyBall(ctx, ball.x, ball.y, R * 4.5);
       else ctx.fillRect(ball.x - R, ball.y - R, R * 2, R * 2);
-      if (flash && performance.now() - flash.at < 900 && state === 'play') text(flash.text, GX + FW / 2, GY + FH / 2 + 50, {size: 13, weight: 600, color: C.muted, align: 'center'});
+      if (flash && performance.now() - flash.at < (flash.record ? 1800 : 900) && state === 'play') {
+        text(flash.text, GX + FW / 2, GY + FH / 2 + 50, flash.record ? {size: 20, weight: 700, color: C.head, align: 'center'} : {size: 13, weight: 600, color: C.muted, align: 'center'});
+      }
       ctx.restore();
       if (state === 'ready') overlay('Pong vs Bot', 'Mouse or W/S · click or Space to serve', GX, GY, FW, FH);
-      else if (state === 'over') overlay('Game over · ' + fmt(top) + ' px/s', 'Click or press Space to play again', GX, GY, FW, FH);
+      else if (state === 'over') overlay((top > runBest ? 'New record · ' : 'Game over · ') + fmt(top) + ' px/s', 'Click or press Space to play again', GX, GY, FW, FH);
       else if (paused) overlay('Paused', 'Press Space or click to continue', GX, GY, FW, FH);
     },
     key(k, repeat) {
@@ -1564,7 +1585,7 @@ function makePongBot() {
     keyup(k) { if (['w', 'arrowup', 's', 'arrowdown'].includes(k)) held = 0; },
     hover(y) { if (state === 'play' && !trickHeld()) you = y; },
     press: start,
-    peek: () => ({ball, you, bot, speed, top, lives, state, assisted, babyOn})  // for the tests
+    peek: () => ({ball, you, bot, speed, top, lives, state, assisted, babyOn, flash, best, at: last})  // for the tests
   };
 }
 
@@ -1957,7 +1978,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
