@@ -173,6 +173,11 @@ tbody tr.sel td { background: var(--select); }
 .clink { padding: 0; border: 0; background: none; color: var(--check); font: inherit; cursor: pointer; }
 .cconv { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .cmsgs { display: flex; flex: 1; flex-direction: column; gap: 5px; overflow: auto; padding: 10px 12px; background: #f4f6f9; user-select: text; -webkit-user-select: text; }
+.cflex { border-left: 3px solid #c8922a; padding: 1px 0 1px 8px; white-space: normal; }
+.cflexk { font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
+.cflexg { font-weight: 600; }
+.cflexs { font-size: 20px; font-weight: 700; line-height: 1.2; }
+.cflexr { font-size: 11px; color: var(--muted); }
 .cmsg { align-self: flex-start; max-width: 75%; padding: 5px 8px 3px; border: 1px solid var(--grid-line); border-radius: 6px; background: var(--paper); white-space: pre-wrap; overflow-wrap: anywhere; }
 .cmsg.me { align-self: flex-end; background: #dbe8f7; border-color: #c4d6ee; }
 .cfrom { color: var(--check); font-size: 11px; font-weight: 600; }
@@ -499,7 +504,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
           <tr data-doc="OLA" data-game="2048"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-06</td><td>OLA</td><td>generell</td><td class="flag">Q</td><td>4</td><td>08.10.2026 12:05</td><td></td><td></td></tr>
           <tr data-doc="Shipment Alert" data-game="flappy"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-07</td><td>Shipment Alert</td><td>24.09.2026 10:29</td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:29</td><td></td><td></td></tr>
           <tr data-doc="T1 Document" data-game="wordle"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-08</td><td>T1 Document</td><td></td><td class="flag">Q</td><td>2</td><td>24.09.2026 10:33</td><td></td><td></td></tr>
-          <tr data-doc="T1 Document"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-09</td><td>T1 Document</td><td></td><td></td><td>2</td><td>03.10.2026 12:17</td><td></td><td></td></tr>
+          <tr data-doc="T1 Document" data-game="pongbot"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-09</td><td>T1 Document</td><td></td><td></td><td>2</td><td>03.10.2026 12:17</td><td></td><td></td></tr>
           <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
           <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
           <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
@@ -547,6 +552,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <p class="cnote" id="cgifnote"></p>
             </div>
             <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button></div>
+            <div class="cpop" id="cflexpop" hidden role="dialog" aria-label="Score zeigen" style="padding:8px;gap:4px;flex-direction:column"></div>
             <div class="cimgbar" id="cimgbar" hidden><img id="cimgthumb" alt=""><span id="cimginfo">Bild senden?</span><button class="vbtn" id="cimgsend" type="button">Senden</button><button class="vbtn" id="cimgcancel" type="button">Abbrechen</button></div>
             <div class="cimgview" id="cimgview" hidden></div>
             <div class="creply" id="creply" hidden><span class="crname" id="crname"></span><span class="crtext" id="crtext"></span><button class="crclose" id="crclose" type="button" title="Abbrechen">&times;</button></div>
@@ -554,6 +560,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <button class="vbtn ctool" id="cemojiBtn" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">&#9786;</button>
               <button class="vbtn ctool" id="cgifBtn" type="button" title="GIF senden" aria-label="GIF senden" aria-expanded="false">GIF</button>
               <button class="vbtn ctool" id="cmpbtn" type="button" title="Spielen" aria-label="Spielen" aria-expanded="false" hidden>🎮</button>
+              <button class="vbtn ctool" id="cflexBtn" type="button" title="Score flexen" aria-label="Score flexen" aria-expanded="false">💪</button>
               <input class="vlinkin cin" id="cin" type="text" maxlength="500" placeholder="Nachricht schreiben" autocomplete="off" aria-label="Nachricht">
               <button class="vbtn" type="submit" title="Senden" aria-label="Senden"><svg viewBox="0 0 12 12"><path d="M1 1.5l10 4.5-10 4.5 1.5-4.5z"/></svg></button>
             </form>
@@ -1317,6 +1324,174 @@ function makeFlappy() {
   };
 }
 
+/* ---------- Pong vs bot ---------- */
+// One endless rally against a bot: every return makes the ball 7 % faster, with no limit. If the bot misses,
+// play goes on at the same speed; if you miss, you lose one of three lives and the speed starts over. The score
+// is the fastest ball you returned. Mouse or W/S, arrow keys.
+function makePongBot() {
+  const PADH = 64, PADW = 8, R = 5, V0 = 280, UP = 1.07, LIVES = 3;
+  const YOU = GX + 22, BOT = GX + AREA - 22, FACE_YOU = YOU + PADW / 2, FACE_BOT = BOT - PADW / 2;
+  let ball, you, bot, speed, top, lives, state, paused, waitUntil, flash, last = 0, held = 0, assisted, botAim, botReact, trail;
+  let best = store.get('pongbotBest', 0);
+  const fmt = v => Math.round(v).toLocaleString('de-DE');
+
+  function serve(dir, v) {
+    const a = (Math.random() * 2 - 1) * 0.5;
+    ball = {x: GX + AREA / 2, y: GY + AREA / 2, vx: dir * v * Math.cos(a), vy: v * Math.sin(a)};
+    speed = v;
+    botAim = null;
+    trail = [];
+  }
+  function reset() {
+    you = GY + AREA / 2;
+    bot = GY + AREA / 2;
+    top = 0;
+    lives = LIVES;
+    state = 'ready';
+    paused = false;
+    flash = null;
+    assisted = false;
+    serve(-1, V0);
+  }
+  function start() {
+    if (state === 'over') reset();
+    if (state === 'ready') { state = 'play'; waitUntil = performance.now() + 400; }
+    paused = false;
+  }
+  // Where the ball will cross the line x, folded at the walls.
+  function landing(x) {
+    const t = (x - ball.x) / ball.vx;
+    if (!(t > 0)) return GY + AREA / 2;
+    const lo = GY + R, span = AREA - 2 * R, per = 2 * span;
+    let y = ((ball.y - lo + ball.vy * t) % per + per) % per;
+    if (y > span) y = per - y;
+    return lo + y;
+  }
+  function bounce(paddleY, dir) {
+    const rel = Math.max(-1, Math.min(1, (ball.y - paddleY) / (PADH / 2))), a = rel * 0.96;
+    speed *= UP;
+    ball.vx = dir * speed * Math.cos(a);
+    ball.vy = speed * Math.sin(a);
+  }
+  function update(dt, now) {
+    const half = PADH / 2, clampPad = y => Math.max(GY + half, Math.min(GY + AREA - half, y));
+    // Your paddle: mouse sets it directly, keys move it; the owner's trick (1 held) plays perfectly but
+    // the run then doesn't count.
+    if (typeof pgAssistOn !== 'undefined' && pgAssistOn && pgAssistHeld) {
+      assisted = true;
+      const target = ball.vx < 0 ? landing(FACE_YOU + R) : GY + AREA / 2;
+      you += Math.max(-2600 * dt, Math.min(2600 * dt, target - you));
+    } else if (held) you += held * 520 * dt;
+    you = clampPad(you);
+    // The bot reacts after a moment, moves at a limited (but growing) speed and aims less precisely the faster
+    // the ball is, so very fast balls get past it too.
+    if (ball.vx > 0) {
+      if (!botAim) { botReact = now + 120; botAim = landing(FACE_BOT - R) + (Math.random() * 2 - 1) * half * 1.1 * Math.min(1, speed / 2600) ** 1.5; }
+      if (now > botReact) bot += Math.max(-1, Math.min(1, (botAim - bot) / 6)) * (520 + speed * 0.45) * dt;
+    } else {
+      botAim = null;
+      bot += Math.max(-200 * dt, Math.min(200 * dt, GY + AREA / 2 - bot));
+    }
+    bot = clampPad(bot);
+    if (now < waitUntil) return;
+    const steps = Math.max(1, Math.ceil(speed * dt / 3)), h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      const px = ball.x;
+      ball.x += ball.vx * h;
+      ball.y += ball.vy * h;
+      if (ball.y < GY + R) { ball.y = 2 * (GY + R) - ball.y; ball.vy = Math.abs(ball.vy); }
+      if (ball.y > GY + AREA - R) { ball.y = 2 * (GY + AREA - R) - ball.y; ball.vy = -Math.abs(ball.vy); }
+      if (ball.vx < 0 && px - R >= FACE_YOU && ball.x - R < FACE_YOU && Math.abs(ball.y - you) <= half + R) {
+        top = Math.max(top, speed);
+        ball.x = FACE_YOU + R;
+        bounce(you, 1);
+        if (!assisted && top > best) { best = top; store.set('pongbotBest', Math.round(best)); }
+      } else if (ball.vx > 0 && px + R <= FACE_BOT && ball.x + R > FACE_BOT && Math.abs(ball.y - bot) <= half + R) {
+        ball.x = FACE_BOT - R;
+        bounce(bot, -1);
+      }
+      if (ball.x < GX - R) {
+        lives--;
+        flash = {text: lives ? 'Missed' : 'Game over', at: now};
+        if (!lives) {
+          state = 'over';
+          if (!assisted && top > 0 && typeof reportScore === 'function') reportScore('pongbot', Math.round(top));
+          return;
+        }
+        serve(-1, V0);
+        waitUntil = now + 900;
+        return;
+      }
+      if (ball.x > GX + AREA + R) {
+        flash = {text: 'Bot missed', at: now};
+        serve(1, speed);
+        waitUntil = now + 600;
+        return;
+      }
+    }
+    trail.push([ball.x, ball.y]);
+    if (trail.length > 6) trail.shift();
+  }
+  reset();
+
+  return {
+    pause() { if (state === 'play') paused = true; held = 0; },
+    stats: () => ['Speed: ' + fmt(state === 'play' ? speed : top) + ' px/s', 'Max: ' + fmt(best) + ' px/s'],
+    step(now) {
+      const dt = Math.min(0.033, (now - last) / 1000);
+      last = now;
+      if (state !== 'play' || paused) return false;
+      update(dt, now);
+      return true;
+    },
+    draw() {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(GX, GY, AREA, AREA);
+      ctx.clip();
+      drawGrid(GX, GY, 20, 20, AREA / 20, 5);
+      ctx.fillStyle = C.gridStrong;
+      for (let y = GY + 4; y < GY + AREA; y += 16) ctx.fillRect(GX + AREA / 2 - 1, y, 2, 8);
+      text(fmt(state === 'play' ? speed : top) + ' px/s', GX + AREA / 2, GY + 40, {size: 22, weight: 700, color: C.gridStrong, align: 'center'});
+      for (let i = 0; i < LIVES; i++) {
+        ctx.fillStyle = i < lives ? C.head : C.grid;
+        ctx.fillRect(GX + 12 + i * 14, GY + 12, 10, 10);
+      }
+      // A faint streak behind the ball once it gets fast.
+      if (state === 'play' && speed > 700) {
+        trail.forEach(([x, y], i) => {
+          ctx.globalAlpha = 0.08 + 0.05 * i;
+          ctx.fillStyle = C.ink;
+          ctx.fillRect(x - R, y - R, R * 2, R * 2);
+        });
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = C.head;
+      ctx.fillRect(YOU - PADW / 2, you - PADH / 2, PADW, PADH);
+      ctx.fillStyle = C.snake;
+      ctx.fillRect(BOT - PADW / 2, bot - PADH / 2, PADW, PADH);
+      ctx.fillStyle = C.ink;
+      ctx.fillRect(ball.x - R, ball.y - R, R * 2, R * 2);
+      if (flash && performance.now() - flash.at < 900 && state === 'play') text(flash.text, GX + AREA / 2, GY + AREA / 2 + 50, {size: 13, weight: 600, color: C.muted, align: 'center'});
+      ctx.restore();
+      if (state === 'ready') overlay('Pong vs Bot', 'Mouse or W/S · click or Space to serve');
+      else if (state === 'over') overlay('Game over · ' + fmt(top) + ' px/s', 'Click or press Space to play again');
+      else if (paused) overlay('Paused', 'Press Space or click to continue');
+    },
+    key(k, repeat) {
+      if (k === ' ' || k === 'enter') { if (!repeat) start(); return true; }
+      if (k === 'p' && state === 'play') { paused = !paused; return true; }
+      if (k === 'w' || k === 'arrowup') { held = -1; return true; }
+      if (k === 's' || k === 'arrowdown') { held = 1; return true; }
+      return !!DIRS[k];
+    },
+    keyup(k) { if (['w', 'arrowup', 's', 'arrowdown'].includes(k)) held = 0; },
+    hover(y) { if (state === 'play' && !(typeof pgAssistOn !== 'undefined' && pgAssistOn && pgAssistHeld)) you = y; },
+    press: start,
+    peek: () => ({ball, you, speed, top, lives, state, assisted})  // for the tests
+  };
+}
+
 /* ---------- Plain documents ---------- */
 function makeDoc(seed) {
   let s = seed * 7919;
@@ -1551,7 +1726,7 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong'};
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongbot: 'Pong vs Bot'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -1706,7 +1881,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 16;
+const APP_VERSION = 17;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -2063,13 +2238,16 @@ function broadcastScores() {
     if (mine && mine.score > 0) signed({kind: 'hs', game, score: mine.score, name: me.name}).then(b => publish('hs/' + me.id, b)).catch(() => {});
   }
 }
+function lbScore(game, score) {
+  return game === 'wordle' ? (7 - score) + '/6' : game === 'pongbot' ? score.toLocaleString('de-DE') + ' px/s' : String(score);
+}
 function toggleLb() {
   const p = $('clb');
   p.hidden = !p.hidden;
   if (!p.hidden) renderLb();
 }
 function renderLb() {
-  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'ttt', 'c4', 'uno', 'react', 'pong'];
+  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong'];
   const avail = allGames.filter(g => lb[g] && Object.keys(lb[g]).length);
   if (!avail.includes(lbGame)) lbGame = avail[0] || 'snake';
   $('clbtabs').replaceChildren(...avail.map(g =>
@@ -2082,11 +2260,11 @@ function renderLb() {
   const medals = ['gold', 'silver', 'bronze'];
   const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong'];
   $('clbbody').replaceChildren(el('table', {class: 'clbtable'},
-    el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : 'Score'}))),
+    el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : lbGame === 'pongbot' ? 'Tempo' : 'Score'}))),
     el('tbody', {}, ...entries.map((e, i) => el('tr', {},
       el('td', {class: 'rank ' + (medals[i] || ''), text: String(i + 1)}),
       el('td', {text: e.name}),
-      el('td', {text: lbGame === 'wordle' ? (7 - e.score) + '/6' : String(e.score)})
+      el('td', {text: lbScore(lbGame, e.score)})
     )))
   ));
 }
@@ -4341,7 +4519,7 @@ function renderMsgs() {
         quote,
         c === ALL && !mine ? el('div', {class: 'cfrom', text: m.name}) : null,
         m.deleted ? el('div', {text: mine ? 'Du hast diese Nachricht gelöscht' : 'Diese Nachricht wurde gelöscht'})
-          : m.img ? imgView(c, m) : gif ? gifImg(m.id + gif, gif, m.text) : el('div', {text: m.text}),
+          : m.img ? imgView(c, m) : gif ? gifImg(m.id + gif, gif, m.text) : flexCard(m.text) || el('div', {text: m.text}),
         el('div', {class: 'ctime'}, deleteButton(c, m), fmtTime(m.ts), checks),
         ...reactViews(c, m));
     })
@@ -4747,7 +4925,7 @@ function gifImg(key, src, text) {
   return gifEls.get(key);
 }
 
-const pops = {cemojiBtn: $('cemoji'), cgifBtn: $('cgif'), cmpbtn: $('cmppop')};
+const pops = {cemojiBtn: $('cemoji'), cgifBtn: $('cgif'), cmpbtn: $('cmppop'), cflexBtn: $('cflexpop')};
 function closePops() {
   for (const [btn, pop] of Object.entries(pops)) { pop.hidden = true; $(btn).setAttribute('aria-expanded', 'false'); }
 }
@@ -4770,6 +4948,32 @@ $('cemoji').append(...EMOJIS.map(x => el('button', {class: 'cemo', type: 'button
 }})));
 $('cemojiBtn').addEventListener('click', () => togglePop('cemojiBtn'));
 $('cmpbtn').addEventListener('click', () => togglePop('cmpbtn'));
+// Flex: pick one of your leaderboard scores and post it to the chat as a card.
+const FLEX = '💪 FLEX · ';
+function flexScore(game, score) {
+  if (['ttt', 'c4', 'uno', 'react', 'pong'].includes(game)) return score + (score === 1 ? ' Sieg' : ' Siege');
+  if (game === 'wordle') return 'in ' + (7 - score) + ' Versuchen';
+  if (game === 'pongbot') return score.toLocaleString('de-DE') + ' px/s';
+  return score.toLocaleString('de-DE') + ' Punkte';
+}
+function flexText(game) {
+  const all = Object.entries(lb[game] || {}).sort((a, b) => b[1].score - a[1].score), i = all.findIndex(([id]) => id === me.id);
+  return FLEX + GAME_NAMES[game] + ' · ' + flexScore(game, all[i][1].score) + ' · Platz ' + (i + 1) + ' von ' + all.length;
+}
+function renderFlexPop() {
+  const mine = Object.keys(GAME_NAMES).filter(g => lb[g] && lb[g][me.id] && lb[g][me.id].score > 0);
+  $('cflexpop').replaceChildren(...(mine.length ? mine.map(g => el('button', {class: 'vbtn', type: 'button', style: 'width:100%;text-align:left',
+    text: GAME_NAMES[g] + ' — ' + flexScore(g, lb[g][me.id].score), onclick: () => { closePops(); sendText(flexText(g)); }}))
+    : [el('div', {class: 'cnote', text: 'Noch keine Scores. Spiel erst was, dann kannst du flexen.'})]));
+}
+function flexCard(text) {
+  if (!text.startsWith(FLEX)) return null;
+  const [, game, score, rank] = text.split(' · ');
+  if (!score) return null;
+  return el('div', {class: 'cflex'}, el('div', {class: 'cflexk', text: '💪 FLEX'}), el('div', {class: 'cflexg', text: game}),
+    el('div', {class: 'cflexs', text: score}), rank ? el('div', {class: 'cflexr', text: rank}) : null);
+}
+$('cflexBtn').addEventListener('click', () => { renderFlexPop(); togglePop('cflexBtn'); });
 $('cmpTtt').addEventListener('click', () => { closePops(); inviteMp('ttt'); });
 $('cmpC4').addEventListener('click', () => { closePops(); inviteMp('c4'); });
 $('cmpDraw').addEventListener('click', () => { closePops(); inviteMp('draw'); });
@@ -4896,7 +5100,7 @@ if (window.crypto && crypto.subtle) {
 }
 
 /* ---------- Viewer ---------- */
-const games = {snake: makeSnake(), tetris: makeTetris(), '2048': make2048(), wordle: makeWordle(), flappy: makeFlappy()};
+const games = {snake: makeSnake(), tetris: makeTetris(), '2048': make2048(), wordle: makeWordle(), flappy: makeFlappy(), pongbot: makePongBot()};
 const docs = new Map();
 let scale = 1, showing = false, selectedRow = rows.find(r => r.dataset.game === 'snake'), current = null;
 
@@ -5065,6 +5269,12 @@ canvas.addEventListener('pointerdown', e => {
   canvas.focus();
   if (current.press) { current.press(); render(); }
 });
+canvas.addEventListener('pointermove', e => {
+  if (!showing || !current.hover) return;
+  const r = canvas.getBoundingClientRect();
+  current.hover((e.clientY - r.top - canvas.clientTop) / scale);
+});
+document.addEventListener('keyup', e => { if (showing && current.keyup) current.keyup(e.key.toLowerCase()); });
 canvas.addEventListener('pointerup', e => {
   if (!current.pointer) return;
   const r = canvas.getBoundingClientRect();
