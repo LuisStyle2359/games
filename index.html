@@ -359,6 +359,9 @@ tbody tr.sel td { background: var(--select); }
 @media (max-width: 560px) { .clist { width: 120px; } .cperson { padding: 6px; } .cpsub, .cstat, .cme span { display: none; } }
 #video.gray img, #video.gray iframe { filter: grayscale(1) contrast(0.92) brightness(1.04); }
 
+.updbtn { border: 1px solid #c8922a; border-radius: 3px; background: #fff3cd; color: #6b4a00; font: inherit; font-size: 11px; padding: 1px 10px; cursor: pointer; animation: updpulse 1.6s ease-in-out infinite; }
+.updbtn:hover { background: #ffe08a; }
+@keyframes updpulse { 50% { background: #ffe08a; } }
 .statusbar { display: flex; align-items: center; justify-content: space-between; height: 24px; color: var(--muted); }
 .views { display: flex; gap: 6px; }
 .views span { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid transparent; }
@@ -584,6 +587,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
 
 <div class="statusbar band">
   <span>11 documents</span>
+  <button class="updbtn" id="updbtn" type="button" hidden>&#10227; Update verfügbar – jetzt neu laden</button>
   <span class="views">
     <span class="on" id="layoutSplit" role="button" tabindex="0" title="Documents and preview" aria-label="Documents and preview"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M.5 6.5h11"/></svg></span>
     <span id="layoutBig" role="button" tabindex="0" title="Preview only" aria-label="Preview only"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M6.5 .5v12"/></svg></span>
@@ -1904,7 +1908,28 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 21;
+const APP_VERSION = 22;
+// Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
+// and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
+// fetches the page past the browser cache, so the reload afterwards gets the new version too.
+let updCheckedAt = 0;
+function offerUpdate(v) { if (v > APP_VERSION && v < 1000) $('updbtn').hidden = false; }
+async function checkUpdate() {
+  updCheckedAt = Date.now();
+  try {
+    const html = await (await fetch(location.href.split('#')[0], {cache: 'reload'})).text();
+    const m = html.match(/const APP_VERSION = (\d+);/);
+    if (m) offerUpdate(Number(m[1]));
+  } catch (e) {}
+}
+$('updbtn').addEventListener('click', async () => {
+  $('updbtn').textContent = 'Lädt…';
+  await checkUpdate();
+  location.reload();
+});
+setTimeout(checkUpdate, 5000);
+setInterval(checkUpdate, 120000);
+window.addEventListener('focus', () => { if (Date.now() - updCheckedAt > 30000) checkUpdate(); });
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
@@ -2081,7 +2106,10 @@ async function incoming(t, payload) {
     if (!body || room !== r || body.kind !== 'p' || body.from !== sub.slice(2) || !cleanName(body.name) || !(Date.now() - body.t < STALE)) return;
     const v = Number.isInteger(body.v) ? body.v : 0;
     people.set(body.from, {name: cleanName(body.name), seen: Date.now(), v});
-    if (v > APP_VERSION && v < 1000) addMsg(ALL, {id: 'upd-' + v, from: 'system', name: '', text: 'Es gibt eine neuere Version dieser Seite – bitte mit Strg+F5 neu laden, damit alle Spiele funktionieren.', ts: Date.now()});
+    if (v > APP_VERSION && v < 1000) {
+      offerUpdate(v);
+      addMsg(ALL, {id: 'upd-' + v, from: 'system', name: '', text: 'Es gibt eine neuere Version dieser Seite – unten auf „Jetzt neu laden“ klicken, damit alle Spiele funktionieren.', ts: Date.now()});
+    }
     renderPeople();
     if (body.from === conv) renderMsgs();
   } else if (sub === ALL) {
