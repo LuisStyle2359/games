@@ -1924,7 +1924,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3448,7 +3448,7 @@ function pgBallAt(g, T) {
       if (last.mg && last.mg[me]) return [face - s * PG_BR, y, 0, 0];
       const py = pgPadAt(pg, t);
       if (Math.abs(y - py) <= half + PG_BR) {
-        const a = Math.max(-1, Math.min(1, (y - py) / half)) * Math.PI / 3, sp = Math.hypot(vx, vy), v = Math.min(1600, sp * (sp < 1150 ? 1.05 : 1.02));
+        const a = Math.max(-1, Math.min(1, (y - py) / half)) * Math.PI / 3, sp = Math.hypot(vx, vy), v = Math.min(1900, sp * (sp < 1150 ? 1.05 : 1.02));
         x = face - s * PG_BR;
         vx = -s * v * Math.cos(a);
         vy = v * Math.sin(a);
