@@ -170,7 +170,10 @@ export class Hub {
 // Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
 // their paddle is; the page draws its own paddle right away and the rest from these updates.
 const W = 640, H = 360, PH = 70, BIG = 105, MINI = 44, PW = 10, PX = 24, BR = 7, WIN = 7, CAP = 10, V0 = 330, VFAST = 1150, VMAX = 1900,
-  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000;
+  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000,
+  GOD_CHANCE = 0.025, GOD_MS = 8000, GOD_PH = 140;
+// The owner's admin key (public half): a signed request from the owner's page can spawn the divine item.
+const ADMIN_PUB = {kty: 'EC', crv: 'P-256', x: '30m7AWoz9Hby1aY-forxylWjKyUcxg5hykvUolJKZVg', y: '-BaBgI413Atu8-Ep57UHLwkFhcZbidMNGSwQ0hR1LpA'};
 
 export class Arena {
   constructor(ctx) {
@@ -198,6 +201,8 @@ export class Arena {
     this.since = ITEMS.map(() => 0);
     this.ph = [PH, PH];
     this.bigUntil = [0, 0];
+    this.god = [0, 0];
+    this.adminT = 0;
     this.miniUntil = [0, 0];
     this.slow = [0, 0];
     this.shield = [false, false];
@@ -248,6 +253,8 @@ export class Arena {
       if (this.votes[0] !== null && this.votes[1] !== null) this.decide();
     } else if (msg.t === 'fire' && this.stuck === i) {
       this.release(now);
+    } else if (msg.t === 'god' && Number.isFinite(msg.ts) && typeof msg.sig === 'string') {
+      this.adminGod(msg.ts, msg.sig);
     } else if (msg.t === 'quit' && this.st !== 'over') {
       this.finish(2 - i);
     }
@@ -312,10 +319,12 @@ export class Arena {
     for (let i = 0; i < 2; i++) {
       if (this.bigUntil[i] && now > this.bigUntil[i]) { this.bigUntil[i] = 0; this.ph[i] = PH; }
       if (this.miniUntil[i] && now > this.miniUntil[i]) { this.miniUntil[i] = 0; this.ph[i] = PH; }
+      if (this.god[i] && now > this.god[i]) { this.god[i] = 0; this.ph[i] = this.bigUntil[i] ? BIG : PH; this.event('godend', i); }
     }
-    if (!this.pu) return;
+    if (!this.pu && !(this.item && this.item.k === 'god')) return;
     if (!this.item && now > this.nextItem) {
-      this.item = {k: this.pickItem(), x: W / 2 + (Math.random() * 2 - 1) * 110, y: 50 + Math.random() * (H - 100), t: now};
+      // A 2.5 % roll for the divine item first; otherwise the usual fair pick.
+      this.item = {k: Math.random() < GOD_CHANCE ? 'god' : this.pickItem(), x: W / 2 + (Math.random() * 2 - 1) * 110, y: 50 + Math.random() * (H - 100), t: now};
     }
     // An item nobody hits goes away after a while and makes room for a new one.
     if (this.item && now - this.item.t > ITEM_LIFE) {
@@ -331,6 +340,8 @@ export class Arena {
       if (it.k === 'slow') this.slow[i] = now + SLOW_MS;
       // Mini paddle: the opponent's paddle shrinks for a while.
       if (it.k === 'mini') { const j = 1 - i; this.ph[j] = MINI; this.miniUntil[j] = now + 8000; this.bigUntil[j] = 0; }
+      // Divine paddle: for 8 s a double-size paddle, every return a fireball, and a goal nothing gets through.
+      if (it.k === 'god') { this.god[i] = now + GOD_MS; this.ph[i] = GOD_PH; this.miniUntil[i] = 0; }
       if (it.k === 'shield') this.shield[i] = true;
       if (it.k === 'magnet') this.magnet[i] = true;
       this.event('get', i, it.k);
@@ -360,6 +371,19 @@ export class Arena {
     Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
     this.last = i;
     this.turbo = false;
+    if (this.god[i] > Date.now()) { this.b.vx = -s * TURBO * Math.cos(a); this.b.vy = TURBO * Math.sin(a); this.turbo = true; }
+  }
+
+  // The owner's page asks for the divine item, signed with the admin key; it appears at once.
+  async adminGod(ts, sig) {
+    if (Math.abs(Date.now() - ts) > 60000 || ts <= this.adminT || this.st !== 'play') return;
+    try {
+      const key = await crypto.subtle.importKey('jwk', ADMIN_PUB, {name: 'ECDSA', namedCurve: 'P-256'}, false, ['verify']);
+      const raw = Uint8Array.from(atob(sig.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+      if (!await crypto.subtle.verify({name: 'ECDSA', hash: 'SHA-256'}, key, raw, new TextEncoder().encode('god|' + this.key + '|' + ts))) return;
+    } catch (e) { return; }
+    this.adminT = ts;
+    this.item = {k: 'god', x: W / 2 + (Math.random() * 2 - 1) * 80, y: 70 + Math.random() * (H - 140), t: Date.now()};
   }
 
   stick(i, now) {
@@ -442,12 +466,23 @@ export class Arena {
         if (this.magnet[i]) { this.stick(i, now); return; }
         // Where the ball meets the paddle sets the angle; every return is a bit faster.
         if (Math.abs(b.y - this.pad[i].y) <= this.ph[i] / 2 + BR) this.bounce(i, this.pad[i].y, face - s * BR, b.y, Math.hypot(b.vx, b.vy));
-        else if (!this.pend[i]) this.pend[i] = {t: now, x: face - s * BR, y: b.y, v: Math.hypot(b.vx, b.vy)};
+        else if (!this.pend[i] && !(this.god[i] > now)) this.pend[i] = {t: now, x: face - s * BR, y: b.y, v: Math.hypot(b.vx, b.vy)};
       }
       for (let i = 0; i < 2; i++) {
         const out = i === 0 ? b.x < -BR : b.x > W + BR;
         if (!out) continue;
         if (this.pend[i] && !this.pend[i].done) { b.x = i === 0 ? -BR : W + BR; continue; }
+        if (this.god[i] > now) {
+          // The golden wall sends everything back, as a fireball.
+          b.x = i === 0 ? BR : W - BR;
+          const sp = Math.hypot(b.vx, b.vy) || 1;
+          b.vx = (i === 0 ? 1 : -1) * Math.abs(b.vx) / sp * TURBO;
+          b.vy = b.vy / sp * TURBO;
+          this.turbo = true;
+          this.last = i;
+          this.event('godwall', i);
+          continue;
+        }
         if (this.shield[i]) {
           this.shield[i] = false;
           this.pend[i] = null;
@@ -484,7 +519,7 @@ export class Arena {
       sl: [Math.max(0, this.slow[0] - now), Math.max(0, this.slow[1] - now)],
       m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]], ph: this.ph,
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
-      sh: this.shield, mg: this.magnet, stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
+      sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)], stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
       aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }
