@@ -375,6 +375,11 @@ tbody tr.sel td { background: var(--select); }
 .trollbar { height: 10px; border: 1px solid #c8922a; border-radius: 3px; background: #fff; overflow: hidden; margin: 6px 0 4px; }
 .trollbar div { height: 100%; width: 0; background: #e8a33a; }
 .trollimg { display: block; width: 100%; border-radius: 4px; margin: 8px 0 12px; }
+@keyframes trolltoast { from { transform: translate(-50%, 30px) scale(.8); opacity: 0; } 15% { transform: translate(-50%, 0) scale(1.08); opacity: 1; } 25%, 85% { transform: translate(-50%, 0) scale(1); opacity: 1; } to { transform: translate(-50%, 0) scale(1); opacity: 0; } }
+.trolltoast { position: fixed; left: 50%; bottom: 48px; z-index: 2100; background: #2b1d3a; color: #fff; font-size: 18px; font-weight: 700; padding: 10px 22px; border-radius: 24px; box-shadow: 0 8px 28px rgba(0, 0, 0, .35); pointer-events: none; animation: trolltoast 3.4s ease-out forwards; }
+.trollpoll .upddlg-row { justify-content: center; position: relative; }
+.trollpoll .upddlg-row .vbtn { min-width: 80px; }
+.trollno { transition: left .12s ease-out, top .12s ease-out; }
 .adminpanel { position: fixed; top: 60px; right: 16px; z-index: 1500; width: 240px; background: var(--paper); border: 1px solid #c8922a; border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .25); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .adminpanel select, .adminpanel .vbtn { width: 100%; height: 28px; }
 .adminpanel .admstat { font-size: 11px; color: var(--muted); min-height: 14px; }
@@ -1360,7 +1365,7 @@ function makeFlappy() {
 function makePongBot() {
   const FW = 720, FH = 370, PADH = 70, PADW = 8, R = 5, V0 = 380, UP = 1.07, LIVES = 3;
   const YOU = GX + 24, BOT = GX + FW - 24, FACE_YOU = YOU + PADW / 2, FACE_BOT = BOT - PADW / 2;
-  let ball, you, bot, speed, top, lives, state, paused, waitUntil, flash, last = 0, held = 0, assisted, botAim, botReact, streak;
+  let ball, you, bot, speed, top, lives, state, paused, waitUntil, flash, last = 0, held = 0, assisted, botAim, botReact, streak, babyOn = false;
   let best = store.get('pongbotBest', 0);
   const fmt = v => Math.round(v).toLocaleString('de-DE');
 
@@ -1380,6 +1385,7 @@ function makePongBot() {
     paused = false;
     flash = null;
     assisted = false;
+    babyOn = false;
     serve(-1, V0);
   }
   function start() {
@@ -1454,6 +1460,7 @@ function makePongBot() {
       }
       if (ball.x < GX - R) {
         lives--;
+        babyOn = false;
         flash = {text: lives ? 'Missed' : 'Game over', at: now};
         if (!lives) {
           state = 'over';
@@ -1467,6 +1474,7 @@ function makePongBot() {
       if (ball.x > GX + FW + R) {
         // The bot serves the next ball itself, from its paddle, so it never starts a point already beaten.
         flash = {text: 'Bot missed', at: now};
+        babyOn = false;
         serve(-1, speed, FACE_BOT - R, bot);
         waitUntil = now + 700;
         return;
@@ -1522,8 +1530,10 @@ function makePongBot() {
       ctx.fillRect(YOU - PADW / 2, you - PADH / 2, PADW, PADH);
       ctx.fillStyle = C.snake;
       ctx.fillRect(BOT - PADW / 2, bot - PADH / 2, PADW, PADH);
+      if (state === 'play' && !paused && !babyOn && babyTake()) babyOn = true;
       ctx.fillStyle = C.ink;
-      ctx.fillRect(ball.x - R, ball.y - R, R * 2, R * 2);
+      if (babyOn) babyBall(ctx, ball.x, ball.y, R * 4.5);
+      else ctx.fillRect(ball.x - R, ball.y - R, R * 2, R * 2);
       if (flash && performance.now() - flash.at < 900 && state === 'play') text(flash.text, GX + FW / 2, GY + FH / 2 + 50, {size: 13, weight: 600, color: C.muted, align: 'center'});
       ctx.restore();
       if (state === 'ready') overlay('Pong vs Bot', 'Mouse or W/S · click or Space to serve', GX, GY, FW, FH);
@@ -1540,7 +1550,7 @@ function makePongBot() {
     keyup(k) { if (['w', 'arrowup', 's', 'arrowdown'].includes(k)) held = 0; },
     hover(y) { if (state === 'play' && !trickHeld()) you = y; },
     press: start,
-    peek: () => ({ball, you, bot, speed, top, lives, state, assisted})  // for the tests
+    peek: () => ({ball, you, bot, speed, top, lives, state, assisted, babyOn})  // for the tests
   };
 }
 
@@ -1933,7 +1943,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 31;
+const APP_VERSION = 32;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2579,6 +2589,8 @@ function handleMp(from, dm) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'react' && !g.over) handleReact(g, dm);
   } else if (EM_TYPES.has(dm.type)) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'emoji' && !g.over) handleEmoji(g, dm);
+  } else if (dm.type === 'pgbaby') {
+    if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) g.pg.babyReq = true;
   } else if (dm.type === 'pgstat') {
     if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) { g.pg.opConn = String(dm.c || ''); g.pg.opAt = Date.now(); }
   } else if (UNO_TYPES.has(dm.type)) {
@@ -3573,7 +3585,79 @@ function hischamMode() {
   };
   requestAnimationFrame(tick);
 }
-const TROLLS = {hischam: hischamMode, poop: () => emojiRain('💩'), pig: () => emojiRain('🐷')};
+// Shown after a troll so the victim knows who it was.
+function trollToast() {
+  const t = el('div', {class: 'trolltoast', text: 'Getrollt von Luis 😈'});
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+// uwu: the next message typed into the chat gets "uwu 👉👈🥺" added to its end.
+function uwuTroll(text) {
+  if (!store.get('trollUwu', false)) return text;
+  store.set('trollUwu', false);
+  setTimeout(trollToast, 600);
+  return text.slice(0, MAXLEN - 10) + ' uwu 👉👈🥺';
+}
+// Baby-Ball: the next Ping Pong point is played with the baby's face as the ball (also for the opponent),
+// or the next point against the bot. Waits up to 10 minutes for a game to be running.
+let trollBabyUntil = 0, babySprite = null;
+function babyTake() {
+  if (trollBabyUntil < Date.now()) return false;
+  trollBabyUntil = 0;
+  return true;
+}
+function babyBall(ctx, x, y, r) {
+  if (!babySprite) {
+    babySprite = document.createElement('canvas');
+    babySprite.width = babySprite.height = 96;
+    const img = new Image();
+    img.onload = () => {
+      const c = babySprite.getContext('2d');
+      c.fillStyle = '#ffffff';
+      c.beginPath(); c.arc(48, 48, 47, 0, 7); c.fill();
+      c.beginPath(); c.arc(48, 48, 43, 0, 7); c.clip();
+      c.drawImage(img, 30, 4, 300, 300, 5, 5, 86, 86);
+      babySprite.ready = true;
+    };
+    img.src = HISCHAM_IMG;
+  }
+  if (!babySprite.ready) { ctx.fillRect(x - 6, y - 6, 12, 12); return; }
+  // The Ping Pong canvas maps game coordinates by hand (pgPixels), so do the same here.
+  const m = ctx.pgK || 1, ox = ctx.pgK ? ctx.pgOx : 0, oy = ctx.pgK ? ctx.pgOy : 0;
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.translate((x + ox) * m, (y + oy) * m);
+  ctx.rotate(Math.sin(x / 40) * 0.35);
+  ctx.drawImage(babySprite, -r * m, -r * m, r * 2 * m, r * 2 * m);
+  ctx.restore();
+}
+// "Ist Luis cool?": the Nein button runs away from the mouse; pressing it anyway counts as Ja.
+function coolPoll() {
+  const done = () => { dlg.remove(); trollToast(); };
+  const yes = el('button', {class: 'vbtn upddlg-go', type: 'button', text: 'Ja', onclick: done});
+  const no = el('button', {class: 'vbtn trollno', type: 'button', text: 'Nein', onclick: () => { no.textContent = 'Ja'; setTimeout(done, 400); }});
+  const row = el('div', {class: 'upddlg-row'}, yes, no);
+  const flee = e => {
+    if (no.textContent !== 'Nein') return;
+    if (e && e.cancelable) e.preventDefault();
+    const w = window.innerWidth - no.offsetWidth - 16, h = window.innerHeight - no.offsetHeight - 16, r = no.getBoundingClientRect();
+    let x, y, n = 0;
+    do { x = 16 + Math.random() * (w - 16); y = 16 + Math.random() * (h - 16); } while (Math.hypot(x - r.left, y - r.top) < 160 && ++n < 50);
+    no.style.position = 'fixed';
+    no.style.zIndex = 1001;
+    no.style.left = x + 'px';
+    no.style.top = y + 'px';
+  };
+  no.addEventListener('pointerenter', flee);
+  no.addEventListener('pointerdown', flee);
+  no.addEventListener('focus', () => yes.focus());
+  const box = el('div', {class: 'upddlg-box trollpoll'}, el('div', {class: 'upddlg-head', text: '📊 Kurze Umfrage'}), el('p', {text: 'Ist Luis cool?'}), row);
+  const dlg = el('div', {class: 'upddlg', role: 'alertdialog'}, box);
+  document.body.appendChild(dlg);
+  yes.focus();
+}
+const TROLLS = {hischam: hischamMode, poop: () => emojiRain('💩'), pig: () => emojiRain('🐷'),
+  uwu: () => store.set('trollUwu', true), baby: () => { trollBabyUntil = Date.now() + 600000; }, poll: coolPoll};
 function runTroll(what) { if (TROLLS[what]) TROLLS[what](); }
 // Asks the game server for the divine item right now, signed with the admin key (the server checks it).
 async function adminGod() {
@@ -3596,6 +3680,7 @@ function toggleAdmin() {
   }});
   p = el('div', {class: 'adminpanel', id: 'adminpanel'}, el('div', {class: 'upddlg-head', text: 'Admin'}), who,
     go('hischam', 'HISCHAM-MODUS'), go('poop', '💩-Regen'), go('pig', '🐷-Regen'),
+    go('uwu', 'uwu an nächste Nachricht'), go('baby', '👶 Baby-Ball (1 Punkt)'), go('poll', '📊 Umfrage: Ist Luis cool?'),
     el('button', {class: 'vbtn', type: 'button', text: '⚡ Göttliches Item spawnen', onclick: () => {
       adminGod().then(ok => { stat.textContent = ok ? '⚡ Göttliches Item gespawnt' : 'Nur während eines laufenden Pong-Matches'; }).catch(() => { stat.textContent = 'Fehlgeschlagen'; });
     }}), stat);
@@ -4020,6 +4105,10 @@ function pgFrame(g, ts) {
 
     // Points: the digit jumps; a fireball goal holds the picture, tears it and blows up in front of the goal.
     const total = s.sc[0] + s.sc[1];
+    // Baby-Ball troll: the face is the ball until the next point, for both players.
+    if (s.st === 'play' && babyTake()) { pg.babyReq = true; sendMpMsg(g.opponent, {type: 'pgbaby', gid: g.gid}).catch(() => {}); }
+    if (pg.babyReq && s.st === 'play') { pg.babyReq = false; pg.baby = total; }
+    if (pg.baby !== undefined && (total !== pg.baby || s.st === 'over')) pg.baby = undefined;
     if (pg.prevTotal !== undefined && total > pg.prevTotal && s.st !== 'over') {
       const mineScored = s.sc[me1] > pg.prevMine, x = mineScored ? PG_W - 36 : 36, y = pg.lastBall ? pg.lastBall[1] : PG_H / 2;
       fx.scoreJump[mineScored ? 0 : 1] = 1;
@@ -4488,7 +4577,7 @@ function pgFrame(g, ts) {
       } else pg.ghosts = null;
       // A new serve after a goal blinks in so it never reads as a second ball next to the explosion.
       const since = now - (fx.serveAt || 0);
-      if (since > 700 || (since > 300 && Math.floor(since / 80) % 2)) {
+      if (pg.baby === undefined && (since > 700 || (since > 300 && Math.floor(since / 80) % 2))) {
         const cool = now - (pg.coolAt || 0), heat = s.stuck >= 0 ? (full ? '#e8401c' : charge > 0.55 ? '#ff9f1c' : charge > 0.25 ? '#ffd23f' : null) : cool < 200 ? '#ff6b1a' : cool < 450 ? '#ffd23f' : null;
         if (heat) { ctx.fillStyle = heat; ctx.fillRect(bx - 10, by - 10, 20, 20); }
         ctx.fillStyle = s.stuck < 0 && cool < 200 ? '#fff3b0' : '#ffffff';
@@ -4500,6 +4589,7 @@ function pgFrame(g, ts) {
         }
       }
     }
+    if (pg.baby !== undefined && s.st === 'play') babyBall(ctx, bx, by, 26);
   }
 
   // Explosions: a disc of hot pixels that hollows out into a ring.
@@ -5127,7 +5217,7 @@ $('cform').addEventListener('submit', e => {
   if (!text || cin.disabled) return;
   cin.value = '';
   closePops();
-  sendText(text);
+  sendText(uwuTroll(text));
 });
 
 async function sendText(raw) {
