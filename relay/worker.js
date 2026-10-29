@@ -381,14 +381,15 @@ export class Arena {
     else if (this.curve[i] > Date.now()) this.spin = this.curveSpin(i, Math.abs(this.b.vx));
   }
 
-  // The bend follows the paddle: moving up at the hit curves the ball up, moving down curves it down, a still
-  // paddle picks a side at random. It is scaled to the ball's speed so a curve shifts the ball by about the
-  // same distance across the table (70–120 px), however fast it is.
+  // The bend follows the paddle: moving up at the hit curves the ball up, moving down curves it down; from a
+  // still paddle it bends against the ball's flight, so it flies a clear arc. It is scaled to the ball's speed
+  // so a curve shifts the ball by about the same distance across the table (170–260 px), however fast it is.
   curveSpin(i, vx) {
     const h = this.hist[i], last = h[h.length - 1];
     let vel = 0;
     if (last) { const old = h.find(([t]) => t >= last[0] - 80) || last; vel = (last[1] - old[1]) / Math.max(0.03, (last[0] - old[0]) / 1000); }
-    const dir = Math.abs(vel) > 120 ? Math.sign(vel) : Math.random() < 0.5 ? -1 : 1, shift = 70 + 50 * Math.min(1, Math.abs(vel) / 800);
+    const dir = Math.abs(vel) > 120 ? Math.sign(vel) : Math.abs(this.b.vy) > 40 ? -Math.sign(this.b.vy) : Math.random() < 0.5 ? -1 : 1;
+    const shift = 170 + 90 * Math.min(1, Math.abs(vel) / 800);
     return dir * 2 * shift * vx * vx / (FACE_GAP * FACE_GAP);
   }
 
