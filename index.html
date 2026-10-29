@@ -1395,7 +1395,8 @@ function makePongBot() {
     // the ball is, so very fast balls get past it too.
     if (ball.vx > 0) {
       if (!botAim) { botReact = now + 110; botAim = landing(FACE_BOT - R) + (Math.random() * 2 - 1) * half * 1.1 * Math.min(1, speed / 4000) ** 1.5; }
-      if (now > botReact) bot += Math.max(-1, Math.min(1, (botAim - bot) / 6)) * (560 + speed * 0.45) * dt;
+      // It moves straight to its target at its top speed and stops there, never past it.
+      if (now > botReact) { const step = (560 + speed * 0.45) * dt; bot += Math.max(-step, Math.min(step, botAim - bot)); }
     } else {
       botAim = null;
       bot += Math.max(-220 * dt, Math.min(220 * dt, GY + FH / 2 - bot));
@@ -1510,7 +1511,7 @@ function makePongBot() {
     keyup(k) { if (['w', 'arrowup', 's', 'arrowdown'].includes(k)) held = 0; },
     hover(y) { if (state === 'play' && !trickHeld()) you = y; },
     press: start,
-    peek: () => ({ball, you, speed, top, lives, state, assisted})  // for the tests
+    peek: () => ({ball, you, bot, speed, top, lives, state, assisted})  // for the tests
   };
 }
 
@@ -1903,7 +1904,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 20;
+const APP_VERSION = 21;
 function announce() {
   if (mq && room) signed({kind: 'p', t: Date.now(), v: APP_VERSION}).then(b => publish('p/' + me.id, b, true)).catch(() => {});
 }
