@@ -361,6 +361,15 @@ tbody tr.sel td { background: var(--select); }
 
 .updbtn { border: 1px solid #c8922a; border-radius: 3px; background: #fff3cd; color: #6b4a00; font: inherit; font-size: 11px; padding: 1px 10px; cursor: pointer; animation: updpulse 1.6s ease-in-out infinite; }
 .updbtn:hover { background: #ffe08a; }
+.upddlg { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgba(20, 30, 45, .35); }
+.upddlg[hidden] { display: none; }
+.upddlg-box { width: min(380px, calc(100vw - 32px)); background: var(--paper); border: 1px solid #c8922a; border-radius: 6px; box-shadow: 0 12px 40px rgba(0, 0, 0, .3); padding: 16px 18px 14px; animation: updin .25s ease-out; }
+.upddlg-head { font-size: 16px; font-weight: 700; color: #6b4a00; }
+.upddlg-box p { margin: 8px 0 14px; line-height: 1.4; }
+.upddlg-row { display: flex; gap: 8px; justify-content: flex-end; }
+.upddlg-row .vbtn { height: 30px; padding: 0 14px; }
+.upddlg-go { background: #fff3cd; border-color: #c8922a; font-weight: 600; animation: updpulse 1.6s ease-in-out infinite; }
+@keyframes updin { from { transform: translateY(12px) scale(.96); opacity: 0; } }
 @keyframes updpulse { 50% { background: #ffe08a; } }
 .statusbar { display: flex; align-items: center; justify-content: space-between; height: 24px; color: var(--muted); }
 .views { display: flex; gap: 6px; }
@@ -592,6 +601,13 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
     <span class="on" id="layoutSplit" role="button" tabindex="0" title="Documents and preview" aria-label="Documents and preview"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M.5 6.5h11"/></svg></span>
     <span id="layoutBig" role="button" tabindex="0" title="Preview only" aria-label="Preview only"><svg viewBox="0 0 12 13"><rect x=".5" y=".5" width="11" height="12"/><path d="M6.5 .5v12"/></svg></span>
   </span>
+</div>
+<div class="upddlg" id="upddlg" hidden role="alertdialog" aria-labelledby="updtitle">
+  <div class="upddlg-box">
+    <div class="upddlg-head" id="updtitle">&#10227; Neue Version verfügbar</div>
+    <p>Es gibt ein Update. Lade die Seite neu, damit alles funktioniert und du die neuesten Funktionen hast.</p>
+    <div class="upddlg-row"><button class="vbtn upddlg-go" id="updgo" type="button">Jetzt neu laden</button><button class="vbtn" id="updlater" type="button">Später</button></div>
+  </div>
 </div>
 
 <script>
@@ -1908,12 +1924,19 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
 let updCheckedAt = 0;
-function offerUpdate(v) { if (v > APP_VERSION && v < 1000) $('updbtn').hidden = false; }
+// A window pops up in the middle of the screen; "Später" closes it for ten minutes, the small button in the
+// status bar stays.
+let updLaterUntil = 0;
+function offerUpdate(v) {
+  if (!(v > APP_VERSION && v < 1000)) return;
+  $('updbtn').hidden = false;
+  if (Date.now() > updLaterUntil) $('upddlg').hidden = false;
+}
 async function checkUpdate() {
   updCheckedAt = Date.now();
   try {
@@ -1922,11 +1945,14 @@ async function checkUpdate() {
     if (m) offerUpdate(Number(m[1]));
   } catch (e) {}
 }
-$('updbtn').addEventListener('click', async () => {
-  $('updbtn').textContent = 'Lädt…';
+async function doUpdate() {
+  $('updbtn').textContent = $('updgo').textContent = 'Lädt…';
   await checkUpdate();
   location.reload();
-});
+}
+$('updbtn').addEventListener('click', doUpdate);
+$('updgo').addEventListener('click', doUpdate);
+$('updlater').addEventListener('click', () => { $('upddlg').hidden = true; updLaterUntil = Date.now() + 600000; });
 setTimeout(checkUpdate, 5000);
 setInterval(checkUpdate, 120000);
 window.addEventListener('focus', () => { if (Date.now() - updCheckedAt > 30000) checkUpdate(); });
