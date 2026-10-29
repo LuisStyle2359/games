@@ -170,8 +170,8 @@ export class Hub {
 // Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
 // their paddle is; the page draws its own paddle right away and the rest from these updates.
 const W = 640, H = 360, PH = 70, BIG = 105, MINI = 44, PW = 10, PX = 24, BR = 7, WIN = 7, CAP = 10, V0 = 330, VFAST = 1150, VMAX = 1900,
-  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000,
-  GOD_CHANCE = 0.025, GOD_MS = 8000, GOD_PH = 140;
+  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini', 'curve'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000,
+  GOD_CHANCE = 0.025, GOD_MS = 8000, GOD_PH = 140, CURVE_MS = 12000, FACE_GAP = W - 2 * (PX + PW / 2 + BR);
 // The owner's admin key (public half): a signed request from the owner's page can spawn the divine item.
 const ADMIN_PUB = {kty: 'EC', crv: 'P-256', x: '30m7AWoz9Hby1aY-forxylWjKyUcxg5hykvUolJKZVg', y: '-BaBgI413Atu8-Ep57UHLwkFhcZbidMNGSwQ0hR1LpA'};
 
@@ -202,6 +202,8 @@ export class Arena {
     this.ph = [PH, PH];
     this.bigUntil = [0, 0];
     this.god = [0, 0];
+    this.curve = [0, 0];
+    this.spin = 0;
     this.adminT = 0;
     this.miniUntil = [0, 0];
     this.slow = [0, 0];
@@ -276,6 +278,7 @@ export class Arena {
     this.pend = [null, null];
     this.stuck = -1;
     this.turbo = false;
+    this.spin = 0;
     this.last = -1;
   }
 
@@ -341,6 +344,8 @@ export class Arena {
       // Mini paddle: the opponent's paddle shrinks for a while.
       if (it.k === 'mini') { const j = 1 - i; this.ph[j] = MINI; this.miniUntil[j] = now + 8000; this.bigUntil[j] = 0; }
       // Divine paddle: for 8 s a double-size paddle, every return a fireball, and a goal nothing gets through.
+      // Curveball: for 12 s every return of the taker bends on its way across.
+      if (it.k === 'curve') this.curve[i] = now + CURVE_MS;
       if (it.k === 'god') { this.god[i] = now + GOD_MS; this.ph[i] = GOD_PH; this.miniUntil[i] = 0; }
       if (it.k === 'shield') this.shield[i] = true;
       if (it.k === 'magnet') this.magnet[i] = true;
@@ -371,7 +376,20 @@ export class Arena {
     Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
     this.last = i;
     this.turbo = false;
+    this.spin = 0;
     if (this.god[i] > Date.now()) { this.b.vx = -s * TURBO * Math.cos(a); this.b.vy = TURBO * Math.sin(a); this.turbo = true; }
+    else if (this.curve[i] > Date.now()) this.spin = this.curveSpin(i, Math.abs(this.b.vx));
+  }
+
+  // The bend follows the paddle: moving up at the hit curves the ball up, moving down curves it down, a still
+  // paddle picks a side at random. It is scaled to the ball's speed so a curve shifts the ball by about the
+  // same distance across the table (70–120 px), however fast it is.
+  curveSpin(i, vx) {
+    const h = this.hist[i], last = h[h.length - 1];
+    let vel = 0;
+    if (last) { const old = h.find(([t]) => t >= last[0] - 80) || last; vel = (last[1] - old[1]) / Math.max(0.03, (last[0] - old[0]) / 1000); }
+    const dir = Math.abs(vel) > 120 ? Math.sign(vel) : Math.random() < 0.5 ? -1 : 1, shift = 70 + 50 * Math.min(1, Math.abs(vel) / 800);
+    return dir * 2 * shift * vx * vx / (FACE_GAP * FACE_GAP);
   }
 
   // The owner's page asks for the divine item, signed with the admin key; it appears at once.
@@ -388,6 +406,7 @@ export class Arena {
 
   stick(i, now) {
     this.stuck = i;
+    this.spin = 0;
     this.stuckUntil = now + 3000;
     this.magnet[i] = false;
     this.pad[i].ty = this.pad[i].y;
@@ -406,6 +425,7 @@ export class Arena {
     b.vy = TURBO * Math.sin(a);
     this.stuck = -1;
     this.turbo = true;
+    this.spin = 0;
     this.last = i;
     this.event('fire', i);
   }
@@ -457,8 +477,16 @@ export class Arena {
       const px = b.x, f = this.slowAt(b.vx, now);
       b.x += b.vx * h * f;
       b.y += b.vy * h * f;
-      if (b.y < BR) { b.y = BR; b.vy = Math.abs(b.vy); }
-      if (b.y > H - BR) { b.y = H - BR; b.vy = -Math.abs(b.vy); }
+      if (this.spin) {
+        // The curve turns the ball's direction without changing its speed.
+        const sp = Math.hypot(b.vx, b.vy);
+        b.vy += this.spin * h * f;
+        const k = sp / Math.hypot(b.vx, b.vy);
+        b.vx *= k; b.vy *= k;
+      }
+      // A curving ball that hits a wall comes off it with the curve turned around.
+      if (b.y < BR) { b.y = BR; b.vy = Math.abs(b.vy); if (this.spin < 0) this.spin = -this.spin; }
+      if (b.y > H - BR) { b.y = H - BR; b.vy = -Math.abs(b.vy); if (this.spin > 0) this.spin = -this.spin; }
       for (let i = 0; i < 2; i++) {
         const face = i === 0 ? PX + PW / 2 : W - PX - PW / 2, s = i === 0 ? -1 : 1;
         const crossed = s < 0 ? b.vx < 0 && px - BR >= face - 1 && b.x - BR < face : b.vx > 0 && px + BR <= face + 1 && b.x + BR > face;
@@ -479,6 +507,7 @@ export class Arena {
           b.vx = (i === 0 ? 1 : -1) * Math.abs(b.vx) / sp * TURBO;
           b.vy = b.vy / sp * TURBO;
           this.turbo = true;
+          this.spin = 0;
           this.last = i;
           this.event('godwall', i);
           continue;
@@ -486,6 +515,7 @@ export class Arena {
         if (this.shield[i]) {
           this.shield[i] = false;
           this.pend[i] = null;
+          this.spin = 0;
           b.x = i === 0 ? BR : W - BR;
           b.vx = i === 0 ? Math.abs(b.vx) : -Math.abs(b.vx);
           this.turbo = false;
@@ -519,7 +549,8 @@ export class Arena {
       sl: [Math.max(0, this.slow[0] - now), Math.max(0, this.slow[1] - now)],
       m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]], ph: this.ph,
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
-      sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)], stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
+      sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)],
+      cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
       aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }

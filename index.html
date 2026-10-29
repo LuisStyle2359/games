@@ -1933,7 +1933,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3282,7 +3282,8 @@ function renderUno() {
 const PG_W = 640, PG_H = 360, PG_PH = 70, PG_PW = 10, PG_PX = 24, PG_BR = 7, PG_FACE = PG_PX + PG_PW / 2 + PG_BR, PG_DELAY = 45;
 const PG_ITEMS = {big: {icon: '🟨', name: 'Riesen-Schläger', color: '#b6ff3b', hue: 85}, shield: {icon: '🛡️', name: 'Schutzwand', color: '#b388ff', hue: 265},
   magnet: {icon: '🧲', name: 'Magnet-Schuss', color: '#ff3b5c', hue: 350}, slow: {icon: '⏳', name: 'Zeitlupe', color: '#2ef2d0', hue: 170},
-  mini: {icon: '🔻', name: 'Mini-Schläger', color: '#ffd23f', hue: 48}, god: {icon: '⚡', name: 'Göttlicher Schläger', color: '#ffe066', hue: 50}};
+  mini: {icon: '🔻', name: 'Mini-Schläger', color: '#ffd23f', hue: 48}, god: {icon: '⚡', name: 'Göttlicher Schläger', color: '#ffe066', hue: 50},
+  curve: {icon: '🌀', name: 'Kurvenball', color: '#ff6ad5', hue: 315}};
 // First to 7; from 6:6 on a two-point lead is needed, at most up to 10 (at 9:9 the next point wins).
 function pgTarget(sc) { const hi = Math.max(sc[0], sc[1]), lo = Math.min(sc[0], sc[1]); return lo >= 6 ? Math.min(10, hi === lo ? hi + 2 : hi + 1) : 7; }
 let pgGame = null;
@@ -3448,13 +3449,15 @@ function pgBallAt(g, T) {
   const f0 = slowF(vx, t);
   vx /= f0;
   vy /= f0;
+  let spin = (last.sp || 0) / (f0 * f0);
   while (t < end) {
     const h = Math.min(4, end - t), px = x, f = slowF(vx, t);
     t += h;
     x += vx * f * h / 1000;
     y += vy * f * h / 1000;
-    if (y < PG_BR) { y = 2 * PG_BR - y; vy = Math.abs(vy); }
-    if (y > PG_H - PG_BR) { y = 2 * (PG_H - PG_BR) - y; vy = -Math.abs(vy); }
+    if (spin) { const sp = Math.hypot(vx, vy); vy += spin * f * h / 1000; const k = sp / Math.hypot(vx, vy); vx *= k; vy *= k; }
+    if (y < PG_BR) { y = 2 * PG_BR - y; vy = Math.abs(vy); if (spin < 0) spin = -spin; }
+    if (y > PG_H - PG_BR) { y = 2 * (PG_H - PG_BR) - y; vy = -Math.abs(vy); if (spin > 0) spin = -spin; }
     if (s < 0 ? vx < 0 && px - PG_BR >= face - 1 && x - PG_BR < face : vx > 0 && px + PG_BR <= face + 1 && x + PG_BR > face) {
       if (last.mg && last.mg[me]) return [face - s * PG_BR, y, 0, 0];
       const py = pgPadAt(pg, t);
@@ -3463,6 +3466,12 @@ function pgBallAt(g, T) {
         x = face - s * PG_BR;
         vx = -s * v * Math.cos(a);
         vy = v * Math.sin(a);
+        spin = 0;
+        // Our own curveball: bend it the way the server will, from how our paddle was moving.
+        if (!godMe(t) && last.cv && last.cv[me] - (t - last.ts) > 0) {
+          const hs = pg.hist, l = hs[hs.length - 1], o = l && (hs.find(([ht]) => ht >= l[0] - 80) || l), vel = l ? (l[1] - o[1]) / Math.max(0.03, (l[0] - o[0]) / 1000) : 0;
+          if (Math.abs(vel) > 120) spin = Math.sign(vel) * 2 * (70 + 50 * Math.min(1, Math.abs(vel) / 800)) * vx * vx / ((PG_W - 2 * PG_FACE) ** 2);
+        }
       }
     }
     // Our divine wall sends a ball we missed straight back as a fireball.
@@ -3608,6 +3617,19 @@ function pgAssistTarget(g, s) {
   if (!s || s.st !== 'play') return {y: PG_H / 2, t: 0, toward: false};
   const x = g.myMark === 1 ? PG_FACE : PG_W - PG_FACE, [bx, by, vx, vy] = s.p;
   if (!vx || (x - bx) / vx <= 0) return {y: PG_H / 2 + (by - PG_H / 2) * 0.35, t: 0, toward: false};
+  if (s.sp) {
+    // A curveball: run its bending path forward (the curve turns around at the walls, like on the server).
+    let px = bx, py = by, pvx = vx, pvy = vy, sp = s.sp, tt = 0;
+    while (tt < 3 && (pvx < 0 ? px > x : px < x)) {
+      const v0 = Math.hypot(pvx, pvy);
+      px += pvx * 0.004; py += pvy * 0.004; pvy += sp * 0.004; tt += 0.004;
+      const k = v0 / Math.hypot(pvx, pvy);
+      pvx *= k; pvy *= k;
+      if (py < PG_BR) { py = 2 * PG_BR - py; pvy = Math.abs(pvy); if (sp < 0) sp = -sp; }
+      if (py > PG_H - PG_BR) { py = 2 * (PG_H - PG_BR) - py; pvy = -Math.abs(pvy); if (sp > 0) sp = -sp; }
+    }
+    return {y: py, t: tt, toward: true};
+  }
   const t = (x - bx) / vx, span = PG_H - 2 * PG_BR, period = 2 * span;
   let y = ((by - PG_BR + vy * t) % period + period) % period;
   if (y > span) y = period - y;
@@ -3719,15 +3741,16 @@ const PG_ICONS = {
   magnet: ['WW.....WW', 'WW.....WW', 'RR.....RR', 'RW.....RR', 'RW.....RD', 'RRR...RRD', '.RRRRRRD.', '..DDDDD..', '.........'],
   slow: ['WWWWWWWWW', '.T.....T.', '..TTTTT..', '...TTT...', '....T....', '...T.T...', '..T.T.T..', '.TTTTTTT.', 'WWWWWWWWW'],
   mini: ['..GGGGG..', '...GGG...', '....G....', '.........', '..WWWWW..', '.........', '....G....', '...GGG...', '..GGGGG..'],
+  curve: ['..PPPPP..', '.P.....P.', 'P..PPP..P', 'P.P...P.P', 'P.P.W.P.P', 'P.P..PP.P', 'P..PP...P', '.P......P', '..PPPPPP.'],
   god: ['.....GGG.', '....GGW..', '...GGW...', '..GGGGGG.', '.GGGGGG..', '....GWG..', '...GWG...', '..GW.....', '.G.......']
 };
 // The divine item's star jewel (O outline, G gold, W light gold, X white core).
 const PG_GOD_STAR = ['....O....', '...OXO...', '..OXWGO..', '.OXWGGGO.', 'OWWGGGGDO', '.OGGGGDO.', '..OGGDO..', '...ODO...', '....O....'];
 // An angel wing (upper one, pointing into the field, root at the bottom left); O gold outline, W white, G light gold.
 const PG_WING = ['..........OO', '........OOWO', '......OOWWWO', '....OOWWWWGO', '..OOWWWWWGO.', '.OWWWWWWGGO.', 'OWWWWWWGGOO.', 'OWWGOWGOWGO.', 'OGO.OGO.OGO.'];
-const PG_ICON_COL = {W: '#ffffff', R: '#ff3b5c', D: '#a3152f', L: '#b6ff3b', V: '#b388ff', T: '#2ef2d0', G: '#ffd23f'};
-const PG_DARK = {'#ff3b5c': '#8a1830', '#b388ff': '#4a2d85', '#b6ff3b': '#4f7a14', '#ffffff': '#6b7079', '#2ef2d0': '#12695b', '#ffd23f': '#7a5c10'};
-const PG_LABEL = {big: 'RIESEN-SCHLÄGER', shield: 'SCHUTZWAND', magnet: 'MAGNET', slow: 'ZEITLUPE', mini: 'MINI-SCHLÄGER', god: 'GÖTTLICH'};
+const PG_ICON_COL = {W: '#ffffff', R: '#ff3b5c', D: '#a3152f', L: '#b6ff3b', V: '#b388ff', T: '#2ef2d0', G: '#ffd23f', P: '#ff6ad5'};
+const PG_DARK = {'#ff3b5c': '#8a1830', '#b388ff': '#4a2d85', '#b6ff3b': '#4f7a14', '#ffffff': '#6b7079', '#2ef2d0': '#12695b', '#ffd23f': '#7a5c10', '#ff6ad5': '#7a2a63'};
+const PG_LABEL = {big: 'RIESEN-SCHLÄGER', shield: 'SCHUTZWAND', magnet: 'MAGNET', slow: 'ZEITLUPE', mini: 'MINI-SCHLÄGER', god: 'GÖTTLICH', curve: 'KURVENBALL'};
 // 5x7 pixel font for the banner and the score.
 const PG_FONT = {
   A: '.###.#...##...#######...##...##...#', B: '####.#...##...#####.#...##...#####.', C: '.#####....#....#....#....#.....####',
@@ -4083,6 +4106,17 @@ function pgFrame(g, ts) {
     }
     if (fx.wallGhost && fx.wallGhost.f-- > 0) { ctx.fillStyle = '#ffffff'; ctx.fillRect(fx.wallGhost.i === me1 ? 4 : PG_W - 16, 0, 12, PG_H); }
 
+    // Curveball: a pink time bar over the holder's half.
+    for (const i of [me1, op1]) {
+      const left = s.cv ? s.cv[i] : 0;
+      if (!left) continue;
+      const hx = i === me1 ? 24 : PG_W / 2 + 24, w = PG_W / 2 - 48;
+      ctx.fillStyle = '#7a2a63';
+      ctx.fillRect(hx, 36, w, 4);
+      ctx.fillStyle = '#ff6ad5';
+      ctx.fillRect(hx, 36, w * Math.min(1, left / 12000), 4);
+    }
+
     // Divine paddle: a radiant golden wall on the back line with light running up and down, a soft glow into
     // the field, a ripple where it threw a ball back, and a golden time bar over that half.
     for (const i of [me1, op1]) {
@@ -4262,6 +4296,13 @@ function pgFrame(g, ts) {
       const snap = Math.sin(fx.recoil[i] * Math.PI * 3) * 10 * fx.recoil[i];
       const bend = s.stuck === i ? PGX(4 + 8 * charge) : 0, jit = s.stuck === i && charge > 0.4 ? PGX((Math.random() - 0.5) * 8 * charge) : 0;
       const divine = s.gd && s.gd[i] > 0;
+      if (s.cv && s.cv[i] > 0) {
+        ctx.fillStyle = '#ff6ad5';
+        for (const e of [-1, 1]) for (let k = 0; k < 3; k++) {
+          const a = now / 160 + k * 2.1, cx2 = baseX + Math.cos(a) * 12, cy2 = y + e * (half + 6) + Math.sin(a) * 5;
+          ctx.fillRect(cx2 - 2, cy2 - 2, 4, 4);
+        }
+      }
       if (divine) {
         // Wings behind the paddle, beating; a halo above it; light rising off it.
         // Angel wings out of both ends of the paddle, spread into the field and beating (the tips lift and drop).
@@ -4431,6 +4472,16 @@ function pgFrame(g, ts) {
       pg.trail = [];
       // In slow motion the ball drags teal after-images behind it.
       const slowNow = s.sl && s.sl[s.p[2] < 0 ? 0 : 1] > 0;
+      // A curveball spins: a pink helix winds along the path it took, and a stripe turns on the ball itself.
+      if (s.sp && s.stuck < 0) {
+        if (dt) { pg.ctrail = [[bx, by], ...(pg.ctrail || [])].slice(0, 16); }
+        (pg.ctrail || []).forEach(([cx2, cy2], k) => {
+          if (!k) return;
+          const [nx2, ny2] = pg.ctrail[k - 1], len = Math.hypot(nx2 - cx2, ny2 - cy2) || 1, w = Math.sin(k * 0.9 - now / 45) * 7;
+          ctx.fillStyle = k > 10 ? '#7a2a63' : k % 2 ? '#ff6ad5' : '#ffd1f0';
+          ctx.fillRect(cx2 - (ny2 - cy2) / len * w - 2, cy2 + (nx2 - cx2) / len * w - 2, 4, 4);
+        });
+      } else pg.ctrail = null;
       if (slowNow && s.stuck < 0) {
         if (!pg.ghosts || now - pg.ghostAt > 45) { pg.ghosts = [[bx, by], ...(pg.ghosts || [])].slice(0, 4); pg.ghostAt = now; }
         pg.ghosts.forEach(([gx, gy], k) => { if (k) { ctx.fillStyle = k < 2 ? '#2ef2d0' : '#12695b'; ctx.fillRect(gx - 4, gy - 4, 8, 8); } });
@@ -4442,6 +4493,11 @@ function pgFrame(g, ts) {
         if (heat) { ctx.fillStyle = heat; ctx.fillRect(bx - 10, by - 10, 20, 20); }
         ctx.fillStyle = s.stuck < 0 && cool < 200 ? '#fff3b0' : '#ffffff';
         ctx.fillRect(bx - 6, by - 6, 12, 12);
+        if (s.sp && s.stuck < 0) {
+          const a = now / 60 * Math.sign(s.sp);
+          ctx.fillStyle = '#ff6ad5';
+          ctx.fillRect(bx + Math.round(Math.cos(a) * 3) - 2, by + Math.round(Math.sin(a) * 3) - 2, 4, 4);
+        }
       }
     }
   }
