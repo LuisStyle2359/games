@@ -1563,9 +1563,9 @@ function makePongBot() {
       ctx.fillRect(YOU - PADW / 2, you - PADH / 2, PADW, PADH);
       ctx.fillStyle = C.snake;
       ctx.fillRect(BOT - PADW / 2, bot - PADH / 2, PADW, PADH);
-      if (state === 'play' && !paused && !babyOn && babyTake()) babyOn = true;
+      if (state === 'play' && !paused && !babyOn) babyOn = babyTake() || false;
       ctx.fillStyle = C.ink;
-      if (babyOn) babyBall(ctx, ball.x, ball.y, R * 4.5);
+      if (babyOn) babyBall(ctx, ball.x, ball.y, R * 4.5, babyOn);
       else ctx.fillRect(ball.x - R, ball.y - R, R * 2, R * 2);
       if (flash && performance.now() - flash.at < (flash.record ? 1800 : 900) && state === 'play') {
         text(flash.text, GX + FW / 2, GY + FH / 2 + 50, flash.record ? {size: 20, weight: 700, color: C.head, align: 'center'} : {size: 13, weight: 600, color: C.muted, align: 'center'});
@@ -1982,7 +1982,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 35;
+const APP_VERSION = 36;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2656,7 +2656,7 @@ function handleMp(from, dm) {
   } else if (EM_TYPES.has(dm.type)) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'emoji' && !g.over) handleEmoji(g, dm);
   } else if (dm.type === 'pgbaby') {
-    if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) g.pg.babyReq = true;
+    if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) g.pg.babyReq = BALL_FACES[dm.face] ? dm.face : 'baby';
   } else if (dm.type === 'pgstat') {
     if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) { g.pg.opConn = String(dm.c || ''); g.pg.opAt = Date.now(); }
   } else if (UNO_TYPES.has(dm.type)) {
@@ -3664,37 +3664,43 @@ function uwuTroll(text) {
   setTimeout(trollToast, 600);
   return text.slice(0, MAXLEN - 10) + ' uwu 👉👈🥺';
 }
-// Baby-Ball: the next Ping Pong point is played with the baby's face as the ball (also for the opponent),
-// or the next point against the bot. Waits up to 10 minutes for a game to be running.
-let trollBabyUntil = 0, babySprite = null;
+// Face balls (Baby-Ball, Gleg-Ball): the next Ping Pong point is played with a face as the ball (also for the
+// opponent), or the next point against the bot. Waits up to 10 minutes for a game to be running.
+const GLEG_IMG = 'data:image/jpeg;base64,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';
+const BALL_FACES = {baby: {src: () => HISCHAM_IMG, crop: [30, 4, 300, 300]}, gleg: {src: () => GLEG_IMG, crop: [0, 0, 180, 180]}};
+let trollBall = null;
+const faceSprites = {};
 function babyTake() {
-  if (trollBabyUntil < Date.now()) return false;
-  trollBabyUntil = 0;
-  return true;
+  if (!trollBall || trollBall.until < Date.now()) return null;
+  const face = trollBall.face;
+  trollBall = null;
+  return face;
 }
-function babyBall(ctx, x, y, r) {
-  if (!babySprite) {
-    babySprite = document.createElement('canvas');
-    babySprite.width = babySprite.height = 96;
+function babyBall(ctx, x, y, r, face) {
+  const f = BALL_FACES[face] ? face : 'baby';
+  let sp = faceSprites[f];
+  if (!sp) {
+    sp = faceSprites[f] = document.createElement('canvas');
+    sp.width = sp.height = 128;
     const img = new Image();
     img.onload = () => {
-      const c = babySprite.getContext('2d');
+      const c = sp.getContext('2d');
       c.fillStyle = '#ffffff';
-      c.beginPath(); c.arc(48, 48, 47, 0, 7); c.fill();
-      c.beginPath(); c.arc(48, 48, 43, 0, 7); c.clip();
-      c.drawImage(img, 30, 4, 300, 300, 5, 5, 86, 86);
-      babySprite.ready = true;
+      c.beginPath(); c.arc(64, 64, 63, 0, 7); c.fill();
+      c.beginPath(); c.arc(64, 64, 58, 0, 7); c.clip();
+      c.drawImage(img, ...BALL_FACES[f].crop, 6, 6, 116, 116);
+      sp.ready = true;
     };
-    img.src = HISCHAM_IMG;
+    img.src = BALL_FACES[f].src();
   }
-  if (!babySprite.ready) { ctx.fillRect(x - 6, y - 6, 12, 12); return; }
+  if (!sp.ready) { ctx.fillRect(x - 6, y - 6, 12, 12); return; }
   // The Ping Pong canvas maps game coordinates by hand (pgPixels), so do the same here.
   const m = ctx.pgK || 1, ox = ctx.pgK ? ctx.pgOx : 0, oy = ctx.pgK ? ctx.pgOy : 0;
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.translate((x + ox) * m, (y + oy) * m);
   ctx.rotate(Math.sin(x / 40) * 0.35);
-  ctx.drawImage(babySprite, -r * m, -r * m, r * 2 * m, r * 2 * m);
+  ctx.drawImage(sp, -r * m, -r * m, r * 2 * m, r * 2 * m);
   ctx.restore();
 }
 // "Ist Luis cool?": the Nein button runs away from the mouse; pressing it anyway counts as Ja.
@@ -3887,7 +3893,8 @@ function flyTroll() {
   requestAnimationFrame(step);
 }
 const TROLLS = {hischam: hischamMode, poop: () => emojiRain('💩'), pig: () => emojiRain('🐷'),
-  uwu: () => store.set('trollUwu', true), baby: () => { trollBabyUntil = Date.now() + 600000; }, poll: coolPoll,
+  uwu: () => store.set('trollUwu', true), baby: () => { trollBall = {face: 'baby', until: Date.now() + 600000}; },
+  gleg: () => { trollBall = {face: 'gleg', until: Date.now() + 600000}; }, poll: coolPoll,
   fall: letterFall, virus: virusScan, fly: flyTroll};
 function runTroll(what) { if (TROLLS[what]) TROLLS[what](); }
 // Asks the game server for the divine item right now, signed with the admin key (the server checks it).
@@ -3911,7 +3918,7 @@ function toggleAdmin() {
   }});
   p = el('div', {class: 'adminpanel', id: 'adminpanel'}, el('div', {class: 'upddlg-head', text: 'Admin'}), who,
     go('hischam', 'HISCHAM-MODUS'), go('poop', '💩-Regen'), go('pig', '🐷-Regen'),
-    go('uwu', 'uwu an nächste Nachricht'), go('baby', '👶 Baby-Ball (1 Punkt)'), go('poll', '📊 Umfrage: Ist Luis cool?'),
+    go('uwu', 'uwu an nächste Nachricht'), go('baby', '👶 Baby-Ball (1 Punkt)'), go('gleg', '🧑‍🦲 Gleg-Ball (1 Punkt)'), go('poll', '📊 Umfrage: Ist Luis cool?'),
     go('fall', '🍂 Buchstaben fallen runter'), go('virus', '🦠 Fake-Virenscan'), go('fly', '🪰 Fliege'),
     el('button', {class: 'vbtn', type: 'button', text: '⚡ Göttliches Item spawnen', onclick: () => {
       adminGod().then(ok => { stat.textContent = ok ? '⚡ Göttliches Item gespawnt' : 'Nur während eines laufenden Pong-Matches'; }).catch(() => { stat.textContent = 'Fehlgeschlagen'; });
@@ -4338,8 +4345,9 @@ function pgFrame(g, ts) {
     // Points: the digit jumps; a fireball goal holds the picture, tears it and blows up in front of the goal.
     const total = s.sc[0] + s.sc[1];
     // Baby-Ball troll: the face is the ball until the next point, for both players.
-    if (s.st === 'play' && babyTake()) { pg.babyReq = true; sendMpMsg(g.opponent, {type: 'pgbaby', gid: g.gid}).catch(() => {}); }
-    if (pg.babyReq && s.st === 'play') { pg.babyReq = false; pg.baby = total; }
+    const face = s.st === 'play' && babyTake();
+    if (face) { pg.babyReq = face; sendMpMsg(g.opponent, {type: 'pgbaby', gid: g.gid, face}).catch(() => {}); }
+    if (pg.babyReq && s.st === 'play') { pg.babyFace = pg.babyReq; pg.babyReq = false; pg.baby = total; }
     if (pg.baby !== undefined && (total !== pg.baby || s.st === 'over')) pg.baby = undefined;
     if (pg.prevTotal !== undefined && total > pg.prevTotal && s.st !== 'over') {
       const mineScored = s.sc[me1] > pg.prevMine, x = mineScored ? PG_W - 36 : 36, y = pg.lastBall ? pg.lastBall[1] : PG_H / 2;
@@ -4821,7 +4829,7 @@ function pgFrame(g, ts) {
         }
       }
     }
-    if (pg.baby !== undefined && s.st === 'play') babyBall(ctx, bx, by, 26);
+    if (pg.baby !== undefined && s.st === 'play') babyBall(ctx, bx, by, 26, pg.babyFace);
   }
 
   // Explosions: a disc of hot pixels that hollows out into a ring.
