@@ -610,6 +610,7 @@ class Room {
     this.auto = 0;
     this.timer = 0;
     this.ev = {n: 0};
+    this.evq = [];
     this.w = null;
     this.votes = {};
     this.pu = false;
@@ -697,7 +698,9 @@ class Room {
     this.pausedBy = null;
   }
 
-  event(k, extra) { this.ev = {n: this.ev.n + 1, k, ...extra}; }
+  // Several things can happen in one tick (a hit, then the kill, then the end of the round): the last few events
+  // go out with every update, so the page sees each one even if updates are lost or come together.
+  event(k, extra) { this.ev = {n: this.ev.n + 1, k, ...extra}; this.evq.push(this.ev); if (this.evq.length > 8) this.evq.shift(); }
 
   loop() {
     const now = Date.now();
@@ -725,7 +728,7 @@ class Room {
 
   // What every update carries besides the game itself.
   base(now) {
-    return {t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, host: this.players[0] && this.players[0].pid, ev: this.ev,
+    return {t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, host: this.players[0] && this.players[0].pid, ev: this.ev, evs: this.evq,
       vt: this.st === 'vote' ? this.votes : null, pu: this.pu, coin: this.coin, pb: this.st === 'pause' ? this.pausedBy : null,
       pz: this.st === 'pause' && this.pausedBy ? Math.max(0, this.pauseEnd - now) : 0};
   }
@@ -884,14 +887,17 @@ export class Kick extends Room {
     // counts exactly once.
     for (const p of ps) {
       for (const k in p.fx) if (k !== 'hammer' && p.fx[k] > 0) p.fx[k]--;
+      // One step per tick on average, whatever a page sends (a short burst to catch up is fine).
+      p.cr = Math.min(3, (p.cr || 0) + 1);
       if (!p.q.length) {
-        if (p.started && p.owed < 8) { p.owed++; kickMove(p, p.k); kickBounds(p, this.ko); }
+        if (p.started && p.owed < 8) { p.owed++; p.cr--; kickMove(p, p.k); kickBounds(p, this.ko); }
         continue;
       }
       p.started = true;
       while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
-      const steps = p.q.length > 4 ? 2 : 1;
+      const steps = Math.min(p.q.length > 4 ? 2 : 1, Math.floor(p.cr));
       for (let n = 0; n < steps && p.q.length; n++) {
+        p.cr--;
         const [k, i] = p.q.shift();
         p.k = k;
         p.ack = i;
@@ -1314,7 +1320,7 @@ const BR_MAP = [
   '#ooo#........=.....=.......#ooo#',
   '#ooo=...........B..........=ooo#',
   '#ooo#........=.....=.......#ooo#',
-  '#ooo#........==.====.......#ooo#',
+  '#ooo#........====.==.......#ooo#',
   '#ooo###.######.....######=##ooo#',
   '#oooo#.....#...d......#....#ooo#',
   '#oooo=.....#..........=....=ooo#',
@@ -1343,10 +1349,11 @@ function brMove(p, k, a, g) {
   if (f && s) { f *= Math.SQRT1_2; s *= Math.SQRT1_2; }
   const v = ((k & 16) ? BR_WALK : BR_RUN) / 60, c = Math.cos(a), sn = Math.sin(a);
   const dx = (c * f - sn * s) * v, dy = (sn * f + c * s) * v;
-  p.vx = dx * 60; p.vy = dy * 60;
-  const r = BR_R;
+  const r = BR_R, x0 = p.x, y0 = p.y;
   if (dx && !brSolid(g, p.x + dx + Math.sign(dx) * r, p.y - r + 0.01) && !brSolid(g, p.x + dx + Math.sign(dx) * r, p.y + r - 0.01)) p.x += dx;
   if (dy && !brSolid(g, p.x - r + 0.01, p.y + dy + Math.sign(dy) * r) && !brSolid(g, p.x + r - 0.01, p.y + dy + Math.sign(dy) * r)) p.y += dy;
+  // Speed as really moved: running against a wall makes no noise.
+  p.vx = (p.x - x0) * 60; p.vy = (p.y - y0) * 60;
 }
 // Distance along a ray to the first wall, and which cell it is (DDA through the grid).
 function brRay(g, x, y, a, max = 40) {
@@ -1378,6 +1385,8 @@ export class Breach extends Room {
     mag: 30, reload: 0, cd: 0, nade: 2, hist: [], kills: 0}); }
   // No power-ups in Breach, so nothing to vote on: the match starts right away.
   vote(now) { this.begin(now); }
+  // After a pause nobody can fire for a moment, so lining up on a frozen enemy during the pause gives nothing.
+  resume(now) { super.resume(now); for (const p of this.players) p.cd = Math.max(p.cd, 350); }
   extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, kills: p.kills}; }
   input(p, m) {
     if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i) && Number.isFinite(m.a)) {
@@ -1426,7 +1435,7 @@ export class Breach extends Room {
   endRound(winner, why) {
     if (this.st !== 'play') return;
     winner.sc++;
-    this.event('round', {pid: winner.pid, why, side: winner.side});
+    this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
     if (winner.sc >= BR_WIN) return this.finish(winner);
     this.st = 'roundover';
     this.until = Date.now() + 3500;
@@ -1467,13 +1476,15 @@ export class Breach extends Room {
           else this.fire(p, a, rt);
         }
       };
+      // One input per tick on average, whatever a page sends (a short burst to catch up is fine).
+      p.cr = Math.min(3, (p.cr || 0) + 1);
       if (!p.q.length) {
-        if (p.started && p.owed < 8) { p.owed++; run(p.k & ~32, p.a, 0); }
+        if (p.started && p.owed < 8) { p.owed++; p.cr--; run(p.k & ~32, p.a, 0); }
       } else {
         p.started = true;
         // Inputs skipped to catch up still pass on a reload press (a tap may be in just one input).
         while (p.owed > 0 && p.q.length > 1) { const d = p.q.shift(); p.ack = d[1]; p.owed--; p.q[0][0] |= d[0] & 64; }
-        for (let n = p.q.length > 4 ? 2 : 1; n > 0 && p.q.length; n--) { const [k, i, a, rt] = p.q.shift(); p.ack = i; run(k, a, rt); }
+        for (let n = Math.min(p.q.length > 4 ? 2 : 1, Math.floor(p.cr)); n > 0 && p.q.length; n--) { p.cr--; const [k, i, a, rt] = p.q.shift(); p.ack = i; run(k, a, rt); }
       }
       p.hist.push([this.tick, now, p.x, p.y]);
       if (p.hist.length > 40) p.hist.shift();
@@ -1482,7 +1493,7 @@ export class Breach extends Room {
     for (const c of this.charges) if ((c.t -= 1000 / 60) <= 0) this.blow(c);
     this.charges = this.charges.filter(c => c.t > 0);
     // Defusing: the attacker stands at the bomb holding E and doesn't move.
-    if (atk && atk.alive && (atk.k & 128) && Math.hypot(atk.x - BR_BOMB[0], atk.y - BR_BOMB[1]) < 1.3 && !(atk.k & 15)) {
+    if (atk && atk.alive && (atk.k & 128) && Math.hypot(atk.x - BR_BOMB[0], atk.y - BR_BOMB[1]) < 1.3 && !(atk.k & (15 | 32))) {
       if (!this.defuse) this.event('defusing', {pid: atk.pid});
       this.defuse += 1000 / 60;
       if (this.defuse >= BR_DEFUSE) return this.endRound(atk, 'defuse');
@@ -1503,6 +1514,8 @@ export class Breach extends Room {
       if (o === p || !o.alive) continue;
       let ox = o.x, oy = o.y;
       if (rt) {
+        // A page draws the other player at most about a quarter second in the past; older claims don't count.
+        rt = Math.min(Date.now(), Math.max(rt, Date.now() - 250));
         const h = o.hist, i = h.findIndex(e => e[1] >= rt);
         if (i > 0) { const [, t0, x0, y0] = h[i - 1], [, t1, x1, y1] = h[i], k = (rt - t0) / Math.max(1, t1 - t0); ox = x0 + (x1 - x0) * k; oy = y0 + (y1 - y0) * k; }
         else if (i === 0) { ox = h[0][2]; oy = h[0][3]; }
@@ -1540,7 +1553,7 @@ export class Breach extends Room {
     if (w.cell < 0 || this.map.g[w.cell] !== 2 || this.charges.some(c => c.cell === w.cell)) return;
     p.nade--;
     this.charges.push({cell: w.cell, t: 2000, x: p.x + Math.cos(p.a) * (w.d - 0.05), y: p.y + Math.sin(p.a) * (w.d - 0.05), pid: p.pid});
-    this.event('charge', {pid: p.pid, cell: w.cell});
+    this.event('charge', {pid: p.pid, cell: w.cell, x: this.charges[this.charges.length - 1].x, y: this.charges[this.charges.length - 1].y});
   }
   blow(c) {
     const cx = c.cell % BR_W, cy = Math.floor(c.cell / BR_W);
@@ -1550,13 +1563,24 @@ export class Breach extends Room {
       if (x >= 0 && y >= 0 && x < BR_W && y < BR_H && this.map.g[i] === 2 && (dx === 0 && dy === 0 || Math.random() < 0.5)) this.wear(i, 255);
     }
     this.event('boom', {x: c.x, y: c.y});
+    // Hurts anyone close; a wall in between (after the blast) takes half of it.
+    const dead = [];
     for (const o of this.players) {
       if (!o.alive) continue;
       const d = Math.hypot(o.x - c.x, o.y - c.y);
-      if (d < 2.5) {
-        o.hp = Math.max(0, o.hp - Math.round(70 * (1 - d / 2.5)));
-        if (!o.hp) { const by = this.players.find(q => q.pid === c.pid); if (by && by !== o) this.kill(o, by); else { o.alive = false; const other = this.players.find(q => q !== o); if (other) this.endRound(other, 'kill'); } }
-      }
+      if (d >= 2.5) continue;
+      const a = Math.atan2(o.y - c.y, o.x - c.x), behind = brRay(this.map.g, c.x - Math.cos(a) * 0.1, c.y - Math.sin(a) * 0.1, a, d + 0.1).d < d;
+      const dmg = Math.round(70 * (1 - d / 2.5) * (behind ? 0.5 : 1));
+      o.hp = Math.max(0, o.hp - dmg);
+      if (dmg) this.event('hit', {pid: c.pid, to: o.pid, dmg, x: o.x, y: o.y, sx: c.x, sy: c.y, boom: true});
+      if (!o.hp) { o.alive = false; dead.push(o); }
+    }
+    if (dead.length) {
+      // Both caught in the blast: the defender held on. Otherwise whoever is still standing wins.
+      const def = this.players.find(q => q.side === 'def'), alive = this.players.find(q => q.alive);
+      const winner = dead.length > 1 ? def : alive;
+      for (const o of dead) if (winner && o !== winner) { winner.kills += o.pid !== c.pid ? 1 : 0; this.event('kill', {pid: winner.pid, to: o.pid, x: o.x, y: o.y}); }
+      if (winner) this.endRound(winner, 'kill');
     }
   }
   full(p) {

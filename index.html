@@ -2029,7 +2029,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3421,7 +3421,10 @@ function pgInit(g, key) {
   g.key = /^[a-z0-9]{12,40}$/.test(key || '') ? key : '';
   g.pg = {ws: null, s: null, at: 0, y: PG_H / 2, aimY: PG_H / 2, dirty: true, conn: 'connecting', raf: 0, tries: 0, buf: [], offs: [], off: 0,
     rtt: 0, pingAt: 0, ev: 0, hist: [], sm: {ex: 0, ey: 0}, sentAt: 0, pushT: 0, trail: [], flash: 0, shake: 0, toast: null, parts: [], rings: [], burstAt: null, wasTurbo: false, frameAt: 0};
-  if (pgGame && pgGame.offline && pgGame !== g) offStop();
+  // Only one Ping Pong at a time: an offline match makes way (its document shows the settings again), and an
+  // old online match lets go of its connection.
+  if (pgGame && pgGame !== g && pgGame.offline) { offStop(); if (showing && current === offlineDocs.pong) offShow('pong'); }
+  if (pgGame && pgGame !== g && pgGame.pg && pgGame.pg.ws) { const w = pgGame.pg.ws; pgGame.pg.ws = null; try { w.close(); } catch (e) {} }
   pgGame = g;
   pgConnect(g);
 }
@@ -4107,7 +4110,18 @@ function buildPong(g) {
 function renderPong(g = mpGame) {
   if (!g || g.game !== 'pong') return;
   const ui = pgUi(g);
-  if (ui.grid.dataset.gid !== g.gid || !$('pgcanvas')) buildPong(g);
+  // An online match that ended while an offline one now runs: only its result, the table belongs to the other.
+  if (g !== pgGame) {
+    ui.grid.replaceChildren(el('div', {class: 'rx-score', text: g.over ? (g.winner === g.myMark ? '🏆 Gewonnen' : g.opName + ' hat gewonnen') : ''}));
+    delete ui.grid.dataset.gid;
+    ui.status.textContent = 'Ping Pong vs ' + g.opName;
+    ui.result.hidden = false;
+    ui.result.replaceChildren(el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }}));
+    return;
+  }
+  // The other board may still hold an old table with the same element ids: clear it first.
+  for (const other of [$('ogrid'), $('cmpgrid')]) if (other !== ui.grid && other.querySelector('#pgcanvas')) { other.replaceChildren(); delete other.dataset.gid; }
+  if (ui.grid.dataset.gid !== g.gid || !ui.grid.querySelector('#pgcanvas')) buildPong(g);
   ui.status.textContent = g.over ? (g.winner === g.myMark ? 'Du hast gewonnen!' : g.opName + ' hat gewonnen!')
     : g.offline ? '🏓 Ping Pong gegen Bot (' + OFF_LEVEL_NAMES[g.offline.lvl] + ', Power-ups ' + (g.offline.pu ? 'an' : 'aus') + ') — Maus hoch und runter, du bist links'
     : 'Ping Pong vs ' + g.opName + ' — Maus hoch und runter bewegen, du bist links';
@@ -4346,8 +4360,9 @@ function pgPixels(ctx, k) {
 }
 function pgFrame(g, ts) {
   g.pg.raf = 0;
-  const cv = $('pgcanvas');
-  if (!pgLive(g) || !cv || !pgUi(g).here()) return;
+  if (g !== pgGame || !pgLive(g) || !pgUi(g).here()) return;
+  const cv = pgUi(g).grid.querySelector('#pgcanvas');
+  if (!cv) return;
   const pg = g.pg, ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1, now = ts || performance.now(), fx = pgFx(pg), k = cv.width / PG_W;
   pgClock(pg, performance.timeOrigin + now);
   pgPixels(ctx, k);
@@ -5092,7 +5107,9 @@ function sgMessage(g, m) {
   }
   const mine = m.pl.find(p => p.pid === me.id);
   if (mine && mine.team !== undefined) sg.team = mine.team;
-  if (m.ev && m.ev.n !== sg.ev) { if (prev) sgEvent(g, m.ev, m); sg.ev = m.ev.n; }
+  // Every event since the last one seen (several can come in one update); older servers send only the last.
+  if (Array.isArray(m.evs) && m.evs.length) { for (const e of m.evs) if (e && e.n > sg.ev) { if (prev) sgEvent(g, e, m); sg.ev = e.n; } }
+  else if (m.ev && m.ev.n !== sg.ev) { if (prev) sgEvent(g, m.ev, m); sg.ev = m.ev.n; }
   if (g.game === 'kick') { if (m.ko >= 0 && (!prev || prev.ko < 0 || prev.st !== m.st)) sg.koAt = performance.now(); bzSnapshot(g, m); }
   else if (g.game === 'breach') brSnapshot(g, m);
   else nrSnapshot(g, m);
@@ -5155,7 +5172,7 @@ function sgFinish(g, s) {
   if (g.offline) { offRecord(g, win); sgRedraw(g); return; }
   let text;
   if (g.game === 'kick') text = SG_TITLE.kick + ': ' + (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt ' + s.sc[s.w] + ':' + s.sc[1 - s.w] + (win ? ' – du hast gewonnen! 🎉' : '');
-  else { const w = s.pl.find(p => p.pid === s.w); text = SG_TITLE.tron + ': ' + (win ? 'Du hast gewonnen! 🎉' : (w ? w.name : 'Niemand') + ' hat gewonnen!'); }
+  else { const w = s.pl.find(p => p.pid === s.w); text = SG_TITLE[g.game] + ': ' + (win ? 'Du hast gewonnen! 🎉' : (w ? w.name : 'Niemand') + ' hat gewonnen!'); }
   if (win) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
   addMsg(mpConv(g), {id: 'mp-' + g.gid, from: 'system', name: '', text, ts: Date.now()});
   if (conv === mpConv(g)) renderMpBoard();
@@ -6533,6 +6550,7 @@ class Room {
     this.auto = 0;
     this.timer = 0;
     this.ev = {n: 0};
+    this.evq = [];
     this.w = null;
     this.votes = {};
     this.pu = false;
@@ -6620,7 +6638,9 @@ class Room {
     this.pausedBy = null;
   }
 
-  event(k, extra) { this.ev = {n: this.ev.n + 1, k, ...extra}; }
+  // Several things can happen in one tick (a hit, then the kill, then the end of the round): the last few events
+  // go out with every update, so the page sees each one even if updates are lost or come together.
+  event(k, extra) { this.ev = {n: this.ev.n + 1, k, ...extra}; this.evq.push(this.ev); if (this.evq.length > 8) this.evq.shift(); }
 
   loop() {
     const now = Date.now();
@@ -6648,7 +6668,7 @@ class Room {
 
   // What every update carries besides the game itself.
   base(now) {
-    return {t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, host: this.players[0] && this.players[0].pid, ev: this.ev,
+    return {t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, host: this.players[0] && this.players[0].pid, ev: this.ev, evs: this.evq,
       vt: this.st === 'vote' ? this.votes : null, pu: this.pu, coin: this.coin, pb: this.st === 'pause' ? this.pausedBy : null,
       pz: this.st === 'pause' && this.pausedBy ? Math.max(0, this.pauseEnd - now) : 0};
   }
@@ -6807,14 +6827,17 @@ class Kick extends Room {
     // counts exactly once.
     for (const p of ps) {
       for (const k in p.fx) if (k !== 'hammer' && p.fx[k] > 0) p.fx[k]--;
+      // One step per tick on average, whatever a page sends (a short burst to catch up is fine).
+      p.cr = Math.min(3, (p.cr || 0) + 1);
       if (!p.q.length) {
-        if (p.started && p.owed < 8) { p.owed++; kickMove(p, p.k); kickBounds(p, this.ko); }
+        if (p.started && p.owed < 8) { p.owed++; p.cr--; kickMove(p, p.k); kickBounds(p, this.ko); }
         continue;
       }
       p.started = true;
       while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
-      const steps = p.q.length > 4 ? 2 : 1;
+      const steps = Math.min(p.q.length > 4 ? 2 : 1, Math.floor(p.cr));
       for (let n = 0; n < steps && p.q.length; n++) {
+        p.cr--;
         const [k, i] = p.q.shift();
         p.k = k;
         p.ack = i;
@@ -7237,7 +7260,7 @@ const BR_MAP = [
   '#ooo#........=.....=.......#ooo#',
   '#ooo=...........B..........=ooo#',
   '#ooo#........=.....=.......#ooo#',
-  '#ooo#........==.====.......#ooo#',
+  '#ooo#........====.==.......#ooo#',
   '#ooo###.######.....######=##ooo#',
   '#oooo#.....#...d......#....#ooo#',
   '#oooo=.....#..........=....=ooo#',
@@ -7266,10 +7289,11 @@ function brMove(p, k, a, g) {
   if (f && s) { f *= Math.SQRT1_2; s *= Math.SQRT1_2; }
   const v = ((k & 16) ? BR_WALK : BR_RUN) / 60, c = Math.cos(a), sn = Math.sin(a);
   const dx = (c * f - sn * s) * v, dy = (sn * f + c * s) * v;
-  p.vx = dx * 60; p.vy = dy * 60;
-  const r = BR_R;
+  const r = BR_R, x0 = p.x, y0 = p.y;
   if (dx && !brSolid(g, p.x + dx + Math.sign(dx) * r, p.y - r + 0.01) && !brSolid(g, p.x + dx + Math.sign(dx) * r, p.y + r - 0.01)) p.x += dx;
   if (dy && !brSolid(g, p.x - r + 0.01, p.y + dy + Math.sign(dy) * r) && !brSolid(g, p.x + r - 0.01, p.y + dy + Math.sign(dy) * r)) p.y += dy;
+  // Speed as really moved: running against a wall makes no noise.
+  p.vx = (p.x - x0) * 60; p.vy = (p.y - y0) * 60;
 }
 // Distance along a ray to the first wall, and which cell it is (DDA through the grid).
 function brRay(g, x, y, a, max = 40) {
@@ -7301,6 +7325,8 @@ class Breach extends Room {
     mag: 30, reload: 0, cd: 0, nade: 2, hist: [], kills: 0}); }
   // No power-ups in Breach, so nothing to vote on: the match starts right away.
   vote(now) { this.begin(now); }
+  // After a pause nobody can fire for a moment, so lining up on a frozen enemy during the pause gives nothing.
+  resume(now) { super.resume(now); for (const p of this.players) p.cd = Math.max(p.cd, 350); }
   extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, kills: p.kills}; }
   input(p, m) {
     if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i) && Number.isFinite(m.a)) {
@@ -7349,7 +7375,7 @@ class Breach extends Room {
   endRound(winner, why) {
     if (this.st !== 'play') return;
     winner.sc++;
-    this.event('round', {pid: winner.pid, why, side: winner.side});
+    this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
     if (winner.sc >= BR_WIN) return this.finish(winner);
     this.st = 'roundover';
     this.until = Date.now() + 3500;
@@ -7390,12 +7416,15 @@ class Breach extends Room {
           else this.fire(p, a, rt);
         }
       };
+      // One input per tick on average, whatever a page sends (a short burst to catch up is fine).
+      p.cr = Math.min(3, (p.cr || 0) + 1);
       if (!p.q.length) {
-        if (p.started && p.owed < 8) { p.owed++; run(p.k & ~32, p.a, 0); }
+        if (p.started && p.owed < 8) { p.owed++; p.cr--; run(p.k & ~32, p.a, 0); }
       } else {
         p.started = true;
-        while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
-        for (let n = p.q.length > 4 ? 2 : 1; n > 0 && p.q.length; n--) { const [k, i, a, rt] = p.q.shift(); p.ack = i; run(k, a, rt); }
+        // Inputs skipped to catch up still pass on a reload press (a tap may be in just one input).
+        while (p.owed > 0 && p.q.length > 1) { const d = p.q.shift(); p.ack = d[1]; p.owed--; p.q[0][0] |= d[0] & 64; }
+        for (let n = Math.min(p.q.length > 4 ? 2 : 1, Math.floor(p.cr)); n > 0 && p.q.length; n--) { p.cr--; const [k, i, a, rt] = p.q.shift(); p.ack = i; run(k, a, rt); }
       }
       p.hist.push([this.tick, now, p.x, p.y]);
       if (p.hist.length > 40) p.hist.shift();
@@ -7404,7 +7433,7 @@ class Breach extends Room {
     for (const c of this.charges) if ((c.t -= 1000 / 60) <= 0) this.blow(c);
     this.charges = this.charges.filter(c => c.t > 0);
     // Defusing: the attacker stands at the bomb holding E and doesn't move.
-    if (atk && atk.alive && (atk.k & 128) && Math.hypot(atk.x - BR_BOMB[0], atk.y - BR_BOMB[1]) < 1.3 && !(atk.k & 15)) {
+    if (atk && atk.alive && (atk.k & 128) && Math.hypot(atk.x - BR_BOMB[0], atk.y - BR_BOMB[1]) < 1.3 && !(atk.k & (15 | 32))) {
       if (!this.defuse) this.event('defusing', {pid: atk.pid});
       this.defuse += 1000 / 60;
       if (this.defuse >= BR_DEFUSE) return this.endRound(atk, 'defuse');
@@ -7425,6 +7454,8 @@ class Breach extends Room {
       if (o === p || !o.alive) continue;
       let ox = o.x, oy = o.y;
       if (rt) {
+        // A page draws the other player at most about a quarter second in the past; older claims don't count.
+        rt = Math.min(Date.now(), Math.max(rt, Date.now() - 250));
         const h = o.hist, i = h.findIndex(e => e[1] >= rt);
         if (i > 0) { const [, t0, x0, y0] = h[i - 1], [, t1, x1, y1] = h[i], k = (rt - t0) / Math.max(1, t1 - t0); ox = x0 + (x1 - x0) * k; oy = y0 + (y1 - y0) * k; }
         else if (i === 0) { ox = h[0][2]; oy = h[0][3]; }
@@ -7462,7 +7493,7 @@ class Breach extends Room {
     if (w.cell < 0 || this.map.g[w.cell] !== 2 || this.charges.some(c => c.cell === w.cell)) return;
     p.nade--;
     this.charges.push({cell: w.cell, t: 2000, x: p.x + Math.cos(p.a) * (w.d - 0.05), y: p.y + Math.sin(p.a) * (w.d - 0.05), pid: p.pid});
-    this.event('charge', {pid: p.pid, cell: w.cell});
+    this.event('charge', {pid: p.pid, cell: w.cell, x: this.charges[this.charges.length - 1].x, y: this.charges[this.charges.length - 1].y});
   }
   blow(c) {
     const cx = c.cell % BR_W, cy = Math.floor(c.cell / BR_W);
@@ -7472,13 +7503,24 @@ class Breach extends Room {
       if (x >= 0 && y >= 0 && x < BR_W && y < BR_H && this.map.g[i] === 2 && (dx === 0 && dy === 0 || Math.random() < 0.5)) this.wear(i, 255);
     }
     this.event('boom', {x: c.x, y: c.y});
+    // Hurts anyone close; a wall in between (after the blast) takes half of it.
+    const dead = [];
     for (const o of this.players) {
       if (!o.alive) continue;
       const d = Math.hypot(o.x - c.x, o.y - c.y);
-      if (d < 2.5) {
-        o.hp = Math.max(0, o.hp - Math.round(70 * (1 - d / 2.5)));
-        if (!o.hp) { const by = this.players.find(q => q.pid === c.pid); if (by && by !== o) this.kill(o, by); else { o.alive = false; const other = this.players.find(q => q !== o); if (other) this.endRound(other, 'kill'); } }
-      }
+      if (d >= 2.5) continue;
+      const a = Math.atan2(o.y - c.y, o.x - c.x), behind = brRay(this.map.g, c.x - Math.cos(a) * 0.1, c.y - Math.sin(a) * 0.1, a, d + 0.1).d < d;
+      const dmg = Math.round(70 * (1 - d / 2.5) * (behind ? 0.5 : 1));
+      o.hp = Math.max(0, o.hp - dmg);
+      if (dmg) this.event('hit', {pid: c.pid, to: o.pid, dmg, x: o.x, y: o.y, sx: c.x, sy: c.y, boom: true});
+      if (!o.hp) { o.alive = false; dead.push(o); }
+    }
+    if (dead.length) {
+      // Both caught in the blast: the defender held on. Otherwise whoever is still standing wins.
+      const def = this.players.find(q => q.side === 'def'), alive = this.players.find(q => q.alive);
+      const winner = dead.length > 1 ? def : alive;
+      for (const o of dead) if (winner && o !== winner) { winner.kills += o.pid !== c.pid ? 1 : 0; this.event('kill', {pid: winner.pid, to: o.pid, x: o.x, y: o.y}); }
+      if (winner) this.endRound(winner, 'kill');
     }
   }
   full(p) {
@@ -7557,7 +7599,7 @@ function pgPause(g) {
 }
 document.addEventListener('keydown', e => {
   const g = pgGame;
-  if (!g || !g.offline || g.over || e.code !== 'KeyP' || e.repeat || !pgUi(g).here() || (e.target.matches && e.target.matches('input, textarea'))) return;
+  if (!g || !g.offline || g.over || e.code !== 'KeyP' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !pgUi(g).here() || (e.target.matches && e.target.matches('input, textarea'))) return;
   e.preventDefault();
   pgPause(g);
 });
@@ -7589,10 +7631,11 @@ function pgBrain(A, lvl) {
   };
   const send = m => A.onMessage(1, JSON.stringify(m));
   return () => {
-    const now = Date.now(), dt = Math.min(0.05, (now - last) / 1000), half = A.ph[1] / 2;
+    const now = Date.now(), dt = Math.min(0.05, (now - last) / 1000), half = A.ph[1] / 2, gap = now - last;
     last = now;
     A.away[1] = A.away[0];
-    if (A.st === 'pause' || A.st === 'over') return;
+    // Paused or counting back in: everything stays as it was, and a held magnet shot waits too.
+    if (A.st === 'pause' || A.st === 'resume' || A.st === 'over') { if (fireAt) fireAt += gap; return; }
     if (A.stuck === 1) {
       // Caught with the magnet: aim, then fire.
       if (!fireAt) {
@@ -7932,6 +7975,7 @@ function brSnapshot(g, m) {
   const mine = m.pl.find(p => p.pid === me.id);
   if (!mine) return;
   sg.side = mine.side;
+  if (!Number.isFinite(sg.ang)) sg.ang = mine.a;
   const p = {x: mine.x, y: mine.y, vx: 0, vy: 0};
   if (m.st !== 'play' || !sg.me || !mine.al) {
     sg.me = p; sg.hist = []; sg.vis = {x: 0, y: 0};
@@ -7951,7 +7995,9 @@ function brSnapshot(g, m) {
 function brTicks(g, now) {
   const sg = g.sg, s = sg.s;
   if (!s || !sg.grid) { sg.simAt = now; return; }
-  if (sg.turn) sg.ang += sg.turn * 2.6 / 60 * Math.max(1, Math.min(6, (now - (sg.simAt || now)) / 16.7));
+  // Arrow keys turn 2.6 radians per second, by the time that really passed.
+  if (sg.turn) sg.ang += sg.turn * 2.6 * Math.min(0.1, (now - (sg.turnAt || now)) / 1000);
+  sg.turnAt = now;
   if (!sg.simAt) sg.simAt = now;
   let n = Math.floor((now - sg.simAt) / (1000 / 60));
   if (n > 6) { sg.simAt = now - 6 * 1000 / 60; n = 6; }
@@ -7988,14 +8034,24 @@ function brEvent(g, ev, s) {
     sg.cues = (sg.cues || []).concat({x: ev.x, y: ev.y, at: performance.now(), kind: 'boom'});
     const m2 = s.pl.find(p => p.pid === me.id);
     if (m2 && Math.hypot(m2.x - ev.x, m2.y - ev.y) < 8) sg.shake = 1.2;
-  } else if (ev.k === 'charge' && !mine) sgFloat(g, BR_RW / 2, 70, '💥 Sprengladung!', '#ff6b6b');
-  else if (ev.k === 'defusing') sgBanner(g, mine ? 'ENTSCHÄRFEN…' : 'BOMBE WIRD ENTSCHÄRFT!', mine ? 'Stillhalten und E halten' : 'Schnell zur Bombe!', '#ffd23f');
+  } else if (ev.k === 'charge') {
+    // A charge ticks for 2 s: an arrow to it for everyone, and a text for the one it surprises.
+    if (Number.isFinite(ev.x)) (sg.cues || (sg.cues = [])).push({x: ev.x, y: ev.y, at: performance.now(), kind: 'charge', life: 2000});
+    if (!mine) sgFloat(g, BR_RW / 2, 70, '💥 Sprengladung!', '#ff6b6b');
+  } else if (ev.k === 'defusing') sgBanner(g, mine ? 'ENTSCHÄRFEN…' : 'BOMBE WIRD ENTSCHÄRFT!', mine ? 'Stillhalten und E halten' : 'Schnell zur Bombe!', '#ffd23f');
   else if (ev.k === 'kill') {
     if (mine) sgBanner(g, 'AUSGESCHALTET', ((s.pl.find(p => p.pid === ev.to) || {}).name || '') + ' ist raus', '#ffffff');
-    else if (ev.to === me.id) sg.deadAt = performance.now();
+    else if (ev.to === me.id) {
+      sg.deadAt = performance.now();
+      // Where the shot came from: an arrow to the killer while the round ends.
+      const k = s.pl.find(p => p.pid === ev.pid);
+      if (k) (sg.cues || (sg.cues = [])).push({x: k.x, y: k.y, at: performance.now(), kind: 'killer', life: 3500});
+    }
   } else if (ev.k === 'round') {
-    const won = ev.pid === me.id;
-    sgBanner(g, won ? 'RUNDE GEWONNEN' : 'RUNDE VERLOREN', (BR_WHY[ev.why] || '') + ' · Stand ' + s.pl.map(p => p.sc).join(':'), won ? '#7bd88f' : '#ff6b6b');
+    const won = ev.pid === me.id, w = s.pl.find(p => p.pid === ev.pid);
+    // Lost a duel: how close it was.
+    const close = !won && ev.why === 'kill' && w && ev.hp > 0 ? ' · ' + w.name + ' hatte noch ' + ev.hp + ' ♥' : '';
+    sgBanner(g, won ? 'RUNDE GEWONNEN' : 'RUNDE VERLOREN', (BR_WHY[ev.why] || '') + close + ' · Stand ' + s.pl.map(p => p.sc).join(':'), won ? '#7bd88f' : '#ff6b6b');
   } else if (ev.k === 'over') {
     sgBanner(g, ev.pid === me.id ? 'SIEG!' : 'NIEDERLAGE', 'Endstand ' + s.pl.map(p => p.sc).join(':'), ev.pid === me.id ? '#ffd23f' : '#ffffff');
   }
@@ -8167,11 +8223,15 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
     if (label) { ctx.globalAlpha = alpha; ctx.font = '700 11px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = col; ctx.fillText(label, ax, ay + 20); ctx.globalAlpha = 1; }
   };
   if (other && other.al && s.st === 'play') {
+    // Footsteps are heard step by step: the arrow points to where the last step was (a little blurred) and fades
+    // until the next one, so it gives a direction, not a radar.
     const d = Math.hypot(other.x - px, other.y - py), loud = Math.hypot(other.vx, other.vy) > BR.WALK + 0.3;
-    if (loud && d < 12) arrow(other.x, other.y, '#ffffff', Math.max(0.25, 1 - d / 12) * (0.6 + 0.4 * Math.abs(Math.sin(now / 160))), '👣');
+    if (loud && d < 12 && now - ((sg.step && sg.step.at) || 0) > 350) sg.step = {x: other.x + (Math.random() - 0.5) * 1.2, y: other.y + (Math.random() - 0.5) * 1.2, at: now, d};
   }
-  sg.cues = (sg.cues || []).filter(c => now - c.at < 1500);
-  for (const c of sg.cues) arrow(c.x, c.y, c.kind === 'boom' ? '#ffb020' : '#ff4d4d', 1 - (now - c.at) / 1500, c.kind === 'boom' ? '💥' : '🔫');
+  if (sg.step && now - sg.step.at < 450 && s.st === 'play') arrow(sg.step.x, sg.step.y, '#ffffff', Math.max(0.25, 1 - sg.step.d / 12) * (1 - (now - sg.step.at) / 450), '👣');
+  sg.cues = (sg.cues || []).filter(c => now - c.at < (c.life || 1500));
+  const CUE = {boom: ['#ffb020', '💥'], charge: ['#ff6b6b', '⏱💣'], killer: ['#ff4d4d', '☠'], shot: ['#ff4d4d', '🔫']};
+  for (const c of sg.cues) { const [col, label] = CUE[c.kind] || CUE.shot; arrow(c.x, c.y, col, Math.max(0.3, 1 - (now - c.at) / (c.life || 1500)), label); }
   // Health, ammo, charges at the bottom left; clock and score at the top.
   const pill = (x, y, w, text, col) => { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(x, y, w, 26, 13); ctx.fill(); ctx.fillStyle = col; ctx.font = '700 14px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + 10, y + 13); };
   pill(10, vh - 36, 86, '♥ ' + mine.hp, mine.hp > 40 ? '#7bd88f' : '#ff6b6b');
@@ -8205,10 +8265,13 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
    with the level. Attacking it walks the shortest way to the bomb and defuses; defending it holds a spot in
    the bomb room, watches the doors and goes for the bomb when you defuse. */
 const BR_BOT = {
-  leicht: {react: 700, aim: 0.1, turn: 3, fov: 0.75, hear: 5, strafe: 0, stop: false},
-  mittel: {react: 450, aim: 0.055, turn: 5, fov: 0.95, hear: 8, strafe: 0.3, stop: false},
-  schwer: {react: 280, aim: 0.03, turn: 8, fov: 1.1, hear: 11, strafe: 0.6, stop: true},
-  profi: {react: 160, aim: 0.015, turn: 12, fov: 1.25, hear: 14, strafe: 1, stop: true}};
+  leicht: {react: 700, aim: 0.1, turn: 3, fov: 0.6, hear: 6, strafe: 0, stop: false, breach: 0, roam: 0},
+  mittel: {react: 450, aim: 0.055, turn: 5, fov: 0.65, hear: 9, strafe: 0.3, stop: false, breach: 0.25, roam: 0},
+  schwer: {react: 280, aim: 0.03, turn: 8, fov: 0.7, hear: 12, strafe: 0.6, stop: true, breach: 0.45, roam: 35000},
+  profi: {react: 160, aim: 0.015, turn: 12, fov: 0.75, hear: 15, strafe: 1, stop: true, breach: 0.55, roam: 25000}};
+// How an attacking bot gets in: through one of the doors, or by blowing a hole into a brick wall (stand there,
+// face the wall, place the charge, back off until it has gone off).
+const BR_ENTRY = {doors: [[15.5, 2.5], [15.5, 15.5], [25.5, 15.5]], walls: [{at: [3.2, 6.5], face: 0}, {at: [28.8, 6.5], face: Math.PI}]};
 function brBrain(R, lvl) {
   const P = BR_BOT[lvl] || BR_BOT.mittel, W = BR.W, H = BR.H;
   // Shortest way over the floor from (x, y) to a target cell: the next cell to go to.
@@ -8235,7 +8298,13 @@ function brBrain(R, lvl) {
     const now = Date.now();
     for (const p of R.players) {
       if (!p.bot) continue;
-      if (p.ba === undefined || R.st === 'count') { p.ba = p.a; p.route = null; p.seenAt = 0; }
+      // A new round: forget everything from the last one, pick a way in (attack) or a spot (defence).
+      if (p.brd !== R.rd) {
+        Object.assign(p, {brd: R.rd, ba: p.a, route: null, seenAt: 0, lastSeen: null, post: null, strafe: 0, backUntil: 0, placed: false});
+        const wall = P.breach && Math.random() < P.breach;
+        p.entry = wall ? {...BR_ENTRY.walls[Math.random() < 0.5 ? 0 : 1]} : {at: BR_ENTRY.doors[Math.floor(Math.random() * BR_ENTRY.doors.length)]};
+        p.postUntil = now + (P.roam ? P.roam * (0.7 + Math.random() * 0.6) : Infinity);
+      }
       const o = R.players.find(q => q !== p), g = R.map.g;
       let k = 0, aimDiff = 9;
       if (!p.alive || R.st !== 'play' || !o) { p.q.push([0, p.bseq = (p.bseq || 0) + 1, p.ba, 0]); continue; }
@@ -8259,14 +8328,34 @@ function brBrain(R, lvl) {
         // Heard but not seen (a wall in between): turn that way.
         if (heard) turnTo(p, toO, P.turn * 0.6);
         let target = null;
-        if (p.side === 'atk') target = BR.BOMB;
+        if (p.side === 'atk') {
+          // The way in first, unless time runs out; then the bomb.
+          if (p.entry && R.rl < 30000) p.entry = null;
+          if (p.entry && p.backUntil) {
+            // Charge placed: back off, wait for the bang, then go.
+            if (now < p.backUntil) k |= 2;
+            if (!R.charges.some(c => c.pid === p.pid)) p.entry = null;
+            p.q.push([k, p.bseq = (p.bseq || 0) + 1, p.ba, 0]);
+            continue;
+          }
+          if (p.entry && Math.hypot(p.entry.at[0] - p.x, p.entry.at[1] - p.y) < 0.35) {
+            if (p.entry.face === undefined || p.nade <= 0) p.entry = null;
+            else if (turnTo(p, p.entry.face, P.turn) < 0.05 && Math.abs(Math.atan2(Math.sin(p.a - p.entry.face), Math.cos(p.a - p.entry.face))) < 0.08) {
+              const n = R.charges.length;
+              R.place(p);
+              if (R.charges.length > n) p.backUntil = now + 1100; else p.entry = null;
+            }
+            if (p.entry) { p.q.push([0, p.bseq = (p.bseq || 0) + 1, p.ba, 0]); continue; }
+          }
+          target = p.entry ? p.entry.at : BR.BOMB;
+        }
         else if (R.defuse > 0 || p.lastSeen) target = p.lastSeen && !R.defuse ? p.lastSeen : BR.BOMB;
-        else if (!p.post) { const posts = [[15.5, 5.2], [11.5, 6.5], [21.5, 5.5], [16.5, 7.5]]; p.post = posts[Math.floor(Math.random() * posts.length)]; }
+        else if (!p.post || now > p.postUntil) { if (p.post) p.postUntil = now + P.roam * (0.7 + Math.random() * 0.6); const posts = [[15.5, 5.2], [11.5, 6.5], [21.5, 5.5], [16.5, 7.5]]; p.post = posts[Math.floor(Math.random() * posts.length)]; }
         if (!target && p.post) target = p.post;
-        const atTarget = target && Math.hypot(target[0] - p.x, target[1] - p.y) < (p.side === 'atk' ? 0.6 : 0.4);
+        const atTarget = target && Math.hypot(target[0] - p.x, target[1] - p.y) < (p.side === 'atk' && !p.entry ? 0.6 : 0.3);
         if (p.side === 'def' && p.lastSeen && atTarget) p.lastSeen = null;
         if (atTarget) {
-          if (p.side === 'atk') k |= 128;
+          if (p.side === 'atk' && !p.entry) k |= 128;
           else if (!heard) { p.sweep = (p.sweep || 0) + 1 / 60; turnTo(p, Math.atan2(BR.BOMB[1] - p.y, BR.BOMB[0] - p.x) + Math.PI + Math.sin(p.sweep * 0.8) * 1.4, P.turn * 0.4); }
         } else if (target) {
           if (!p.route || now - (p.routeAt || 0) > 500) { p.route = path(g, Math.floor(p.x), Math.floor(p.y), Math.floor(target[0]), Math.floor(target[1])); p.routeAt = now; }
