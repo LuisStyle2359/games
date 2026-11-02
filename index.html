@@ -2031,7 +2031,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5046,8 +5046,15 @@ const SG_HINT = {kick: 'Pfeiltasten oder WASD laufen, Leertaste schießen', tron
   breach: 'Ins Bild klicken · Maus zielen · WASD laufen · Shift leise · Klick schießen · R laden · F Sprengladung · E entschärfen · +/− Mausempfindlichkeit'};
 let sgGame = null;
 
+// The seat's secret: the game server gives the seat back only to a page that brings it (also after a reload).
+function sgSecret(gid) {
+  try { let s = sessionStorage.getItem('sgsec-' + gid); if (!s) { s = pgKey(); sessionStorage.setItem('sgsec-' + gid, s); } return s; } catch (e) { return pgKey(); }
+}
 function sgInit(g, key, duo) {
+  // Only one of these games at a time: an offline one makes way (its document shows the settings again).
+  if (sgGame && sgGame !== g && sgGame.offline && !g.offline) { const gm = sgGame.game; offStop(); if (showing && current === offlineDocs[gm]) offShow(gm); }
   g.key = /^[a-z0-9]{12,40}$/.test(key || '') ? key : '';
+  g.sec = g.sec || sgSecret(g.gid);
   g.duo = !!duo;
   if (duo) g.conv = g.opponent;
   g.sg = {ws: null, s: null, conn: 'connecting', tries: 0, buf: [], offs: [], off: 0, jit: 25, rtt: 0, pingAt: 0, raf: 0, ev: 0,
@@ -5075,7 +5082,7 @@ function sgConnect(g) {
   let ws, opened = false;
   try {
     ws = g.offline ? sgLocal(g) : new WebSocket(OWN_BROKER.url.replace(/\/+$/, '') + '/' + g.game + '/' + g.gid + '?key=' + g.key + '&pid=' + encodeURIComponent(me.id) +
-      '&name=' + encodeURIComponent(me.name) + (g.duo ? '&auto=2' : ''));
+      '&name=' + encodeURIComponent(me.name) + '&sec=' + g.sec + (g.duo ? '&auto=2' : ''));
   } catch (e) { sg.conn = 'lost'; return; }
   sg.ws = ws;
   ws.onopen = () => { opened = true; sg.conn = 'open'; sg.tries = 0; };
@@ -5110,7 +5117,12 @@ function sgMessage(g, m) {
   const mine = m.pl.find(p => p.pid === me.id);
   if (mine && mine.team !== undefined) sg.team = mine.team;
   // Every event since the last one seen (several can come in one update); older servers send only the last.
-  if (Array.isArray(m.evs) && m.evs.length) { for (const e of m.evs) if (e && e.n > sg.ev) { if (prev) sgEvent(g, e, m); sg.ev = e.n; } }
+  if (Array.isArray(m.evs) && m.evs.length) {
+    // A fresh room (the server restarted) counts from 1 again.
+    if (m.evs[m.evs.length - 1].n < sg.ev) sg.ev = 0;
+    // Marked as seen before it is handled, so one that fails can't block the updates after it.
+    for (const e of m.evs) if (e && e.n > sg.ev) { sg.ev = e.n; if (prev) try { sgEvent(g, e, m); } catch (err) {} }
+  }
   else if (m.ev && m.ev.n !== sg.ev) { if (prev) sgEvent(g, m.ev, m); sg.ev = m.ev.n; }
   if (g.game === 'kick') { if (m.ko >= 0 && (!prev || prev.ko < 0 || prev.st !== m.st)) sg.koAt = performance.now(); bzSnapshot(g, m); }
   else if (g.game === 'breach') brSnapshot(g, m);
@@ -5849,7 +5861,8 @@ function nrTurn(g, d) {
   const sg = g.sg, s = sg.s, mi = s ? s.pl.findIndex(p => p.pid === me.id) : -1, mine = s && s.pl[mi], t = sg.trails[mi];
   if (!mine || !t || !t.length) return;
   sg.pend = sg.pend || [];
-  // Confused: every direction is the opposite one.
+  // Confused: every direction is the opposite one (the server turns it around too; the key as pressed goes there).
+  const pressed = d;
   if (mine.fx && mine.fx.confuse > 0) d = (d + 2) % 4;
   const cur = sg.pend.length ? sg.pend[sg.pend.length - 1].d : mine.d;
   if (d === cur || d === (cur + 2) % 4 || sg.pend.length >= 3) return;
@@ -5859,7 +5872,7 @@ function nrTurn(g, d) {
   if (last[2]) while (last[2] + (n - t.length + 1) * cellMs < arrive) n++;
   n++;
   if (sg.pend.length) n = Math.max(n, sg.pend[sg.pend.length - 1].n + 1);
-  sgSend(g, {t: 'turn', d, n});
+  sgSend(g, {t: 'turn', d: pressed, n});
   sg.pend.push({d, n});
 }
 // The own bike as it will be when the latest key press reaches the server: from its newest confirmed cell,
@@ -5934,7 +5947,7 @@ function nrEvent(g, ev, s) {
     if (h) { sg.rings.push({x: h[0], y: h[1], r0: 6, r1: 40, life: 0, max: 0.4, c: '#60a5fa', w: 6}); sgFloat(g, h[0], h[1] - 18, '🛡️ GERETTET', '#60a5fa'); }
   } else if (ev.k === 'round') {
     const i = s.pl.findIndex(p => p.pid === ev.pid);
-    sgBanner(g, ev.pid ? (ev.pid === me.id ? 'RUNDE GEWONNEN' : s.pl[i].name.toUpperCase() + ' GEWINNT') : 'UNENTSCHIEDEN', 'Runde ' + s.rd + ' · Stand ' + s.pl.map(p => p.sc).join(':'), ev.pid ? NR_COL[i] : '#ffffff');
+    sgBanner(g, ev.pid ? (ev.pid === me.id ? 'RUNDE GEWONNEN' : (i >= 0 ? s.pl[i].name.toUpperCase() : 'JEMAND') + ' GEWINNT') : 'UNENTSCHIEDEN', 'Runde ' + s.rd + ' · Stand ' + s.pl.map(p => p.sc).join(':'), ev.pid ? NR_COL[i] : '#ffffff');
   } else if (ev.k === 'over') {
     const i = s.pl.findIndex(p => p.pid === ev.pid);
     sgBanner(g, ev.pid === me.id ? 'SIEG!' : 'ENDE', ev.pid && i >= 0 ? s.pl[i].name + ' gewinnt' : '', ev.pid && i >= 0 ? NR_COL[i] : '#ffffff');
@@ -6580,16 +6593,22 @@ class Room {
     if (this.key && this.key !== key) return new Response('forbidden', {status: 403});
     let p = this.players.find(x => x.pid === pid);
     if (!p && (this.st !== 'lobby' || this.players.length >= this.max)) return new Response('full', {status: 409});
+    // A seat belongs to the page that took it: a reconnect has to bring the same secret, so nobody who knows
+    // the room's key and someone's chat id can take over their seat.
+    const sec = (u.searchParams.get('sec') || '').slice(0, 64);
+    if (p && p.sec && p.sec !== sec) return new Response('taken', {status: 409});
     this.key = key;
     const [client, server] = Object.values(new WebSocketPair());
     server.accept();
-    if (!p) { p = {pid, ws: null, left: 0, away: false, pauses: 2}; this.players.push(p); this.joined(p); }
+    const first = !this.players.length;
+    if (!p) { p = {pid, sec, ws: null, left: 0, away: false, pauses: 2}; this.players.push(p); this.joined(p); }
     if (p.ws) try { p.ws.close(1000, 'replaced'); } catch (e) {}
     p.ws = server;
     p.name = (u.searchParams.get('name') || '').slice(0, 24) || 'Spieler';
     p.left = 0;
     p.away = false;
-    if (Number(u.searchParams.get('auto')) === 2) this.auto = 2;
+    // Only whoever opens the room can make it a direct match that starts by itself.
+    if (first && Number(u.searchParams.get('auto')) === 2) this.auto = 2;
     server.addEventListener('message', e => this.onMessage(p, e.data));
     const gone = () => {
       if (p.ws !== server) return;
@@ -6612,6 +6631,8 @@ class Room {
   }
 
   onMessage(p, data) {
+    // Someone who left (or quit) has no say any more.
+    if (!this.players.includes(p)) return;
     let m;
     try { m = JSON.parse(data); } catch (e) { return; }
     const now = Date.now();
@@ -6628,7 +6649,7 @@ class Room {
       this.pauseEnd = now + (this.solo ? 864e5 : 60000);
       this.event('pause', {pid: p.pid});
     } else if (m.t === 'resume' && this.st === 'pause' && this.pausedBy) this.resume(now);
-    else if (m.t === 'quit') { if (this.st === 'lobby') { try { p.ws.close(1000, 'bye'); } catch (e) {} this.remove(p); } else this.drop(p); }
+    else if (m.t === 'quit') { const ws = p.ws; if (this.st === 'lobby') this.remove(p); else this.drop(p); try { ws.close(1000, 'bye'); } catch (e) {} }
     else this.input(p, m);
   }
 
@@ -6769,6 +6790,7 @@ class Kick extends Room {
         y: mates.length === 1 ? KH / 2 : KH / 2 + (i ? 70 : -70), vx: 0, vy: 0}));
     }
     this.ko = team;
+    this.koT = 0;
     this.touch = null;
     this.wall = [0, 0];
     this.spin = 0;
@@ -6847,6 +6869,8 @@ class Kick extends Room {
       }
       p.started = true;
       while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
+      // Inputs piled up while the server stood still: drop the oldest, so the player doesn't lag behind for good.
+      if (p.q.length > 4 && p.cr < 2) { p.ack = p.q[p.q.length - 5][1]; p.q.splice(0, p.q.length - 4); }
       const steps = Math.min(p.q.length > 4 ? 2 : 1, Math.floor(p.cr));
       for (let n = 0; n < steps && p.q.length; n++) {
         p.cr--;
@@ -6913,7 +6937,8 @@ class Kick extends Room {
     // The wall power-up: a barrier in front of the goal that only the ball bounces off.
     for (const t of [0, 1]) if (this.wall[t] > 0 && wallHit(b, t === 0 ? K_WALL_X : KW - K_WALL_X)) { this.spin = 0; this.event('wallhit', {team: t}); }
     ballBounds(b);
-    if (this.ko >= 0 && Math.hypot(b.vx, b.vy) > 0.01) this.ko = -1;
+    // Kickoff: once the ball moves, or after 5 s if nobody takes it, everyone may go for the ball.
+    if (this.ko >= 0 && (Math.hypot(b.vx, b.vy) > 0.01 || ++this.koT > 300)) this.ko = -1;
     this.items();
     if (this.st === 'play' && (b.x < -KBR || b.x > KW + KBR)) {
       const team = b.x < 0 ? 1 : 0, scorer = ps.find(p => p.pid === this.touch);
@@ -7019,6 +7044,12 @@ function ballBounds(b) {
   if (b.y > KH - KBR) { b.y = KH - KBR; b.vy = -b.vy * 0.5; }
   for (const side of [0, 1]) {
     const inGoal = side === 0 ? b.x < 0 : b.x > KW, line = side === 0 ? 0 : KW, s = side === 0 ? 1 : -1;
+    // A fast ball that went past the end line beside the goal in one step bounces off the wall, it doesn't score.
+    if (inGoal && (b.y < top || b.y > bot) && (side === 0 ? b.x - b.vx >= 0 : b.x - b.vx <= KW)) {
+      b.x = side === 0 ? KBR : KW - KBR;
+      b.vx = s * Math.abs(b.vx) * 0.5;
+      continue;
+    }
     if (inGoal) {
       if (b.y < top + KBR) { b.y = top + KBR; b.vy = Math.abs(b.vy) * 0.1; }
       if (b.y > bot - KBR) { b.y = bot - KBR; b.vy = -Math.abs(b.vy) * 0.1; }
@@ -7079,7 +7110,8 @@ class Tron extends Room {
   extra(p) { return {sc: p.sc, al: p.alive, x: p.x, y: p.y, d: p.d, f: Math.round(p.fuel), bo: p.boost, fc: p.face || null, fx: p.fx, sp: tronSpeed(p)}; }
   input(p, m) {
     // A turn can name the move it is meant for (the page has already shown it there); it waits for that move.
-    if (m.t === 'turn' && Number.isInteger(m.d) && m.d >= 0 && m.d < 4 && p.q.length < 3) p.q.push({d: m.d, n: Number.isInteger(m.n) ? m.n : 0});
+    // A turn can't wait for a move far ahead (a stale one from the last round would block all others).
+    if (m.t === 'turn' && Number.isInteger(m.d) && m.d >= 0 && m.d < 4 && p.q.length < 3) p.q.push({d: m.d, n: Number.isInteger(m.n) ? Math.min(m.n, p.mc + 8) : 0});
     else if (m.t === 'boost' && typeof m.v === 'boolean') p.boost = m.v;
     else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f) && this.st === 'play') p.face = m.f;
     else if (m.t === 'full') this.full(p);
@@ -7161,7 +7193,9 @@ class Tron extends Room {
       this.players.forEach((p, i) => {
         if (!p.alive || steps[i] <= r) return;
         while (p.q.length && !(p.q[0].n > p.mc + 1)) {
-          const d = p.q.shift().d;
+          // Confused: every turn goes the other way (for pages and bots alike).
+          let d = p.q.shift().d;
+          if (p.fx.confuse > 0) d = (d + 2) % 4;
           if (d !== p.d && d !== (p.d + 2) % 4) { p.d = d; break; }
         }
         let nx = p.x + T_DIR[p.d][0], ny = p.y + T_DIR[p.d][1];
@@ -7170,7 +7204,9 @@ class Tron extends Room {
           if (!((p.fx.shield || p.fx.god) && this.dodge(p, target))) {
             this.crash(p, i);
             const o = target.get(ny * TW + nx);
-            if (o && o.p.alive && this.open(p, nx, ny)) this.crash(o.p, o.i);
+            if (o && o.p.alive && this.open(p, nx, ny) && !o.p.fx.god) {
+              if (o.p.fx.shield) { o.p.fx.shield = 0; this.event('shield', {pid: o.p.pid}); } else this.crash(o.p, o.i);
+            }
             return;
           }
           if (!p.fx.god) { p.fx.shield = 0; this.event('shield', {pid: p.pid}); }
@@ -7469,6 +7505,8 @@ class Breach extends Room {
         p.started = true;
         // Inputs skipped to catch up still pass on a reload press (a tap may be in just one input).
         while (p.owed > 0 && p.q.length > 1) { const d = p.q.shift(); p.ack = d[1]; p.owed--; p.q[0][0] |= d[0] & 64; }
+        // Inputs piled up while the server stood still: drop the oldest (a reload press goes on).
+        if (p.q.length > 4 && p.cr < 2) { while (p.q.length > 4) { const d = p.q.shift(); p.ack = d[1]; p.q[0][0] |= d[0] & 64; } }
         for (let n = Math.min(p.q.length > 4 ? 2 : 1, Math.floor(p.cr)); n > 0 && p.q.length; n--) { p.cr--; const [k, i, a, rt] = p.q.shift(); p.ack = i; run(k, a, rt); }
       }
       p.hist.push([this.tick, now, p.x, p.y]);
@@ -7911,7 +7949,8 @@ function nrBrain(R, lvl) {
       });
       let best = opts.reduce((a, c) => c.s > a.s ? c : a);
       if (Math.random() < P.err) best = opts[Math.floor(Math.random() * 3)];
-      if (best.d !== p.d) p.q = [{d: best.d, n: 0}];
+      // Confused, the server turns every turn around: the better bots steer the other way on purpose.
+      if (best.d !== p.d) p.q = [{d: p.fx.confuse > 0 && (lvl === 'schwer' || lvl === 'profi') ? (best.d + 2) % 4 : best.d, n: 0}];
       if (P.boost) {
         let run = 0, x = p.x, y = p.y;
         while (run < 16) { x += NR_DIR[best.d][0]; y += NR_DIR[best.d][1]; if (!open(p, x, y)) break; run++; }

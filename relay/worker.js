@@ -628,16 +628,22 @@ class Room {
     if (this.key && this.key !== key) return new Response('forbidden', {status: 403});
     let p = this.players.find(x => x.pid === pid);
     if (!p && (this.st !== 'lobby' || this.players.length >= this.max)) return new Response('full', {status: 409});
+    // A seat belongs to the page that took it: a reconnect has to bring the same secret, so nobody who knows
+    // the room's key and someone's chat id can take over their seat.
+    const sec = (u.searchParams.get('sec') || '').slice(0, 64);
+    if (p && p.sec && p.sec !== sec) return new Response('taken', {status: 409});
     this.key = key;
     const [client, server] = Object.values(new WebSocketPair());
     server.accept();
-    if (!p) { p = {pid, ws: null, left: 0, away: false, pauses: 2}; this.players.push(p); this.joined(p); }
+    const first = !this.players.length;
+    if (!p) { p = {pid, sec, ws: null, left: 0, away: false, pauses: 2}; this.players.push(p); this.joined(p); }
     if (p.ws) try { p.ws.close(1000, 'replaced'); } catch (e) {}
     p.ws = server;
     p.name = (u.searchParams.get('name') || '').slice(0, 24) || 'Spieler';
     p.left = 0;
     p.away = false;
-    if (Number(u.searchParams.get('auto')) === 2) this.auto = 2;
+    // Only whoever opens the room can make it a direct match that starts by itself.
+    if (first && Number(u.searchParams.get('auto')) === 2) this.auto = 2;
     server.addEventListener('message', e => this.onMessage(p, e.data));
     const gone = () => {
       if (p.ws !== server) return;
@@ -660,6 +666,8 @@ class Room {
   }
 
   onMessage(p, data) {
+    // Someone who left (or quit) has no say any more.
+    if (!this.players.includes(p)) return;
     let m;
     try { m = JSON.parse(data); } catch (e) { return; }
     const now = Date.now();
@@ -676,7 +684,7 @@ class Room {
       this.pauseEnd = now + (this.solo ? 864e5 : 60000);
       this.event('pause', {pid: p.pid});
     } else if (m.t === 'resume' && this.st === 'pause' && this.pausedBy) this.resume(now);
-    else if (m.t === 'quit') { if (this.st === 'lobby') { try { p.ws.close(1000, 'bye'); } catch (e) {} this.remove(p); } else this.drop(p); }
+    else if (m.t === 'quit') { const ws = p.ws; if (this.st === 'lobby') this.remove(p); else this.drop(p); try { ws.close(1000, 'bye'); } catch (e) {} }
     else this.input(p, m);
   }
 
@@ -817,6 +825,7 @@ export class Kick extends Room {
         y: mates.length === 1 ? KH / 2 : KH / 2 + (i ? 70 : -70), vx: 0, vy: 0}));
     }
     this.ko = team;
+    this.koT = 0;
     this.touch = null;
     this.wall = [0, 0];
     this.spin = 0;
@@ -895,6 +904,8 @@ export class Kick extends Room {
       }
       p.started = true;
       while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
+      // Inputs piled up while the server stood still: drop the oldest, so the player doesn't lag behind for good.
+      if (p.q.length > 4 && p.cr < 2) { p.ack = p.q[p.q.length - 5][1]; p.q.splice(0, p.q.length - 4); }
       const steps = Math.min(p.q.length > 4 ? 2 : 1, Math.floor(p.cr));
       for (let n = 0; n < steps && p.q.length; n++) {
         p.cr--;
@@ -961,7 +972,8 @@ export class Kick extends Room {
     // The wall power-up: a barrier in front of the goal that only the ball bounces off.
     for (const t of [0, 1]) if (this.wall[t] > 0 && wallHit(b, t === 0 ? K_WALL_X : KW - K_WALL_X)) { this.spin = 0; this.event('wallhit', {team: t}); }
     ballBounds(b);
-    if (this.ko >= 0 && Math.hypot(b.vx, b.vy) > 0.01) this.ko = -1;
+    // Kickoff: once the ball moves, or after 5 s if nobody takes it, everyone may go for the ball.
+    if (this.ko >= 0 && (Math.hypot(b.vx, b.vy) > 0.01 || ++this.koT > 300)) this.ko = -1;
     this.items();
     if (this.st === 'play' && (b.x < -KBR || b.x > KW + KBR)) {
       const team = b.x < 0 ? 1 : 0, scorer = ps.find(p => p.pid === this.touch);
@@ -1067,6 +1079,12 @@ function ballBounds(b) {
   if (b.y > KH - KBR) { b.y = KH - KBR; b.vy = -b.vy * 0.5; }
   for (const side of [0, 1]) {
     const inGoal = side === 0 ? b.x < 0 : b.x > KW, line = side === 0 ? 0 : KW, s = side === 0 ? 1 : -1;
+    // A fast ball that went past the end line beside the goal in one step bounces off the wall, it doesn't score.
+    if (inGoal && (b.y < top || b.y > bot) && (side === 0 ? b.x - b.vx >= 0 : b.x - b.vx <= KW)) {
+      b.x = side === 0 ? KBR : KW - KBR;
+      b.vx = s * Math.abs(b.vx) * 0.5;
+      continue;
+    }
     if (inGoal) {
       if (b.y < top + KBR) { b.y = top + KBR; b.vy = Math.abs(b.vy) * 0.1; }
       if (b.y > bot - KBR) { b.y = bot - KBR; b.vy = -Math.abs(b.vy) * 0.1; }
@@ -1127,7 +1145,8 @@ export class Tron extends Room {
   extra(p) { return {sc: p.sc, al: p.alive, x: p.x, y: p.y, d: p.d, f: Math.round(p.fuel), bo: p.boost, fc: p.face || null, fx: p.fx, sp: tronSpeed(p)}; }
   input(p, m) {
     // A turn can name the move it is meant for (the page has already shown it there); it waits for that move.
-    if (m.t === 'turn' && Number.isInteger(m.d) && m.d >= 0 && m.d < 4 && p.q.length < 3) p.q.push({d: m.d, n: Number.isInteger(m.n) ? m.n : 0});
+    // A turn can't wait for a move far ahead (a stale one from the last round would block all others).
+    if (m.t === 'turn' && Number.isInteger(m.d) && m.d >= 0 && m.d < 4 && p.q.length < 3) p.q.push({d: m.d, n: Number.isInteger(m.n) ? Math.min(m.n, p.mc + 8) : 0});
     else if (m.t === 'boost' && typeof m.v === 'boolean') p.boost = m.v;
     else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f) && this.st === 'play') p.face = m.f;
     else if (m.t === 'full') this.full(p);
@@ -1209,7 +1228,9 @@ export class Tron extends Room {
       this.players.forEach((p, i) => {
         if (!p.alive || steps[i] <= r) return;
         while (p.q.length && !(p.q[0].n > p.mc + 1)) {
-          const d = p.q.shift().d;
+          // Confused: every turn goes the other way (for pages and bots alike).
+          let d = p.q.shift().d;
+          if (p.fx.confuse > 0) d = (d + 2) % 4;
           if (d !== p.d && d !== (p.d + 2) % 4) { p.d = d; break; }
         }
         let nx = p.x + T_DIR[p.d][0], ny = p.y + T_DIR[p.d][1];
@@ -1218,7 +1239,9 @@ export class Tron extends Room {
           if (!((p.fx.shield || p.fx.god) && this.dodge(p, target))) {
             this.crash(p, i);
             const o = target.get(ny * TW + nx);
-            if (o && o.p.alive && this.open(p, nx, ny)) this.crash(o.p, o.i);
+            if (o && o.p.alive && this.open(p, nx, ny) && !o.p.fx.god) {
+              if (o.p.fx.shield) { o.p.fx.shield = 0; this.event('shield', {pid: o.p.pid}); } else this.crash(o.p, o.i);
+            }
             return;
           }
           if (!p.fx.god) { p.fx.shield = 0; this.event('shield', {pid: p.pid}); }
@@ -1517,6 +1540,8 @@ export class Breach extends Room {
         p.started = true;
         // Inputs skipped to catch up still pass on a reload press (a tap may be in just one input).
         while (p.owed > 0 && p.q.length > 1) { const d = p.q.shift(); p.ack = d[1]; p.owed--; p.q[0][0] |= d[0] & 64; }
+        // Inputs piled up while the server stood still: drop the oldest (a reload press goes on).
+        if (p.q.length > 4 && p.cr < 2) { while (p.q.length > 4) { const d = p.q.shift(); p.ack = d[1]; p.q[0][0] |= d[0] & 64; } }
         for (let n = Math.min(p.q.length > 4 ? 2 : 1, Math.floor(p.cr)); n > 0 && p.q.length; n--) { p.cr--; const [k, i, a, rt] = p.q.shift(); p.ack = i; run(k, a, rt); }
       }
       p.hist.push([this.tick, now, p.x, p.y]);
