@@ -337,6 +337,26 @@ tbody tr.sel td { background: var(--select); }
 .uno-hand .uc.dim { opacity: .5; }
 .uno-color { display: inline-block; width: 12px; height: 12px; margin-right: 4px; border-radius: 50%; vertical-align: middle; }
 .unobtn { color: #c0392b; font-weight: 700; }
+.sg-canvas { background: #2f6b2b; border: none; }
+.sg-canvas.sg-tron { background: #070b17; }
+.sg-over { background: transparent; text-shadow: 0 2px 10px rgba(0,0,0,.85), 0 0 3px #000; color: #fff; font-size: 26px; font-weight: 700; white-space: pre-line; line-height: 1.4; pointer-events: none; }
+.sg-lobby { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10,16,24,.45); padding: 10px; }
+.sg-lobby[hidden] { display: none; }
+.sg-lobbybox { background: var(--paper); border: 1px solid #c8922a; border-radius: 6px; padding: 14px 18px; width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+.sg-lobbybox p { margin: 0; font-size: 12px; color: var(--muted); }
+.sg-teams { display: flex; gap: 10px; }
+.sg-team { flex: 1; border: 1px solid var(--grid-line); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 4px; min-height: 92px; }
+.sg-team0 b { color: #c0392b; } .sg-team1 b { color: #2563eb; }
+.sg-riders { display: flex; flex-direction: column; gap: 4px; }
+.sg-pl { font-size: 13px; display: flex; align-items: center; gap: 6px; } .sg-pl.me { font-weight: 700; }
+.sg-chip { width: 12px; height: 12px; border-radius: 3px; display: inline-block; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.sg-score { white-space: pre; font-weight: 600; }
+.sg-start { background: #2e9d4f; border-color: #237a3d; color: #fff; font-weight: 700; height: 34px; font-size: 14px; }
+.sg-start:hover:not(:disabled) { background: #26864a; }
+.sg-start:disabled { background: #a9c7b2; border-color: #a9c7b2; }
+.sg-free { color: var(--muted); font-style: italic; }
+.sg-chipfree { background: transparent; box-shadow: inset 0 0 0 1px var(--muted); }
+.sg-lobbybox .sg-keys { color: var(--ink); font-size: 11.5px; }
 .pg-over { background: rgba(16,22,31,.55); color: #fff; font-size: 28px; font-weight: 700; white-space: pre-line; line-height: 1.4; }
 .pg-vote { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(16,22,31,.82); color: #fff; }
 .pg-vote-q { font-size: 18px; font-weight: 700; }
@@ -591,7 +611,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
-            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button></div>
+            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button><button class="vbtn" id="cmpKick" type="button" style="width:100%">⚽ Fußball</button><button class="vbtn" id="cmpTron" type="button" style="width:100%">🏍️ Neon Rush</button></div>
             <div class="cpop" id="cflexpop" hidden role="dialog" aria-label="Score zeigen" style="padding:8px;gap:4px;flex-direction:column"></div>
             <div class="cimgbar" id="cimgbar" hidden><img id="cimgthumb" alt=""><span id="cimginfo">Bild senden?</span><button class="vbtn" id="cimgsend" type="button">Senden</button><button class="vbtn" id="cimgcancel" type="button">Abbrechen</button></div>
             <div class="cimgview" id="cimgview" hidden></div>
@@ -1825,7 +1845,7 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong vs Bot'};
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong vs Bot', kick: 'Fußball', tron: 'Neon Rush'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -1982,7 +2002,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2207,6 +2227,7 @@ async function incoming(t, payload) {
     const body = await verify(box);
     if (body && room === r && body.kind === 'del') { applyDelete(ALL, body.from, body.id); return; }
     if (body && room === r && body.kind === 'uopen') { unoTableSeen(body); return; }
+    if (body && room === r && body.kind === 'sgopen') { sgTableSeen(body); return; }
     if (body && room === r && body.kind === 'react') { applyReact(ALL, body.from, String(body.owner || ''), body.id, body.e); return; }
     if (body && room === r && body.kind === 'img') { imgMeta(ALL, body.from, cleanName(body.name) || 'Unbekannt', body); return; }
     if (body && room === r && body.kind === 'imgc') { imgChunk(ALL, body.from, body); return; }
@@ -2415,7 +2436,7 @@ function toggleLb() {
   if (!p.hidden) renderLb();
 }
 function renderLb() {
-  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong', 'pongtop'];
+  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong', 'pongtop', 'kick', 'tron'];
   const avail = allGames.filter(g => lb[g] && Object.keys(lb[g]).length);
   if (!avail.includes(lbGame)) lbGame = avail[0] || 'snake';
   $('clbtabs').replaceChildren(...avail.map(g =>
@@ -2426,7 +2447,7 @@ function renderLb() {
     .sort((a, b) => b.score - a.score);
   if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Scores für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
   const medals = ['gold', 'silver', 'bronze'];
-  const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong'];
+  const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong', 'kick', 'tron'];
   $('clbbody').replaceChildren(el('table', {class: 'clbtable'},
     el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : ['pongbot', 'pongtop'].includes(lbGame) ? 'Tempo' : 'Score'}))),
     el('tbody', {}, ...entries.map((e, i) => el('tr', {},
@@ -2479,6 +2500,7 @@ function startMp(gid, game, opponent, opName, myMark, key) {
   else if (game === 'react') rxInit(mpGame);
   else if (game === 'uno') unoStartDuo(mpGame);
   else if (game === 'pong') pgInit(mpGame, key);
+  else if (SG_GAMES.includes(game)) sgInit(mpGame, key, true);
   mpInvites = mpInvites.filter(i => i.from !== opponent && !i.mine);
   conv = opponent;
   renderChat();
@@ -2496,12 +2518,13 @@ function syncMpView() {
 }
 function renderMpBoard() {
   if (!mpGame) return;
-  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno', 'pong'].includes(mpGame.game));
+  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron'].includes(mpGame.game));
   if (mpGame.game === 'draw') { renderDraw(); return; }
   if (mpGame.game === 'emoji') { renderEmoji(); return; }
   if (mpGame.game === 'react') { renderReact(); return; }
   if (mpGame.game === 'uno') { renderUno(); return; }
   if (mpGame.game === 'pong') { renderPong(); return; }
+  if (SG_GAMES.includes(mpGame.game)) { renderSg(); return; }
   const g = mpGame, myTurn = g.turn === g.myMark;
   const opLabel = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
   if (g.over) {
@@ -2592,7 +2615,7 @@ setInterval(() => {
 function inviteMp(game) {
   if (conv === ALL || !people.has(conv) || !mq || mpRunning()) return;
   closePops();
-  const gid = me.id + Date.now().toString(36), key = game === 'pong' ? pgKey() : undefined;
+  const gid = me.id + Date.now().toString(36), key = ['pong', 'kick', 'tron'].includes(game) ? pgKey() : undefined;
   sendMpMsg(conv, {type: 'invite', game, gid, name: me.name, key}).catch(() => {});
   addMsg(conv, {id: 'inv-' + gid, from: 'system', name: '', text: GAME_NAMES[game] + ': Einladung an ' + nameOf(conv) + ' gesendet…', ts: Date.now()});
   if ((people.get(conv).v || 0) < APP_VERSION) addMsg(conv, {id: 'old-' + gid, from: 'system', name: '', text: 'Hinweis: ' + nameOf(conv) + ' hat noch eine ältere Version der Seite offen. Kommt die Einladung nicht an, muss ' + nameOf(conv) + ' die Seite mit Strg+F5 neu laden.', ts: Date.now()});
@@ -2612,6 +2635,7 @@ function resignMp() {
   const g = mpGame;
   if (!g || g.over) return;
   if (g.game === 'uno') { if (g.isHost) unoClose(g); else unoLeave(g); return; }
+  if (SG_GAMES.includes(g.game)) { sgLeave(g); return; }
   if (g.game === 'pong') pgQuit(g);
   g.over = true;
   g.winner = 3 - g.myMark;
@@ -4947,6 +4971,783 @@ function pgFrame(g, ts) {
   pg.raf = requestAnimationFrame(ts => pgFrame(g, ts));
 }
 
+/* Fußball and Neon Rush: games for two to four players that run on our own game server, like Ping Pong.
+   One against one from a direct invitation, up to four at a table in the group chat (like Uno). The page
+   connects with the game's key and its chat id; the server keeps the lobby, the game and the score. */
+const SG_GAMES = ['kick', 'tron'], SG_MAX = 4;
+const SG_TITLE = {kick: '⚽ Fußball', tron: '🏍️ Neon Rush'};
+const SG_HINT = {kick: 'Pfeiltasten oder WASD laufen, Leertaste schießen', tron: 'Pfeiltasten oder WASD lenken, Leertaste hält den Boost'};
+let sgGame = null;
+
+function sgInit(g, key, duo) {
+  g.key = /^[a-z0-9]{12,40}$/.test(key || '') ? key : '';
+  g.duo = !!duo;
+  if (duo) g.conv = g.opponent;
+  g.sg = {ws: null, s: null, conn: 'connecting', tries: 0, buf: [], offs: [], off: 0, jit: 25, rtt: 0, pingAt: 0, raf: 0, ev: 0,
+    keys: 0, seq: 0, hist: [], me: null, vis: {x: 0, y: 0}, simAt: 0, trails: [], ghosts: [], rd: 0,
+    parts: [], rings: [], banner: null, shake: 0, frameAt: 0, roster: ''};
+  sgGame = g;
+  sgConnect(g);
+}
+function sgSend(g, m) { const ws = g.sg.ws; if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+function sgConnect(g) {
+  const sg = g.sg;
+  if (mpGame !== g || g.over || !OWN_BROKER.url || !g.key) { sg.conn = 'lost'; return; }
+  let ws, opened = false;
+  try {
+    ws = new WebSocket(OWN_BROKER.url.replace(/\/+$/, '') + '/' + g.game + '/' + g.gid + '?key=' + g.key + '&pid=' + encodeURIComponent(me.id) +
+      '&name=' + encodeURIComponent(me.name) + (g.duo ? '&auto=2' : ''));
+  } catch (e) { sg.conn = 'lost'; return; }
+  sg.ws = ws;
+  ws.onopen = () => { opened = true; sg.conn = 'open'; sg.tries = 0; };
+  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } sgMessage(g, m); };
+  ws.onclose = () => {
+    if (sg.ws !== ws) return;
+    sg.ws = null;
+    sg.conn = 'lost';
+    // Turned away before ever getting in: the table is full or already playing.
+    if (!opened && !sg.s && sg.tries >= 2) { sg.conn = 'full'; if (conv === mpConv(g)) renderMpBoard(); return; }
+    if (mpGame === g && !g.over && sg.tries++ < 30) setTimeout(() => sgConnect(g), 1000);
+  };
+}
+const sgRosterKey = s => s.st + '|' + s.host + '|' + s.pl.map(p => p.pid + ':' + p.name + ':' + p.team + ':' + p.on).join(',');
+function sgMessage(g, m) {
+  const sg = g.sg;
+  if (m.t === 'pong' && Number.isFinite(m.c)) { const r = performance.now() - m.c; sg.rtt = sg.rtt ? sg.rtt * 0.7 + r * 0.3 : r; return; }
+  if (m.t === 'full') { if (g.game === 'tron') nrFull(g, m); return; }
+  if (m.t !== 's' || !Array.isArray(m.pl)) return;
+  const prev = sg.s;
+  sg.s = m;
+  if (Number.isFinite(m.ts)) {
+    // As in Ping Pong: the smallest gap to the server clock is the offset, and others are drawn a little in
+    // the past, between two real positions, by about as much as updates arrive late.
+    sg.offs.push(pgMs() - m.ts);
+    if (sg.offs.length > 240) sg.offs.shift();
+    sg.off = Math.min(...sg.offs);
+    sg.jit = Math.max(pgMs() - m.ts - sg.off, sg.jit * 0.985);
+    sg.buf.push(m);
+    if (sg.buf.length > 90) sg.buf.shift();
+  }
+  const mine = m.pl.find(p => p.pid === me.id);
+  if (mine && mine.team !== undefined) sg.team = mine.team;
+  if (m.ev && m.ev.n !== sg.ev) { if (prev) sgEvent(g, m.ev, m); sg.ev = m.ev.n; }
+  if (g.game === 'kick') { if (m.ko >= 0 && (!prev || prev.ko < 0 || prev.st !== m.st)) sg.koAt = performance.now(); bzSnapshot(g, m); }
+  else nrSnapshot(g, m);
+  if (m.st === 'over' && !g.over) sgFinish(g, m);
+  const rk = sgRosterKey(m);
+  if (rk !== sg.roster) { sg.roster = rk; if (conv === mpConv(g)) renderSgChrome(g); }
+}
+// Ball, players and bikes as the server had them a moment ago, between the two updates around that moment.
+function sgSample(g) {
+  const sg = g.sg, buf = sg.buf, delay = Math.max(30, Math.min(120, 16 + sg.jit)), t = pgMs() - sg.off - delay;
+  if (!buf.length) return null;
+  let i = buf.length - 1;
+  while (i > 0 && buf[i - 1].ts > t) i--;
+  const b = buf[i], a = buf[i - 1];
+  // Past the newest update (one came late): carry on with the last speeds for up to 100 ms instead of freezing.
+  if (!a || b.ts <= t) return {a: b, b, k: 1, ex: Math.max(0, Math.min(6, (t - b.ts) / BZ_TICK))};
+  return {a, b, k: Math.max(0, Math.min(1, (t - a.ts) / (b.ts - a.ts))), ex: 0};
+}
+function sgAnnounce(g, open) {
+  const n = g.sg.s ? g.sg.s.pl.length : 1;
+  signed({kind: 'sgopen', game: g.game, gid: g.gid, key: g.key, n, open}).then(b => publish(ALL, b)).catch(() => {});
+}
+function sgTableSeen(body) {
+  const gid = String(body.gid || '').slice(0, 40);
+  if (!gid || !SG_GAMES.includes(body.game) || !/^[a-z0-9]{12,40}$/.test(body.key || '')) return;
+  if (body.open) {
+    if (!mpTables.has(gid)) bumpUnread(ALL);
+    mpTables.set(gid, {gid, game: body.game, key: body.key, host: body.from, name: cleanName(body.name) || nameOf(body.from),
+      n: Math.max(1, Math.min(SG_MAX, body.n | 0)), ts: Date.now()});
+  } else mpTables.delete(gid);
+  if (conv === ALL) renderMsgs();
+}
+function sgOpenTable(game) {
+  if (!mq || mpRunning() || !room || !OWN_BROKER.url) return;
+  closePops();
+  mpGame = {gid: me.id + Date.now().toString(36), game, conv: ALL, opponent: null, opName: '', myMark: 1, over: false, table: true};
+  sgInit(mpGame, pgKey(), false);
+  renderMsgs();
+}
+function sgJoinTable(t) {
+  if (!mq || mpRunning() || !people.has(t.host)) return;
+  mpGame = {gid: t.gid, game: t.game, conv: ALL, opponent: null, opName: t.name, myMark: 2, over: false, table: true};
+  sgInit(mpGame, t.key, false);
+  renderMsgs();
+}
+function sgLeave(g) {
+  sgSend(g, {t: 'quit'});
+  if (g.sg.ws) { const ws = g.sg.ws; g.sg.ws = null; setTimeout(() => { try { ws.close(); } catch (e) {} }, 200); }
+  if (g.table && g.sg.s && g.sg.s.host === me.id && g.sg.s.st === 'lobby' && g.sg.s.pl.length <= 1) sgAnnounce(g, false);
+  g.over = true;
+  g.left = true;
+  addMsg(mpConv(g), {id: 'mp-' + g.gid, from: 'system', name: '', text: SG_TITLE[g.game] + ': Du hast das Spiel verlassen.', ts: Date.now()});
+  if (conv === mpConv(g)) renderMpBoard();
+}
+function sgFinish(g, s) {
+  g.over = true;
+  const win = g.game === 'kick' ? s.w === g.sg.team : s.w === me.id;
+  g.winner = win ? g.myMark : 0;
+  let text;
+  if (g.game === 'kick') text = SG_TITLE.kick + ': ' + (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt ' + s.sc[s.w] + ':' + s.sc[1 - s.w] + (win ? ' – du hast gewonnen! 🎉' : '');
+  else { const w = s.pl.find(p => p.pid === s.w); text = SG_TITLE.tron + ': ' + (win ? 'Du hast gewonnen! 🎉' : (w ? w.name : 'Niemand') + ' hat gewonnen!'); }
+  if (win) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
+  addMsg(mpConv(g), {id: 'mp-' + g.gid, from: 'system', name: '', text, ts: Date.now()});
+  if (conv === mpConv(g)) renderMpBoard();
+}
+function sgEvent(g, ev, s) {
+  if (g.game === 'kick') bzEvent(g, ev, s);
+  else nrEvent(g, ev, s);
+}
+// Steady chores: keep the connection alive, tell the server whether the game is in sight, announce an open
+// table in the group chat, and (Fußball) run the own player's 60 Hz steps.
+setInterval(() => {
+  const g = sgGame;
+  if (!g) return;
+  const sg = g.sg;
+  if (mpGame !== g) { if (sg.ws) { const ws = sg.ws; sg.ws = null; try { ws.close(); } catch (e) {} } sgGame = null; return; }
+  if (!sg.ws || sg.ws.readyState !== 1) return;
+  const now = performance.now();
+  const away = !(chatVisible() && conv === mpConv(g) && !$('cmpboard').hidden);
+  if (away !== sg.away || now - (sg.awayAt || 0) > 2000) { sg.away = away; sg.awayAt = now; sgSend(g, {t: 'away', v: away}); }
+  if (now - sg.pingAt > 2000) { sg.pingAt = now; sgSend(g, {t: 'ping', c: now}); }
+  if (g.table && sg.s && sg.s.host === me.id) {
+    const open = sg.s.st === 'lobby' && !g.over;
+    if (open ? now - (sg.annAt || 0) > 4000 : sg.annOpen) { sg.annAt = now; sg.annOpen = open; sgAnnounce(g, open); }
+  }
+  // The owner's face-ball prank also works here: the victim's page hands it to the game server.
+  if (sg.s && sg.s.st === 'play' && !g.over) { const face = babyTake(); if (face) sgSend(g, {t: 'face', f: face}); }
+  if (g.game === 'kick') bzTicks(g, now);
+}, 8);
+
+const SG_KEYS = {arrowup: 1, w: 1, arrowdown: 2, s: 2, arrowleft: 4, a: 4, arrowright: 8, d: 8, ' ': 16, x: 16};
+function sgActive() {
+  const g = mpGame;
+  return !!g && SG_GAMES.includes(g.game) && !!g.sg && !g.over && conv === mpConv(g) && !$('cmpboard').hidden && chatVisible();
+}
+document.addEventListener('keydown', e => {
+  if (!sgActive() || e.ctrlKey || e.metaKey || e.altKey || (e.target.matches && e.target.matches('input, textarea'))) return;
+  const bit = SG_KEYS[e.key.toLowerCase()];
+  if (!bit) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const g = mpGame;
+  if (g.game === 'kick') g.sg.keys |= bit;
+  else if (!e.repeat) { if (bit === 16) sgSend(g, {t: 'boost', v: true}); else nrTurn(g, {1: 0, 8: 1, 2: 2, 4: 3}[bit]); }
+}, true);
+document.addEventListener('keyup', e => {
+  const g = mpGame;
+  if (!g || !g.sg || !SG_GAMES.includes(g.game)) return;
+  const bit = SG_KEYS[e.key.toLowerCase()];
+  if (!bit) return;
+  if (g.game === 'kick') g.sg.keys &= ~bit;
+  else if (bit === 16) sgSend(g, {t: 'boost', v: false});
+}, true);
+window.addEventListener('blur', () => {
+  const g = mpGame;
+  if (!g || !g.sg) return;
+  g.sg.keys = 0;
+  if (g.game === 'tron') sgSend(g, {t: 'boost', v: false});
+});
+
+// The board: a score line, the canvas with an overlay for countdowns and results, and the lobby on top.
+const SG_VIEW = {kick: [852, 472], tron: [800, 500]};
+const sgResize = new ResizeObserver(() => {
+  const st = $('sgstage'), cv = $('sgcanvas'), g = mpGame;
+  if (!st || !cv || !g || !SG_VIEW[g.game]) return;
+  const [vw, vh] = SG_VIEW[g.game];
+  const w = Math.max(160, Math.min(st.clientWidth, st.clientHeight * vw / vh)), bw = Math.round(w * Math.min(2.5, window.devicePixelRatio || 1));
+  cv.style.width = w + 'px';
+  cv.style.height = w * vh / vw + 'px';
+  if (cv.width !== bw) { cv.width = bw; cv.height = Math.round(bw * vh / vw); }
+});
+function buildSg(g) {
+  const grid = $('cmpgrid');
+  grid.className = 'dr-wrap';
+  grid.dataset.gid = g.gid;
+  const [vw, vh] = SG_VIEW[g.game];
+  const cv = el('canvas', {class: 'dr-canvas sg-canvas sg-' + g.game, id: 'sgcanvas', width: vw, height: vh});
+  const stage = el('div', {class: 'dr-stage', id: 'sgstage'}, cv, el('div', {class: 'dr-over sg-over', id: 'sgover', hidden: true}),
+    el('div', {class: 'sg-lobby', id: 'sglobby', hidden: true}));
+  grid.replaceChildren(el('div', {class: 'rx-score sg-score', id: 'sgscore'}), stage);
+  sgResize.disconnect();
+  sgResize.observe(stage);
+}
+function renderSg() {
+  const g = mpGame;
+  if (!g || !SG_GAMES.includes(g.game)) return;
+  if ($('cmpgrid').dataset.gid !== g.gid || !$('sgcanvas')) buildSg(g);
+  renderSgChrome(g);
+  if (!g.sg.raf) g.sg.raf = requestAnimationFrame(ts => sgFrame(g, ts));
+}
+function renderSgChrome(g) {
+  if (mpGame !== g || $('cmpgrid').dataset.gid !== g.gid) return;
+  const s = g.sg.s, lobby = $('sglobby');
+  $('cmpstatus').textContent = SG_TITLE[g.game] + (g.over ? '' : ' — ' + SG_HINT[g.game]);
+  const res = $('cmpresult');
+  res.hidden = false;
+  res.replaceChildren(g.over
+    ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
+    : el('button', {class: 'vbtn', text: 'Verlassen', onclick: () => sgLeave(g)}));
+  lobby.hidden = !(s && s.st === 'lobby') || g.over;
+  if (lobby.hidden) return;
+  const host = s.pl[0], iHost = host && host.pid === me.id;
+  const startBtn = iHost && !g.duo ? el('button', {class: 'vbtn sg-start', type: 'button', text: (g.game === 'kick' ? '▶ Anpfiff' : '▶ Start') + ' (' + s.pl.length + '/' + SG_MAX + ')',
+    disabled: s.pl.length < 2, onclick: () => sgSend(g, {t: 'start'})}) : null;
+  const wait = g.duo ? 'Warte auf ' + g.opName + '…' : iHost ? (s.pl.length < 2 ? 'Warte auf Mitspieler – im Gruppenchat können sie auf „Mitspielen“ klicken.' : '')
+    : 'Warte, bis ' + (host ? host.name : 'der Gastgeber') + ' startet…';
+  let body;
+  if (g.game === 'kick') {
+    const col = t => {
+      const mates = s.pl.filter(p => p.team === t), mineHere = mates.some(p => p.pid === me.id);
+      return el('div', {class: 'sg-team sg-team' + t},
+        el('b', {text: t === 0 ? '🔴 Rot' : '🔵 Blau'}),
+        ...mates.map(p => el('div', {class: 'sg-pl' + (p.pid === me.id ? ' me' : ''), text: p.name + (p.pid === me.id ? ' (du)' : '') + (p.on ? '' : ' (weg)')})),
+        ...(g.duo ? [] : Array.from({length: 2 - mates.length}, () => el('div', {class: 'sg-pl sg-free', text: '+ frei'}))),
+        !mineHere && !g.duo && mates.length < 2 ? el('button', {class: 'vbtn', type: 'button', text: 'Hierher wechseln', onclick: () => sgSend(g, {t: 'team', v: t})}) : null);
+    };
+    body = el('div', {class: 'sg-teams'}, col(0), col(1));
+  } else {
+    body = el('div', {class: 'sg-riders'}, ...s.pl.map((p, i) => el('div', {class: 'sg-pl' + (p.pid === me.id ? ' me' : '')},
+      el('span', {class: 'sg-chip', style: 'background:' + NR_COL[i]}), p.name + (p.pid === me.id ? ' (du)' : '') + (p.on ? '' : ' (weg)'))),
+      ...(g.duo ? [] : Array.from({length: SG_MAX - s.pl.length}, () => el('div', {class: 'sg-pl sg-free'}, el('span', {class: 'sg-chip sg-chipfree'}), '+ frei'))));
+  }
+  lobby.replaceChildren(el('div', {class: 'sg-lobbybox'},
+    el('div', {class: 'upddlg-head', text: SG_TITLE[g.game] + (g.duo ? '' : ' · ' + s.pl.length + '/' + SG_MAX)}),
+    body, wait ? el('p', {text: wait}) : null, startBtn, el('p', {class: 'sg-keys', text: '⌨ ' + SG_HINT[g.game]})));
+}
+function sgFrame(g, ts) {
+  g.sg.raf = 0;
+  const cv = $('sgcanvas');
+  if (mpGame !== g || !cv || $('cmpboard').hidden) return;
+  const sg = g.sg, now = ts || performance.now(), dt = Math.min(0.05, sg.frameAt ? (now - sg.frameAt) / 1000 : 0.016);
+  sg.frameAt = now;
+  if (g.game === 'kick') bzDraw(g, cv, now, dt);
+  else nrDraw(g, cv, now, dt);
+  // Score line and overlay text.
+  const s = sg.s;
+  let score = '';
+  if (s && g.game === 'kick') {
+    score = sg.team === 0 ? 'Du spielst 🔴 Rot → nach rechts' : sg.team === 1 ? 'Du spielst 🔵 Blau ← nach links' : '';
+  } else if (s) score = 'Erster mit 3 Runden gewinnt';
+  if (sg.rtt) score += '     Ping ' + Math.round(sg.rtt) + ' ms';
+  if ($('sgscore').textContent !== score) $('sgscore').textContent = score;
+  let text = '';
+  if (sg.conn === 'full') text = 'Da ist kein Platz mehr frei\n(oder das Spiel läuft schon).';
+  else if (!s && sg.conn === 'lost') text = 'Spielserver nicht erreichbar – neuer Versuch…';
+  else if (!s) text = 'Verbinde mit dem Spielserver…';
+  else if (g.over && s.st === 'over') text = g.winner ? '🏆 Gewonnen!' : g.game === 'kick' ? (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt' : ((s.pl.find(p => p.pid === s.w) || {}).name || 'Niemand') + ' gewinnt';
+  else if (g.over) text = '';
+  else if (sg.conn === 'lost') text = 'Verbindung weg – neuer Versuch…';
+  else if (s.st === 'count') text = (g.game === 'kick' ? 'Anstoß in\n' : 'Runde ' + s.rd + '\n') + Math.max(1, Math.ceil(s.c / 1000));
+  else if (s.st === 'pause') text = 'Pausiert\n' + (s.pl.some(p => p.aw && p.pid !== me.id) ? 'Warte auf ' + s.pl.filter(p => p.aw && p.pid !== me.id).map(p => p.name).join(', ') + '…' : 'Gleich geht\'s weiter…');
+  else if (s.st === 'resume') text = 'Weiter in\n' + Math.max(1, Math.ceil(s.c / 1000));
+  const over = $('sgover');
+  if (over.textContent !== text) over.textContent = text;
+  over.hidden = !text;
+  sg.raf = requestAnimationFrame(t => sgFrame(g, t));
+}
+function sgBanner(g, text, sub, color) { g.sg.banner = {text, sub, color, at: performance.now()}; }
+// Drawn on top of either game: a big title that pops in and fades, plus sparks and rings.
+function sgDrawFx(g, ctx, dt, now) {
+  const sg = g.sg;
+  sg.parts = sg.parts.filter(p => (p.life += dt) < p.max);
+  for (const p of sg.parts) {
+    p.vx *= Math.pow(0.12, dt); p.vy = p.vy * Math.pow(0.12, dt) + (p.grav || 0) * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    ctx.globalAlpha = Math.max(0, 1 - p.life / p.max);
+    ctx.fillStyle = p.c;
+    ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+  }
+  sg.rings = sg.rings.filter(r => (r.life += dt) < r.max);
+  for (const r of sg.rings) {
+    const q = r.life / r.max;
+    ctx.globalAlpha = 1 - q;
+    ctx.strokeStyle = r.c;
+    ctx.lineWidth = r.w * (1 - q) + 1;
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, r.r0 + (r.r1 - r.r0) * (1 - (1 - q) ** 2), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+function sgBurst(g, x, y, n, colors, speed, opts = {}) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = speed * (0.3 + Math.random() * 0.7);
+    g.sg.parts.push({x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: (opts.life || 0.8) * (0.6 + Math.random() * 0.6),
+      c: colors[i % colors.length], s: opts.size || 4, grav: opts.grav || 0});
+  }
+}
+function sgDrawBanner(g, ctx, vw, vh, now) {
+  const b = g.sg.banner;
+  if (!b) return;
+  const t = (now - b.at) / 1000;
+  if (t > 2.2) { g.sg.banner = null; return; }
+  const pop = t < 0.18 ? 0.6 + 0.4 * (t / 0.18) * 1.15 : t < 0.3 ? 1.15 - 0.15 * ((t - 0.18) / 0.12) : 1;
+  ctx.save();
+  ctx.globalAlpha = t > 1.7 ? Math.max(0, 1 - (t - 1.7) / 0.5) : 1;
+  // A dark band behind the text, so it reads on grass and on neon alike.
+  ctx.fillStyle = 'rgba(0,0,0,.42)';
+  ctx.fillRect(0, vh * 0.42 - 58, vw, b.sub ? 138 : 108);
+  ctx.translate(vw / 2, vh * 0.42);
+  ctx.font = '900 76px "Segoe UI", system-ui, sans-serif';
+  const fit = Math.min(1, vw * 0.9 / ctx.measureText(b.text).width);
+  ctx.scale(pop * fit, pop * fit);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = 'rgba(0,0,0,.55)';
+  ctx.strokeText(b.text, 0, 0);
+  ctx.fillStyle = b.color;
+  ctx.fillText(b.text, 0, 0);
+  if (b.sub) {
+    ctx.font = '700 24px "Segoe UI", system-ui, sans-serif';
+    ctx.lineWidth = 6;
+    ctx.strokeText(b.sub, 0, 54);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(b.sub, 0, 54);
+  }
+  ctx.restore();
+}
+
+/* ⚽ Fußball: the page shows its own player at once by running the server's movement for it (same
+   constants, same steps), and corrects that whenever the server's answer for that input comes back.
+   Everything else is drawn from the server's updates, a little in the past. */
+const BZ_W = 760, BZ_H = 380, BZ_M = 32, BZ_GH = 124, BZ_GD = 38, BZ_POST = 6, BZ_PR = 15, BZ_BR = 9, BZ_CC = 70,
+  BZ_ACC = 0.1, BZ_ACC_KICK = 0.07, BZ_DAMP = 0.96, BZ_TICK = 1000 / 60, BZ_PAD = 46;
+const BZ_TEAM = ['#e5484d', '#3e7bfa'], BZ_TEAM_DARK = ['#8f1d22', '#173e8c'];
+function bzMove(p, k) {
+  let dx = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0), dy = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0);
+  if (dx && dy) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }
+  const a = (k & 16) ? BZ_ACC_KICK : BZ_ACC;
+  p.vx += dx * a; p.vy += dy * a;
+  p.x += p.vx; p.y += p.vy;
+  p.vx *= BZ_DAMP; p.vy *= BZ_DAMP;
+}
+function bzBounds(p, ko) {
+  p.x = Math.max(-BZ_M + BZ_PR, Math.min(BZ_W + BZ_M - BZ_PR, p.x));
+  p.y = Math.max(-BZ_M + BZ_PR, Math.min(BZ_H + BZ_M - BZ_PR, p.y));
+  if (ko < 0) return;
+  if (p.team === 0 && p.x > BZ_W / 2 - BZ_PR) { p.x = BZ_W / 2 - BZ_PR; p.vx = Math.min(0, p.vx); }
+  if (p.team === 1 && p.x < BZ_W / 2 + BZ_PR) { p.x = BZ_W / 2 + BZ_PR; p.vx = Math.max(0, p.vx); }
+  if (p.team !== ko) {
+    const dx = p.x - BZ_W / 2, dy = p.y - BZ_H / 2, d = Math.hypot(dx, dy) || 1;
+    if (d < BZ_CC + BZ_PR) { p.x = BZ_W / 2 + dx / d * (BZ_CC + BZ_PR); p.y = BZ_H / 2 + dy / d * (BZ_CC + BZ_PR); }
+  }
+}
+function bzTicks(g, now) {
+  const sg = g.sg, s = sg.s;
+  if (!s || (s.st !== 'play' && s.st !== 'goal')) { sg.simAt = now; return; }
+  if (!sg.simAt) sg.simAt = now;
+  let n = Math.floor((now - sg.simAt) / BZ_TICK);
+  if (n > 6) { sg.simAt = now - 6 * BZ_TICK; n = 6; }
+  for (let i = 0; i < n; i++) {
+    sg.simAt += BZ_TICK;
+    const k = sg.keys;
+    sgSend(g, {t: 'in', k, i: ++sg.seq});
+    sg.hist.push([sg.seq, k]);
+    if (sg.me) { bzMove(sg.me, k); bzBounds(sg.me, s.ko); }
+  }
+  if (sg.hist.length > 240) sg.hist.splice(0, sg.hist.length - 240);
+}
+function bzSnapshot(g, m) {
+  const sg = g.sg, mine = m.pl.find(p => p.pid === me.id);
+  if (!mine) { sg.me = null; return; }
+  const p = {x: mine.x, y: mine.y, vx: mine.vx, vy: mine.vy, team: mine.team};
+  if ((m.st !== 'play' && m.st !== 'goal') || !sg.me) { sg.me = p; sg.hist = []; sg.vis.x = sg.vis.y = 0; return; }
+  // Start from the server's answer and replay the inputs it hasn't seen yet.
+  sg.hist = sg.hist.filter(h => h[0] > mine.a);
+  for (const [, k] of sg.hist) { bzMove(p, k); bzBounds(p, m.ko); }
+  sg.vis.x += sg.me.x - p.x;
+  sg.vis.y += sg.me.y - p.y;
+  if (Math.hypot(sg.vis.x, sg.vis.y) > 60) sg.vis.x = sg.vis.y = 0;
+  sg.me = p;
+}
+function bzEvent(g, ev, s) {
+  const sg = g.sg;
+  if (ev.k === 'goal') {
+    const gx = ev.team === 0 ? BZ_W + BZ_GD / 2 : -BZ_GD / 2;
+    sgBanner(g, 'TOR!', ev.by ? ev.by + (ev.own ? ' (Eigentor)' : '') : '', BZ_TEAM[ev.team]);
+    sgBurst(g, gx, BZ_H / 2, 90, [BZ_TEAM[ev.team], '#ffffff', '#ffd23f'], 560, {life: 1.4, size: 7, grav: 260});
+    sg.rings.push({x: gx, y: BZ_H / 2, r0: 10, r1: 160, life: 0, max: 0.6, c: '#ffffff', w: 6});
+    sg.shake = 1;
+    sg.netAt = performance.now();
+    sg.netSide = ev.team === 0 ? 1 : 0;
+  } else if (ev.k === 'kick') {
+    const b = s.b;
+    sg.rings.push({x: b[0], y: b[1], r0: BZ_BR, r1: BZ_BR + 26, life: 0, max: 0.28, c: '#ffffff', w: 4});
+    sgBurst(g, b[0], b[1], 8, ['#ffffff', '#fff3b0'], 260, {life: 0.35, size: 4});
+    sg.kickFx = performance.now();
+  } else if (ev.k === 'ot') sgBanner(g, 'VERLÄNGERUNG', 'Das nächste Tor gewinnt', '#ffd23f');
+  else if (ev.k === 'over') sgBanner(g, s.w === sg.team ? 'SIEG!' : 'ABPFIFF', (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt ' + s.sc[s.w] + ':' + s.sc[1 - s.w], BZ_TEAM[s.w]);
+}
+function bzDraw(g, cv, now, dt) {
+  const sg = g.sg, s = sg.s, ctx = cv.getContext('2d'), [vw, vh] = SG_VIEW.kick, k = cv.width / vw;
+  sg.shake = Math.max(0, sg.shake - dt * 2.2);
+  const sx = sg.shake ? (Math.random() * 2 - 1) * 6 * sg.shake : 0, sy = sg.shake ? (Math.random() * 2 - 1) * 6 * sg.shake : 0;
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  // Grass around the pitch, a striped pitch, white lines.
+  ctx.fillStyle = '#2f6b2b';
+  ctx.fillRect(0, 0, vw, vh);
+  ctx.setTransform(k, 0, 0, k, (BZ_PAD + sx) * k, (BZ_PAD + sy) * k);
+  for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? '#3f8a37' : '#47963e'; ctx.fillRect(i * BZ_W / 10, 0, BZ_W / 10, BZ_H); }
+  ctx.strokeStyle = 'rgba(255,255,255,.9)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(0, 0, BZ_W, BZ_H);
+  ctx.beginPath(); ctx.moveTo(BZ_W / 2, 0); ctx.lineTo(BZ_W / 2, BZ_H); ctx.stroke();
+  ctx.beginPath(); ctx.arc(BZ_W / 2, BZ_H / 2, BZ_CC, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(BZ_W / 2, BZ_H / 2, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.lineWidth = 2.5;
+  for (const side of [0, 1]) {
+    const x0 = side ? BZ_W - 110 : 0;
+    ctx.strokeRect(x0, BZ_H / 2 - 115, 110, 230);
+    ctx.strokeRect(side ? BZ_W - 40 : 0, BZ_H / 2 - 72, 40, 144);
+  }
+  // Kickoff: the team with the kickoff colours the centre circle.
+  if (s && s.ko >= 0 && (s.st === 'play' || s.st === 'count')) {
+    ctx.globalAlpha = 0.18 + 0.08 * Math.sin(now / 200);
+    ctx.fillStyle = BZ_TEAM[s.ko];
+    ctx.beginPath(); ctx.arc(BZ_W / 2, BZ_H / 2, BZ_CC, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // Goals: a net that bulges when a ball hits it.
+  for (const side of [0, 1]) {
+    const x0 = side ? BZ_W : -BZ_GD, top = BZ_H / 2 - BZ_GH / 2;
+    const bulge = sg.netAt && sg.netSide === side ? Math.max(0, 1 - (now - sg.netAt) / 500) * 8 : 0;
+    ctx.fillStyle = 'rgba(255,255,255,.12)';
+    ctx.fillRect(x0 + (side ? 0 : -bulge), top, BZ_GD + bulge, BZ_GH);
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let y = top; y <= top + BZ_GH; y += 8) { ctx.moveTo(x0 + (side ? 0 : -bulge), y); ctx.lineTo(x0 + BZ_GD + (side ? bulge : 0), y); }
+    for (let x = 0; x <= BZ_GD + bulge; x += 8) { const xx = side ? x0 + x : x0 - bulge + x; ctx.moveTo(xx, top); ctx.lineTo(xx, top + BZ_GH); }
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const back = side ? x0 + BZ_GD + bulge : x0 - bulge;
+    ctx.moveTo(side ? BZ_W : 0, top); ctx.lineTo(back, top); ctx.lineTo(back, top + BZ_GH); ctx.lineTo(side ? BZ_W : 0, top + BZ_GH);
+    ctx.stroke();
+    for (const py of [top, top + BZ_GH]) {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(side ? BZ_W : 0, py, BZ_POST, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#1b1b1b'; ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+  const smp = s && sgSample(g);
+  if (smp) {
+    const {a, b, k: f, ex} = smp, lerp = (x, y) => x + (y - x) * f;
+    // Going on at a speed that fades the way the server's does (factor d per tick).
+    const ahead = (v, d) => ex ? v * (1 - d ** ex) / (1 - d) : 0;
+    // Players: others from the updates, yourself where your keys already put you.
+    const fv = Math.exp(-dt / 0.08);
+    sg.vis.x *= fv; sg.vis.y *= fv;
+    for (const pb of b.pl) {
+      const pa = a.pl.find(p => p.pid === pb.pid) || pb, mine = pb.pid === me.id && sg.me && (s.st === 'play' || s.st === 'goal');
+      const x = mine ? sg.me.x + sg.vis.x : lerp(pa.x, pb.x) + ahead(pb.vx, BZ_DAMP), y = mine ? sg.me.y + sg.vis.y : lerp(pa.y, pb.y) + ahead(pb.vy, BZ_DAMP);
+      const kicking = mine ? (sg.keys & 16) : (pb.k & 16);
+      ctx.fillStyle = 'rgba(0,0,0,.22)';
+      ctx.beginPath(); ctx.ellipse(x + 3, y + 5, BZ_PR, BZ_PR * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = BZ_TEAM[pb.team];
+      ctx.beginPath(); ctx.arc(x, y, BZ_PR, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = kicking ? 3.5 : 2;
+      ctx.strokeStyle = kicking ? '#ffffff' : BZ_TEAM_DARK[pb.team];
+      ctx.stroke();
+      if (pb.pid === me.id) {
+        // You: a pulsing light ring, and right after a kickoff a marker above your head.
+        ctx.strokeStyle = 'rgba(255,236,140,' + (0.6 + 0.4 * Math.sin(now / 160)) + ')';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, y, BZ_PR + 6 + Math.sin(now / 160) * 1.5, 0, Math.PI * 2); ctx.stroke();
+        if (now - (sg.koAt || 0) < 3000) {
+          const bob = Math.sin(now / 120) * 3;
+          ctx.fillStyle = '#ffec8c';
+          ctx.beginPath(); ctx.moveTo(x - 8, y - BZ_PR - 22 + bob); ctx.lineTo(x + 8, y - BZ_PR - 22 + bob); ctx.lineTo(x, y - BZ_PR - 11 + bob); ctx.fill();
+          ctx.font = '800 14px "Segoe UI", system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'alphabetic';
+          ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)';
+          ctx.strokeText('DU', x, y - BZ_PR - 26 + bob);
+          ctx.fillText('DU', x, y - BZ_PR - 26 + bob);
+        }
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 17px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText((pb.name || '?').charAt(0).toUpperCase(), x, y + 1);
+      ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
+      ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,0,.55)';
+      ctx.strokeText(pb.name + (pb.on ? '' : ' …'), x, y + BZ_PR + 13);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(pb.name + (pb.on ? '' : ' …'), x, y + BZ_PR + 13);
+    }
+    // Ball with its shadow.
+    const bx = lerp(a.b[0], b.b[0]) + ahead(b.b[2], 0.99), by = lerp(a.b[1], b.b[1]) + ahead(b.b[3], 0.99);
+    // A fading streak behind a fast ball, and a flash right after a kick.
+    sg.btrail = [[bx, by], ...(sg.btrail || [])].slice(0, 8);
+    if (Math.hypot(b.b[2], b.b[3]) > 2.5) sg.btrail.forEach(([tx, ty], i) => {
+      if (!i) return;
+      ctx.globalAlpha = 0.28 * (1 - i / 8);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(tx, ty, BZ_BR * (1 - i / 12), 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    const flash = Math.max(0, 1 - (now - (sg.kickFx || 0)) / 140);
+    if (flash) { ctx.fillStyle = 'rgba(255,255,255,' + (0.55 * flash) + ')'; ctx.beginPath(); ctx.arc(bx, by, BZ_BR + 10 * flash, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.ellipse(bx + 3, by + 4, BZ_BR, BZ_BR * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+    if (b.face) babyBall(ctx, bx, by, BZ_BR * 2.6, b.face);
+    else {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(bx, by, BZ_BR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#1b1b1b'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#1b1b1b';
+      ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  sgDrawFx(g, ctx, dt, now);
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  if (s && s.st !== 'lobby') {
+    // Score and clock on the pitch, top centre; the clock turns red in the last 30 s.
+    const cx = vw / 2;
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.beginPath(); ctx.roundRect(cx - 92, 4, 184, 38, 19); ctx.fill();
+    ctx.textBaseline = 'middle';
+    ctx.font = '800 24px "Segoe UI", system-ui, sans-serif';
+    ctx.textAlign = 'right'; ctx.fillStyle = BZ_TEAM[0]; ctx.fillText('●', cx - 50, 23);
+    ctx.textAlign = 'left'; ctx.fillStyle = BZ_TEAM[1]; ctx.fillText('●', cx + 50, 23);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff'; ctx.fillText(s.sc[0] + ' : ' + s.sc[1], cx, 24);
+    const last = !s.ot && s.tl < 30000 && s.st === 'play';
+    const clock = s.ot ? 'GOLDEN GOAL' : Math.floor(s.tl / 60000) + ':' + String(Math.floor(s.tl / 1000) % 60).padStart(2, '0');
+    ctx.font = '700 ' + (last ? 15 + Math.max(0, Math.sin(now / 150)) * 2 : 14) + 'px "Segoe UI", system-ui, sans-serif';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.6)';
+    ctx.strokeText(clock, cx, 54);
+    ctx.fillStyle = s.ot ? '#ffd23f' : last ? '#ff5d5d' : '#ffffff';
+    ctx.fillText(clock, cx, 54);
+  }
+  sgDrawBanner(g, ctx, vw, vh, now);
+}
+
+/* 🏍️ Neon Rush: the server sends the cells every bike reached, stamped with the server's time; the page keeps
+   the trails and draws each bike gliding along them a moment behind, by about as much as updates arrive late,
+   so it moves evenly even when the network delivers in bursts. */
+const NR_W = 80, NR_H = 50, NR_CELL = 10, NR_COL = ['#22e5ff', '#ff3df0', '#ffe14d', '#7dff4d'], NR_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+function nrFull(g, m) {
+  const sg = g.sg;
+  sg.trails = (m.trails || []).map(t => (Array.isArray(t) ? t : []).map(c => [c[0] | 0, c[1] | 0]));
+  sg.ghosts = (m.ghosts || []).map(t => (Array.isArray(t) ? t : []).map(c => [c[0] | 0, c[1] | 0]));
+  sg.rd = m.rd;
+  sg.fullAsked = 0;
+  sg.pend = [];
+  sg.grid = new Uint8Array(NR_W * NR_H);
+  for (const t of [...sg.trails, ...sg.ghosts]) for (const [x, y] of t) if (x >= 0 && y >= 0 && x < NR_W && y < NR_H) sg.grid[y * NR_W + x] = 1;
+}
+// When a key pressed now will have reached the server, on the clock the trail cells are stamped with: half the
+// round trip plus a margin for how much the network wobbles, so a turn practically never arrives too late.
+function nrLead(sg, now) { return now + (sg.rtt || 60) * 0.5 + 10 + Math.min(60, sg.jit); }
+// A turn names the move it is meant for: the first one after it can reach the server. The own bike is drawn
+// turning there right away (see nrPredict), and the server waits for that move, so both agree. Turns the
+// server would ignore (back or the same way) aren't sent.
+function nrTurn(g, d) {
+  const sg = g.sg, s = sg.s, mi = s ? s.pl.findIndex(p => p.pid === me.id) : -1, mine = s && s.pl[mi], t = sg.trails[mi];
+  if (!mine || !t || !t.length) return;
+  sg.pend = sg.pend || [];
+  const cur = sg.pend.length ? sg.pend[sg.pend.length - 1].d : mine.d;
+  if (d === cur || d === (cur + 2) % 4 || sg.pend.length >= 3) return;
+  const last = t[t.length - 1], cellMs = 1000 / ((mine.bo && mine.f > 0) ? 24 : 12), arrive = nrLead(sg, performance.now());
+  // The move the drawn bike is already halfway into is finished first; the turn goes on the one after it.
+  let n = t.length;
+  if (last[2]) while (last[2] + (n - t.length + 1) * cellMs < arrive) n++;
+  n++;
+  if (sg.pend.length) n = Math.max(n, sg.pend[sg.pend.length - 1].n + 1);
+  sgSend(g, {t: 'turn', d, n});
+  sg.pend.push({d, n});
+}
+// The own bike as it will be when the latest key press reaches the server: from its newest confirmed cell,
+// ride on cell by cell at its speed, taking each pending turn at the first cell after it arrives, and stop in
+// front of anything in the way. Returns the cells ahead and how far into the next one the bike is.
+function nrPredict(g, t, p, now) {
+  const sg = g.sg, last = t[t.length - 1], cellMs = 1000 / ((p.bo && p.f > 0) ? 24 : 12);
+  if (!last || !last[2]) return null;
+  // Turns for moves the server has made already are in the confirmed trail.
+  sg.pend = (sg.pend || []).filter(q => q.n > t.length - 1);
+  const T = nrLead(sg, now);
+  let x = last[0], y = last[1], d = p.d, at = last[2], pi = 0, n = t.length;
+  const cells = [];
+  for (;;) {
+    // The direction of the next move, with the turn meant for it (only one turn per move, like the server).
+    let dn = d, pj = pi;
+    while (pj < sg.pend.length && sg.pend[pj].n <= n) { const q = sg.pend[pj++].d; if (q !== d && q !== (d + 2) % 4) { dn = q; break; } }
+    const nx = x + NR_DIR[dn][0], ny = y + NR_DIR[dn][1];
+    const blocked = nx < 0 || ny < 0 || nx >= NR_W || ny >= NR_H || (sg.grid && sg.grid[ny * NR_W + nx]);
+    if (at + cellMs > T || cells.length >= 4 || blocked) return {cells, f: blocked ? 0 : Math.max(0, Math.min(1, (T - at) / cellMs)), d: dn, x, y};
+    pi = pj;
+    d = dn;
+    cells.push([nx, ny]);
+    x = nx; y = ny; at += cellMs; n++;
+  }
+}
+function nrSnapshot(g, m) {
+  const sg = g.sg, now = performance.now();
+  if (m.rd !== sg.rd && m.st !== 'lobby') {
+    if (now - (sg.fullAsked || 0) > 1000) { sg.fullAsked = now; sgSend(g, {t: 'full'}); }
+    return;
+  }
+  const at = m.ts + sg.off - performance.timeOrigin;
+  for (const [i, x, y] of m.mv || []) {
+    (sg.trails[i] || (sg.trails[i] = [])).push([x, y, at]);
+    if (sg.grid && x >= 0 && y >= 0 && x < NR_W && y < NR_H) sg.grid[y * NR_W + x] = 1;
+  }
+}
+function nrEvent(g, ev, s) {
+  const sg = g.sg;
+  if (ev.k === 'crash') {
+    const i = s.pl.findIndex(p => p.pid === ev.pid), c = NR_COL[i] || '#ffffff', t = sg.trails[i], last = t && t[t.length - 1];
+    const x = ((last ? last[0] : ev.x) + 0.5) * NR_CELL, y = ((last ? last[1] : ev.y) + 0.5) * NR_CELL;
+    sgBurst(g, x, y, 60, [c, '#ffffff'], 420, {life: 1, size: 5});
+    sg.rings.push({x, y, r0: 4, r1: 80, life: 0, max: 0.45, c, w: 6});
+    sg.rings.push({x, y, r0: 2, r1: 34, life: 0, max: 0.2, c: '#ffffff', w: 10});
+    sg.shake = ev.pid === me.id ? 1.2 : 0.5;
+    if (ev.pid === me.id && s.pl.filter(p => p.al).length > 1) sgBanner(g, 'DU BIST RAUS', 'Warte auf die nächste Runde', c);
+  } else if (ev.k === 'round') {
+    const i = s.pl.findIndex(p => p.pid === ev.pid);
+    sgBanner(g, ev.pid ? (ev.pid === me.id ? 'RUNDE GEWONNEN' : s.pl[i].name.toUpperCase() + ' GEWINNT') : 'UNENTSCHIEDEN', 'Runde ' + s.rd + ' · Stand ' + s.pl.map(p => p.sc).join(':'), ev.pid ? NR_COL[i] : '#ffffff');
+  } else if (ev.k === 'over') {
+    const i = s.pl.findIndex(p => p.pid === ev.pid);
+    sgBanner(g, ev.pid === me.id ? 'SIEG!' : 'ENDE', ev.pid && i >= 0 ? s.pl[i].name + ' gewinnt' : '', ev.pid && i >= 0 ? NR_COL[i] : '#ffffff');
+  }
+}
+function nrDraw(g, cv, now, dt) {
+  const sg = g.sg, s = sg.s, ctx = cv.getContext('2d'), [vw, vh] = SG_VIEW.tron, k = cv.width / vw, C = NR_CELL;
+  sg.shake = Math.max(0, sg.shake - dt * 2.5);
+  const sx = sg.shake ? (Math.random() * 2 - 1) * 5 * sg.shake : 0, sy = sg.shake ? (Math.random() * 2 - 1) * 5 * sg.shake : 0;
+  ctx.setTransform(k, 0, 0, k, sx * k, sy * k);
+  ctx.fillStyle = '#070b17';
+  ctx.fillRect(-10, -10, vw + 20, vh + 20);
+  ctx.strokeStyle = 'rgba(80,120,255,.16)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= NR_W; x++) { ctx.moveTo(x * C, 0); ctx.lineTo(x * C, vh); }
+  for (let y = 0; y <= NR_H; y++) { ctx.moveTo(0, y * C); ctx.lineTo(vw, y * C); }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(120,160,255,.45)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, vw - 2, vh - 2);
+  ctx.lineCap = 'square';
+  ctx.lineJoin = 'miter';
+  const path = (t, head, upto = t.length, ahead = null) => {
+    ctx.beginPath();
+    ctx.moveTo((t[0][0] + 0.5) * C, (t[0][1] + 0.5) * C);
+    for (let i = 1; i < upto; i++) ctx.lineTo((t[i][0] + 0.5) * C, (t[i][1] + 0.5) * C);
+    if (ahead) for (const c of ahead) ctx.lineTo((c[0] + 0.5) * C, (c[1] + 0.5) * C);
+    if (head) ctx.lineTo(head[0], head[1]);
+  };
+  for (const t of sg.ghosts) {
+    if (t.length < 2) continue;
+    path(t); ctx.strokeStyle = 'rgba(160,170,190,.35)'; ctx.lineWidth = C * 0.35; ctx.stroke();
+  }
+  const pl = s ? s.pl : [];
+  sg.trails.forEach((t, i) => {
+    if (!t || !t.length) return;
+    let p = pl[i] || {};
+    const col = NR_COL[i] || '#fff', alive = p.al && s.st !== 'lobby';
+    // Where the bike was at the drawing time: between the last cell it had reached and the next one.
+    let head, upto = t.length, ahead = null;
+    const pr = alive && s.st === 'play' && p.pid === me.id ? nrPredict(g, t, p, now) : null;
+    if (pr) {
+      // Own bike: confirmed trail, then the predicted cells, then part of the way into the next one.
+      ahead = pr.cells;
+      const [hx, hy] = [pr.x + NR_DIR[pr.d][0] * pr.f, pr.y + NR_DIR[pr.d][1] * pr.f];
+      head = [(hx + 0.5) * C, (hy + 0.5) * C];
+      p = {...p, d: pr.d};
+    } else if (alive && s.st === 'play' && t.length > 1) {
+      // One cell's time behind (cells only come every 83 ms, 42 with boost) plus how late updates arrive.
+      const T = now - 1000 / ((p.bo && p.f > 0) ? 24 : 12) - Math.max(8, Math.min(110, sg.jit));
+      let j = t.length - 1;
+      while (j > 0 && (t[j][2] || 0) > T) j--;
+      const a = t[j], b = t[j + 1];
+      const f = b ? Math.max(0, Math.min(1, (T - (a[2] || 0)) / Math.max(1, b[2] - (a[2] || b[2] - 84)))) : 0;
+      head = b ? [(a[0] + (b[0] - a[0]) * f + 0.5) * C, (a[1] + (b[1] - a[1]) * f + 0.5) * C] : [(a[0] + 0.5) * C, (a[1] + 0.5) * C];
+      upto = j + 1;
+    } else head = [(t[t.length - 1][0] + 0.5) * C, (t[t.length - 1][1] + 0.5) * C];
+    (sg.heads || (sg.heads = []))[i] = head;
+    ctx.globalAlpha = alive ? 1 : 0.35;
+    if (t.length > 1 || ahead) {
+      path(t, head, upto, ahead);
+      const hot = alive && p.bo && p.f > 0;
+      ctx.strokeStyle = col; ctx.globalAlpha = alive ? (hot ? 0.38 : 0.26) : 0.08; ctx.lineWidth = C * 1.5; ctx.stroke();
+      ctx.globalAlpha = alive ? 1 : 0.35; ctx.lineWidth = C * 0.55; ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = alive ? (hot ? 0.85 : 0.6) : 0.12; ctx.lineWidth = C * 0.16; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    if (alive && p.fc) babyBall(ctx, head[0], head[1], C * 1.6, p.fc);
+    else if (alive || s.st === 'count') {
+      const d = NR_DIR[p.d || 0], ang = Math.atan2(d[1], d[0]);
+      ctx.save();
+      ctx.translate(head[0], head[1]);
+      ctx.rotate(ang);
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(C * 0.9, 0); ctx.lineTo(-C * 0.5, -C * 0.55); ctx.lineTo(-C * 0.2, 0); ctx.lineTo(-C * 0.5, C * 0.55); ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(C * 0.15, 0, C * 0.18, 0, Math.PI * 2); ctx.fill();
+      if (p.bo && p.f > 0 && s.st === 'play') {
+        ctx.fillStyle = col;
+        for (let j = 0; j < 3; j++) ctx.fillRect(-C * (0.9 + j * 0.5 + Math.random() * 0.3), -C * 0.12, C * 0.3, C * 0.24);
+      }
+      ctx.restore();
+      if (s.st === 'count' || (p.pid === me.id && s.st === 'play' && now - (sg.rdAt || 0) < 2500)) {
+        ctx.font = '800 15px "Segoe UI", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.75)';
+        ctx.strokeText(p.pid === me.id ? 'DU' : p.name || '', head[0], head[1] - C * 1.5);
+        ctx.fillStyle = col;
+        ctx.fillText(p.pid === me.id ? 'DU' : p.name || '', head[0], head[1] - C * 1.5);
+      }
+    }
+  });
+  if (s && s.st === 'count') sg.rdAt = now;
+  sgDrawFx(g, ctx, dt, now);
+  // Own boost bar at the bottom.
+  const mine = pl.find(p => p.pid === me.id), mi = pl.indexOf(mine);
+  if (mine && (s.st === 'play' || s.st === 'count')) {
+    const w = 160, x = vw / 2 - w / 2, y = vh - 16, f = Math.max(0, Math.min(1, (mine.f || 0) / 2000));
+    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x, y, w, 7);
+    ctx.fillStyle = NR_COL[mi]; ctx.fillRect(x, y, w * f, 7);
+    ctx.font = '600 10px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.fillText('BOOST', x - 6, y + 7);
+  }
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  if (s && s.st !== 'lobby') {
+    // Who is who, in their colours, with their round wins; you are marked.
+    let hx = 10;
+    ctx.textBaseline = 'middle';
+    pl.forEach((q, i) => {
+      const label = (q.pid === me.id ? '▶ ' : '') + q.name + ' ', dots = '●'.repeat(q.sc || 0) + '○'.repeat(Math.max(0, (s.win || 3) - (q.sc || 0)));
+      ctx.font = (q.pid === me.id ? '800' : '700') + ' 15px "Segoe UI", system-ui, sans-serif';
+      const w1 = ctx.measureText(label).width;
+      ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
+      const w2 = ctx.measureText(dots).width;
+      ctx.globalAlpha = q.al || s.st !== 'play' ? 1 : 0.45;
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.beginPath(); ctx.roundRect(hx - 6, 6, w1 + w2 + 12, 24, 12); ctx.fill();
+      ctx.fillStyle = NR_COL[i];
+      ctx.font = (q.pid === me.id ? '800' : '700') + ' 15px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, hx, 19);
+      ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
+      ctx.fillText(dots, hx + w1, 19);
+      ctx.globalAlpha = 1;
+      hx += w1 + w2 + 22;
+    });
+  }
+  sgDrawBanner(g, ctx, vw, vh, now);
+}
+
 /* Malen & Raten */
 const DR_W = 800, DR_H = 500, DR_MAXPTS = 16000;
 const DR_COLORS = ['#222222', '#7f8c8d', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#8e5a2b', '#ff8fc8'];
@@ -5374,7 +6175,10 @@ function renderMsgs() {
   });
   if (c === ALL) for (const t of mpTables.values()) {
     if (t.host === me.id || !people.has(t.host) || Date.now() - t.ts > 45000 || (mpGame && mpGame.gid === t.gid)) continue;
-    cmsgs.appendChild(el('div', {class: 'cmpinvite'},
+    if (t.game) cmsgs.appendChild(el('div', {class: 'cmpinvite'},
+      el('span', {text: SG_TITLE[t.game] + ': ' + t.name + ' hat einen Tisch eröffnet (' + t.n + '/' + SG_MAX + ')'}),
+      el('button', {class: 'mpaccept', text: 'Mitspielen', disabled: mpRunning() || !mq || t.n >= SG_MAX, onclick: () => sgJoinTable(t)})));
+    else cmsgs.appendChild(el('div', {class: 'cmpinvite'},
       el('span', {text: '🃏 ' + t.name + ' hat einen Uno-Tisch eröffnet (' + t.n + '/' + UNO_MAX + ')'}),
       el('button', {class: 'mpaccept', text: 'Mitspielen', disabled: mpRunning() || !mq || t.n >= UNO_MAX, onclick: () => joinUnoTable(t)})));
   }
@@ -5394,6 +6198,9 @@ function updateComposer() {
   for (const id of ['cmpTtt', 'cmpC4', 'cmpDraw', 'cmpReact', 'cmpEmoji']) $(id).hidden = conv === ALL;
   $('cmpPong').hidden = conv === ALL || !OWN_BROKER.url;
   $('cmpUno').textContent = conv === ALL ? 'Uno-Tisch eröffnen (2–6)' : 'Uno';
+  $('cmpKick').hidden = $('cmpTron').hidden = !OWN_BROKER.url;
+  $('cmpKick').textContent = conv === ALL ? '⚽ Fußball-Tisch eröffnen (2–4)' : '⚽ Fußball';
+  $('cmpTron').textContent = conv === ALL ? '🏍️ Neon-Rush-Tisch eröffnen (2–4)' : '🏍️ Neon Rush';
   if (cin.disabled) closePops();
 }
 
@@ -5828,6 +6635,8 @@ $('cmpDraw').addEventListener('click', () => { closePops(); inviteMp('draw'); })
 $('cmpEmoji').addEventListener('click', () => { closePops(); inviteMp('emoji'); });
 $('cmpReact').addEventListener('click', () => { closePops(); inviteMp('react'); });
 $('cmpPong').addEventListener('click', () => { closePops(); inviteMp('pong'); });
+$('cmpKick').addEventListener('click', () => { closePops(); if (conv === ALL) sgOpenTable('kick'); else inviteMp('kick'); });
+$('cmpTron').addEventListener('click', () => { closePops(); if (conv === ALL) sgOpenTable('tron'); else inviteMp('tron'); });
 $('cmpUno').addEventListener('click', () => { closePops(); if (conv === ALL) openUnoTable(); else inviteMp('uno'); });
 
 // GIF search runs through the GIPHY API. GIPHY keys are meant to sit in client code; the only risk of a
