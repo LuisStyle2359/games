@@ -159,9 +159,9 @@ tbody tr.sel td { background: var(--select); }
 .opage { height: 100%; display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--grid-line); border-radius: 4px; overflow: hidden; }
 .opage .cmpboard { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .opage .cmpboard[hidden] { display: none; }
-.osetup { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; overflow-y: auto; background: linear-gradient(135deg, #1f3b2a, #0b1530); }
+.osetup { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 12px; overflow-y: auto; background: linear-gradient(135deg, #1f3b2a, #0b1530); }
 .osetup[hidden] { display: none; }
-.osetbox { background: var(--paper); border: 1px solid #c8922a; border-radius: 6px; padding: 14px 18px; width: min(460px, 100%); display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+.osetbox { background: var(--paper); border: 1px solid #c8922a; border-radius: 6px; padding: 14px 18px; width: min(540px, 100%); margin: auto 0; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
 .osetbox p { margin: 0; font-size: 12px; color: var(--muted); }
 .olabel { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 4px; }
 .orow { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -2031,7 +2031,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -8023,7 +8023,7 @@ function offShow(game) {
       el('div', {class: 'orow'}, opt('pu', true, '⚡ An'), opt('pu', false, 'Aus'))]),
     el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Los geht\'s', disabled: blocked, onclick: () => offStart(game)}),
     blocked ? el('p', {text: 'Erst das laufende Online-Spiel im Chat beenden.'}) : null,
-    el('p', {class: 'sg-keys', text: '⌨ ' + (pong ? 'Maus hoch und runter · mit dem Magneten klicken zum Schießen' : SG_HINT[game]) + ' · P = Pause · 🏆 = deine Siege'})));
+    el('p', {class: 'sg-keys', text: '⌨ ' + (pong ? 'Maus hoch und runter · 🧲 klicken = Magnet-Schuss' : SG_HINT[game]) + ' · P = Pause · 🏆 = deine Siege'})));
   if (doc !== current) return;
 }
 // An online match of the same kind runs on the same board code, so only one of them at a time.
