@@ -1982,7 +1982,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3448,6 +3448,10 @@ setInterval(() => {
     sendMpMsg(g.opponent, {type: 'pgstat', gid: g.gid, c: pg.conn}).catch(() => {});
   }
   if (pg.ws && pg.ws.readyState === 1) {
+    // Tell the server whether the game is in sight; when both players have it hidden (Esc, another tab or
+    // chat), the match pauses.
+    const away = !(chatVisible() && conv === mpConv(g) && !$('cmpboard').hidden);
+    if (away !== pg.away || performance.now() - (pg.awayAt || 0) > 2000) { pg.away = away; pg.awayAt = performance.now(); pgSend(g, {t: 'away', v: away}); }
     pgPush(g);
     if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pgSend(g, {t: 'ping', c: pg.pingAt, rtt: Math.round(pg.rtt)}); }
   }
@@ -4936,6 +4940,8 @@ function pgFrame(g, ts) {
   else if (!s.on[op1]) text = g.opName + ' ist weg… (gewinnst in 10 s)';
   else if (s.st === 'count') text = (s.pu ? '⚡ Power-ups AN' : 'Power-ups AUS') + (s.coin ? ' (Münzwurf)' : '') + '\n' + Math.max(1, Math.ceil(s.c / 1000));
   else if (s.st === 'goal') text = 'Punkt!';
+  else if (s.st === 'pause') text = 'Pausiert\n' + (s.aw && s.aw[op1] ? 'Warte auf ' + g.opName + '…' : 'Gleich geht\'s weiter…');
+  else if (s.st === 'resume') text = 'Weiter in\n' + Math.max(1, Math.ceil(s.c / 1000));
   if (over.textContent !== text) over.textContent = text;
   over.hidden = !text;
   pg.raf = requestAnimationFrame(ts => pgFrame(g, ts));

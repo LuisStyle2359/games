@@ -215,6 +215,10 @@ export class Arena {
     this.turbo = false;
     this.last = -1;
     this.ev = {n: 0};
+    // Pause: when both players have the game out of sight (Esc, another tab), the match stops until both are back.
+    this.away = [false, false];
+    this.pausedAt = 0;
+    this.pausedSt = '';
   }
 
   async fetch(req) {
@@ -227,6 +231,7 @@ export class Arena {
     const i = seat - 1, old = this.seats[i];
     if (old) { this.seats[i] = null; try { old.close(1000, 'replaced'); } catch (e) {} }
     this.seats[i] = server;
+    this.away[i] = false;
     this.names[i] = (u.searchParams.get('name') || '').slice(0, 24);
     server.addEventListener('message', e => this.onMessage(i, e.data));
     const gone = () => { if (this.seats[i] === server) { this.seats[i] = null; this.left[i] = Date.now(); } };
@@ -257,6 +262,8 @@ export class Arena {
       this.release(now);
     } else if (msg.t === 'god' && Number.isFinite(msg.ts) && typeof msg.sig === 'string') {
       this.adminGod(msg.ts, msg.sig);
+    } else if (msg.t === 'away' && typeof msg.v === 'boolean') {
+      this.away[i] = msg.v;
     } else if (msg.t === 'quit' && this.st !== 'over') {
       this.finish(2 - i);
     }
@@ -306,6 +313,9 @@ export class Arena {
     } else if (this.st !== 'wait') {
       for (let i = 0; i < 2; i++) if (!this.seats[i] && now - this.left[i] > 10000) this.finish(2 - i);
       if (this.st !== 'over' && this.seats[0] && this.seats[1]) {
+        if (this.st === 'pause') { if (!this.away[0] && !this.away[1]) this.resume(now); }
+        else if (this.away[0] && this.away[1]) this.pause(now);
+        if (this.st === 'resume' && now >= this.until) this.st = 'play';
         if ((this.st === 'count' || this.st === 'goal') && now >= this.until) { this.st = 'play'; this.launch(); }
         // The ball moves by the time that really passed, so a late timer never slows or speeds it.
         const el = Math.min(0.05, Math.max(0, now - (prevTick || now - TICK)) / 1000);
@@ -316,6 +326,27 @@ export class Arena {
       this.timer = 0;
     }
     this.broadcast(now);
+  }
+
+  pause(now) {
+    this.pausedSt = this.st === 'resume' ? 'play' : this.st;
+    this.pausedAt = now;
+    this.st = 'pause';
+  }
+
+  // Back from a pause: every running timer moves on by the paused time, so power-ups, items and a held magnet
+  // shot have as long left as before. A rally goes on from where it stopped after a 3 s countdown; a pause
+  // between points ends in the usual countdown before the serve.
+  resume(now) {
+    const d = now - this.pausedAt + (this.pausedSt === 'play' ? 3000 : 0), sh = t => t ? t + d : t;
+    for (const k of ['bigUntil', 'miniUntil', 'god', 'curve', 'slow']) this[k] = this[k].map(sh);
+    if (this.item) this.item.t += d;
+    this.nextItem = sh(this.nextItem);
+    this.stuckUntil = sh(this.stuckUntil);
+    for (const h of this.hist) for (const e of h) e[0] += d;
+    for (const p of this.pend) if (p) p.t += d;
+    this.st = this.pausedSt === 'play' ? 'resume' : this.pausedSt;
+    this.until = now + 3000;
   }
 
   powers(now) {
@@ -551,7 +582,7 @@ export class Arena {
       m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]], ph: this.ph,
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
       sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)],
-      cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
+      aw: this.away, cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
       aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }
