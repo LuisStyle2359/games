@@ -1263,7 +1263,8 @@ export class Tron extends Room {
     this.event('round', {pid: win ? win.pid : null});
     if (win && win.sc >= T_WIN) return this.finish(win);
     this.st = 'roundover';
-    this.until = now + 2500;
+    // Long enough for the time-lapse of the round.
+    this.until = now + 3500;
   }
   free(x, y) { return x >= 0 && y >= 0 && x < TW && y < TH && !this.grid[y * TW + x]; }
   // Whether a bike can move into cell (x, y): a ghost or a divine bike rides through trails, never off the grid.

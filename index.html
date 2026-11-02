@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 59;
+const APP_VERSION = 60;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -6091,6 +6091,16 @@ function nrDraw(g, cv, now, dt) {
     path(t); ctx.strokeStyle = 'rgba(160,170,190,.35)'; ctx.lineWidth = C * 0.35; ctx.stroke();
   }
   const pl = s ? s.pl : [];
+  // After a round: the trails grow again from the start in 2 s, so everyone sees who boxed in whom.
+  let tl = null;
+  if (s && s.st === 'roundover') {
+    if (sg.rovRd !== s.rd) { sg.rovRd = s.rd; sg.rovAt = now; }
+    const f = (now - sg.rovAt - 700) / 2000, times = sg.trails.flatMap(t => t ? t.filter(c => c[2]).map(c => c[2]) : []);
+    if (f < 1.15 && times.length > 10) {
+      const t0 = Math.min(...times), t1 = Math.max(...times);
+      tl = {cut: t0 + Math.max(0, Math.min(1, f)) * (t1 - t0)};
+    }
+  }
   sg.trails.forEach((t, i) => {
     if (!t || !t.length || !s) return;
     let p = pl[i] || {};
@@ -6098,7 +6108,11 @@ function nrDraw(g, cv, now, dt) {
     // Where the bike was at the drawing time: between the last cell it had reached and the next one.
     let head, upto = t.length, ahead = null;
     const pr = alive && s.st === 'play' && p.pid === me.id ? nrPredict(g, t, p, now) : null, fx = p.fx || {};
-    if (pr) {
+    if (tl) {
+      upto = 1;
+      while (upto < t.length && (t[upto][2] || 0) <= tl.cut) upto++;
+      head = [(t[upto - 1][0] + 0.5) * C, (t[upto - 1][1] + 0.5) * C];
+    } else if (pr) {
       // Own bike: confirmed trail, then the predicted cells, then part of the way into the next one.
       ahead = pr.cells;
       const [hx, hy] = [pr.x + NR_DIR[pr.d][0] * pr.f, pr.y + NR_DIR[pr.d][1] * pr.f];
@@ -6115,13 +6129,14 @@ function nrDraw(g, cv, now, dt) {
       upto = j + 1;
     } else head = [(t[t.length - 1][0] + 0.5) * C, (t[t.length - 1][1] + 0.5) * C];
     (sg.heads || (sg.heads = []))[i] = head;
-    ctx.globalAlpha = alive ? 1 : 0.35;
+    ctx.globalAlpha = alive || tl ? 1 : 0.35;
     if (t.length > 1 || ahead) {
       path(t, head, upto, ahead, alive && fx.gap > 0);
       const hot = alive && ((p.bo && p.f > 0) || fx.god > 0);
-      ctx.strokeStyle = col; ctx.globalAlpha = alive ? (hot ? 0.38 : 0.26) : 0.08; ctx.lineWidth = C * 1.5; ctx.stroke();
-      ctx.globalAlpha = alive ? 1 : 0.35; ctx.lineWidth = C * 0.55; ctx.stroke();
-      ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = alive ? (hot ? 0.85 : 0.6) : 0.12; ctx.lineWidth = C * 0.16; ctx.stroke();
+      const lit = alive || !!tl;
+      ctx.strokeStyle = col; ctx.globalAlpha = lit ? (hot ? 0.38 : 0.26) : 0.08; ctx.lineWidth = C * 1.5; ctx.stroke();
+      ctx.globalAlpha = lit ? 1 : 0.35; ctx.lineWidth = C * 0.55; ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = lit ? (hot ? 0.85 : 0.6) : 0.12; ctx.lineWidth = C * 0.16; ctx.stroke();
     }
     ctx.globalAlpha = 1;
     if (alive && s.st === 'play') {
@@ -7304,7 +7319,8 @@ class Tron extends Room {
     this.event('round', {pid: win ? win.pid : null});
     if (win && win.sc >= T_WIN) return this.finish(win);
     this.st = 'roundover';
-    this.until = now + 2500;
+    // Long enough for the time-lapse of the round.
+    this.until = now + 3500;
   }
   free(x, y) { return x >= 0 && y >= 0 && x < TW && y < TH && !this.grid[y * TW + x]; }
   // Whether a bike can move into cell (x, y): a ghost or a divine bike rides through trails, never off the grid.
