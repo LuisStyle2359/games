@@ -1471,7 +1471,8 @@ export class Breach extends Room {
         if (p.started && p.owed < 8) { p.owed++; run(p.k & ~32, p.a, 0); }
       } else {
         p.started = true;
-        while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
+        // Inputs skipped to catch up still pass on a reload press (a tap may be in just one input).
+        while (p.owed > 0 && p.q.length > 1) { const d = p.q.shift(); p.ack = d[1]; p.owed--; p.q[0][0] |= d[0] & 64; }
         for (let n = p.q.length > 4 ? 2 : 1; n > 0 && p.q.length; n--) { const [k, i, a, rt] = p.q.shift(); p.ack = i; run(k, a, rt); }
       }
       p.hist.push([this.tick, now, p.x, p.y]);
