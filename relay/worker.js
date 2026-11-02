@@ -237,6 +237,7 @@ export class Arena {
     this.pausedAt = 0;
     this.pausedSt = '';
     this.tok = ['', ''];
+    this.emoAt = [0, 0];
     // Rally: returns in the current point. Rescue: the one-time wall for whoever falls 3 behind. Ghost: the ball
     // fades in the middle of the table after the taker's returns.
     this.rally = 0;
@@ -300,6 +301,10 @@ export class Arena {
       this.release(now);
     } else if (msg.t === 'god' && Number.isFinite(msg.ts) && typeof msg.sig === 'string') {
       this.adminGod(msg.ts, msg.sig);
+    } else if (msg.t === 'emo' && Number.isInteger(msg.v) && msg.v >= 0 && msg.v < 5 && now - (this.emoAt[i] || 0) > 700) {
+      // A quick reaction for the other one to see (no sound, so no trash talk otherwise); at most one every 0.7 s.
+      this.emoAt[i] = now;
+      this.event('emo', i, msg.v);
     } else if (msg.t === 'away' && typeof msg.v === 'boolean') {
       this.away[i] = msg.v;
     } else if (msg.t === 'quit' && this.st !== 'over') {

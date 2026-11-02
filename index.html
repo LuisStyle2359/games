@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 64;
+const APP_VERSION = 65;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -4188,8 +4188,8 @@ function renderPong(g = mpGame) {
   for (const other of [$('ogrid'), $('cmpgrid')]) if (other !== ui.grid && other.querySelector('#pgcanvas')) { other.replaceChildren(); delete other.dataset.gid; }
   if (ui.grid.dataset.gid !== g.gid || !ui.grid.querySelector('#pgcanvas')) buildPong(g);
   ui.status.textContent = g.over ? (g.winner === g.myMark ? 'Du hast gewonnen!' : g.opName + ' hat gewonnen!')
-    : g.offline ? '🏓 Ping Pong gegen Bot (' + OFF_LEVEL_NAMES[g.offline.lvl] + ', Power-ups ' + (g.offline.pu ? 'an' : 'aus') + ') — Maus hoch und runter, du bist links'
-    : 'Ping Pong gegen ' + g.opName + ' — Maus hoch und runter bewegen, du bist links';
+    : g.offline ? '🏓 Ping Pong gegen Bot (' + OFF_LEVEL_NAMES[g.offline.lvl] + ', Power-ups ' + (g.offline.pu ? 'an' : 'aus') + ') — Maus hoch und runter, du bist links · Tasten 2–6: Sprüche'
+    : 'Ping Pong gegen ' + g.opName + ' — Maus hoch und runter bewegen, du bist links · Tasten 2–6: HAHA, EZ, GG, NEIN!, WOW';
   const res = ui.result;
   res.hidden = false;
   if (g.offline) {
@@ -4392,6 +4392,11 @@ function pgEvent(g, ev) {
     pg.rallyRecord = Math.max(best, n);
     return;
   }
+  if (ev.k === 'emo') {
+    (pg.bubbles || (pg.bubbles = [])).push({i: ev.i, text: PG_EMO[ev.kind] || '!', at: performance.now()});
+    if (pg.bubbles.length > 4) pg.bubbles.shift();
+    return;
+  }
   if (ev.k === 'rescue') {
     fxBanner(pg, [['AUFHOLJAGD · WAND FÜR ', '#ffffff'], [name, own]], PG_COL.wall);
     return;
@@ -4425,6 +4430,14 @@ function pgEvent(g, ev) {
   }
 }
 function pgQuit(g) { pgSend(g, {t: 'quit'}); }
+// Reactions on keys 2 to 6 (1 belongs to the owner's trick).
+const PG_EMO = ['HAHA', 'EZ', 'GG', 'NEIN!', 'WOW'];
+document.addEventListener('keydown', e => {
+  const g = pgGame, n = '23456'.indexOf(e.key);
+  if (n < 0 || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !g || !pgLive(g) || !pgUi(g).here() || (e.target.matches && e.target.matches('input, textarea'))) return;
+  e.preventDefault();
+  pgSend(g, {t: 'emo', v: n});
+});
 // End screen: a black panel in the pixel font with both players' numbers (the better one bright), a title each,
 // and a graph of the lead point by point.
 function pgStats(g, ctx, fin, me1, op1) {
@@ -5139,6 +5152,15 @@ function pgFrame(g, ts) {
   }
   ctx.pgOx = ctx.pgOy = 0;
 
+  // Reactions: a pixel speech bubble over the paddle for 1.6 s.
+  pg.bubbles = (pg.bubbles || []).filter(b => now - b.at < 1600);
+  for (const b of pg.bubbles) {
+    const left = b.i === me1, px = 3, w = PGX(pgTextWidth(b.text, px) + 16), x = PGX(left ? 60 : PG_W - 60 - w), py = s ? s.m[b.i][1] : PG_H / 2;
+    const y = PGX(Math.max(8, Math.min(PG_H - 40, py - 70)) - Math.min(1, (now - b.at) / 200) * 6);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, w, 30);
+    ctx.fillRect(left ? x + 8 : x + w - 16, y + 30, 8, 8);
+    pgText(ctx, [[b.text, left ? PG_COL.me : PG_COL.op]], x + w / 2, y + 8, px);
+  }
   // The end of a match: both players' numbers, a title each, and how the lead went.
   if (g.over && s && s.fin && Array.isArray(s.fin.st)) { if (!pg.finAt) pg.finAt = now; if (now - pg.finAt > 1500) pgStats(g, ctx, s.fin, me1, op1); }
   const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis ' + pgTarget(s.sc) + ')' : 'Du 0 : 0 ' + g.opName) + (pg.rtt && !g.offline ? '   ·   Ping ' + Math.round(pg.rtt) + (pgAssistOn ? 'ms' : ' ms') : '');
@@ -6392,6 +6414,7 @@ class Arena {
     this.pausedAt = 0;
     this.pausedSt = '';
     this.tok = ['', ''];
+    this.emoAt = [0, 0];
     // Rally: returns in the current point. Rescue: the one-time wall for whoever falls 3 behind. Ghost: the ball
     // fades in the middle of the table after the taker's returns.
     this.rally = 0;
@@ -6455,6 +6478,10 @@ class Arena {
       this.release(now);
     } else if (msg.t === 'god' && Number.isFinite(msg.ts) && typeof msg.sig === 'string') {
       this.adminGod(msg.ts, msg.sig);
+    } else if (msg.t === 'emo' && Number.isInteger(msg.v) && msg.v >= 0 && msg.v < 5 && now - (this.emoAt[i] || 0) > 700) {
+      // A quick reaction for the other one to see (no sound, so no trash talk otherwise); at most one every 0.7 s.
+      this.emoAt[i] = now;
+      this.event('emo', i, msg.v);
     } else if (msg.t === 'away' && typeof msg.v === 'boolean') {
       this.away[i] = msg.v;
     } else if (msg.t === 'quit' && this.st !== 'over') {
@@ -8070,6 +8097,18 @@ function pgLocal(g) {
   A.votes = [!!o.pu, !!o.pu];
   A.decide();
   const think = pgBrain(A, o.lvl);
+  // The bot reacts too: EZ after three points in a row, WOW after a long rally, GG at the end.
+  const ev0 = A.event.bind(A);
+  let run = 0;
+  A.event = (k, i, kind) => {
+    ev0(k, i, kind);
+    if (k !== 'point') return;
+    run = i === 1 ? run + 1 : 0;
+    const say = v => setTimeout(() => { if (sock.readyState === 1) A.onMessage(1, JSON.stringify({t: 'emo', v})); }, 700);
+    setTimeout(() => { if (A.st === 'over' && sock.readyState === 1) A.onMessage(1, JSON.stringify({t: 'emo', v: 2})); }, 1500);
+    if (run === 3) say(1);
+    else if (kind >= 15) say(4);
+  };
   A.tickAt = Date.now();
   A.timer = setInterval(() => { think(); A.tick(); }, 1000 / 120);
   g.room = A;
