@@ -1874,7 +1874,7 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong vs Bot', kick: 'Fußball', tron: 'Neon Rush', breach: 'Breach'};
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong gegen Bot', kick: 'Fußball', tron: 'Neon Rush', breach: 'Breach'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -2031,7 +2031,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2474,11 +2474,11 @@ function renderLb() {
   const entries = Object.entries(lb[lbGame] || {})
     .map(([id, e]) => ({...e, name: id === me.id ? me.name + ' (du)' : e.name}))
     .sort((a, b) => b.score - a.score);
-  if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Scores für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
+  if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Punkte für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
   const medals = ['gold', 'silver', 'bronze'];
   const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong', 'kick', 'tron', 'breach'];
   $('clbbody').replaceChildren(el('table', {class: 'clbtable'},
-    el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : ['pongbot', 'pongtop'].includes(lbGame) ? 'Tempo' : 'Score'}))),
+    el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : ['pongbot', 'pongtop'].includes(lbGame) ? 'Tempo' : 'Punkte'}))),
     el('tbody', {}, ...entries.map((e, i) => el('tr', {},
       el('td', {class: 'rank ' + (medals[i] || ''), text: String(i + 1)}),
       el('td', {text: e.name}),
@@ -4109,7 +4109,7 @@ function buildPong(g) {
   });
   const vote = v => { pgSend(g, {t: 'vote', v}); g.pg.voted = v; renderPong(g); };
   const voteBox = el('div', {class: 'pg-vote', id: 'pgvote', hidden: true},
-    el('div', {class: 'pg-vote-q', text: 'Diese Runde mit Power-ups?'}),
+    el('div', {class: 'pg-vote-q', text: 'Dieses Spiel mit Power-ups?'}),
     el('div', {class: 'pg-vote-row'},
       el('button', {class: 'vbtn pg-vote-yes', type: 'button', text: '⚡ Mit Power-ups', onclick: () => vote(true)}),
       el('button', {class: 'vbtn', type: 'button', text: 'Ohne', onclick: () => vote(false)})),
@@ -4126,7 +4126,7 @@ function renderPong(g = mpGame) {
   if (g !== pgGame) {
     ui.grid.replaceChildren(el('div', {class: 'rx-score', text: g.over ? (g.winner === g.myMark ? '🏆 Gewonnen' : g.opName + ' hat gewonnen') : ''}));
     delete ui.grid.dataset.gid;
-    ui.status.textContent = 'Ping Pong vs ' + g.opName;
+    ui.status.textContent = 'Ping Pong gegen ' + g.opName;
     ui.result.hidden = false;
     ui.result.replaceChildren(el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }}));
     return;
@@ -4136,12 +4136,12 @@ function renderPong(g = mpGame) {
   if (ui.grid.dataset.gid !== g.gid || !ui.grid.querySelector('#pgcanvas')) buildPong(g);
   ui.status.textContent = g.over ? (g.winner === g.myMark ? 'Du hast gewonnen!' : g.opName + ' hat gewonnen!')
     : g.offline ? '🏓 Ping Pong gegen Bot (' + OFF_LEVEL_NAMES[g.offline.lvl] + ', Power-ups ' + (g.offline.pu ? 'an' : 'aus') + ') — Maus hoch und runter, du bist links'
-    : 'Ping Pong vs ' + g.opName + ' — Maus hoch und runter bewegen, du bist links';
+    : 'Ping Pong gegen ' + g.opName + ' — Maus hoch und runter bewegen, du bist links';
   const res = ui.result;
   res.hidden = false;
   if (g.offline) {
     res.replaceChildren(...(g.over
-      ? [el('button', {class: 'vbtn', type: 'button', text: '▶ Nochmal', onclick: () => offStart('pong')}),
+      ? [el('button', {class: 'vbtn', type: 'button', text: '↻ Nochmal', onclick: () => offStart('pong')}),
         el('button', {class: 'vbtn', type: 'button', text: 'Einstellungen', onclick: () => { offStop(); offShow('pong'); }})]
       : [el('button', {class: 'vbtn', type: 'button', text: g.pg.paused ? '▶ Weiter' : '⏸ Pause', onclick: () => pgPause(g)}),
         el('button', {class: 'vbtn', type: 'button', text: 'Aufgeben', onclick: () => pgQuit(g)})]));
@@ -4350,7 +4350,7 @@ function pgEvent(g, ev) {
       fx.parts.push({x, y, vx: dir * (60 + near * 380 + Math.random() * 80), vy: (y - by) * near * 1.5, life: 0, max: 0.25 + near * 0.25, c: Math.random() < 0.3 ? '#ffffff' : PG_COL.wall, s: 8, grav: 0, shrink: true});
     }
     fx.shake = Math.max(fx.shake, 0.6);
-    fxBanner(pg, [[mine ? 'DEINE' : name + 'S', own], [' WAND HÄLT', PG_COL.wall]], PG_COL.wall);
+    fxBanner(pg, mine ? [['DEINE', own], [' WAND HÄLT', PG_COL.wall]] : [[name, own], [' · WAND HÄLT', PG_COL.wall]], PG_COL.wall);
   }
 }
 function pgQuit(g) { pgSend(g, {t: 'quit'}); }
@@ -4473,8 +4473,8 @@ function pgFrame(g, ts) {
       const a = s.sc[me1], o = s.sc[op1], tgt = pgTarget(s.sc);
       if (a === 9 && o === 9) fxBanner(pg, [['9:9 · NÄCHSTER PUNKT GEWINNT', '#ffffff']], '#ffd23f');
       else if (a === o && a >= 6) fxBanner(pg, [['VERLÄNGERUNG · BIS ' + tgt, '#ffd23f']], '#ffd23f');
-      else if (a + 1 >= tgt && a > o) fxBanner(pg, [['SATZBALL ', '#ffffff'], ['DU', PG_COL.me]], '#ffd23f');
-      else if (o + 1 >= tgt && o > a) fxBanner(pg, [['SATZBALL ', '#ffffff'], [String(g.opName).slice(0, 8), PG_COL.op]], '#ffd23f');
+      else if (a + 1 >= tgt && a > o) fxBanner(pg, [['MATCHBALL ', '#ffffff'], ['FÜR DICH', PG_COL.me]], '#ffd23f');
+      else if (o + 1 >= tgt && o > a) fxBanner(pg, [['MATCHBALL ', '#ffffff'], [String(g.opName).slice(0, 8), PG_COL.op]], '#ffd23f');
     }
     pg.prevTotal = total;
     pg.prevMine = s.sc[me1];
@@ -5031,13 +5031,13 @@ function pgFrame(g, ts) {
   else if (pg.conn !== 'open') text = pg.conn === 'lost' ? 'Spielserver nicht erreichbar – neuer Versuch…' : 'Verbinde mit dem Spielserver…';
   else if (!s || s.st === 'wait') {
     const waited = Date.now() - (pg.waitFrom || Date.now());
-    text = pg.opConn === 'lost' ? g.opName + ' kann den Spielserver nicht erreichen.\nSein Netz blockiert wohl workers.dev.'
+    text = pg.opConn === 'lost' ? g.opName + ' kann den Spielserver nicht erreichen.\nWahrscheinlich blockiert das WLAN dort workers.dev.'
       : pg.opConn === 'connecting' ? g.opName + ' verbindet sich…'
-      : waited > 8000 ? 'Warte auf ' + g.opName + '…\nKommt nichts: ' + g.opName + ' soll Strg+F5 drücken, dann neu einladen.'
+      : waited > 8000 ? 'Warte auf ' + g.opName + '…\nKlappt\'s nicht? ' + g.opName + ' soll Strg+F5 drücken, dann neu einladen.'
       : 'Warte auf ' + g.opName + '…';
   }
   else if (voting) text = '';
-  else if (!s.on[op1]) text = g.opName + ' ist weg… (gewinnst in 10 s)';
+  else if (!s.on[op1]) text = g.opName + ' ist weg…\nKommt ' + g.opName + ' nicht zurück, gewinnst du in 10 s.';
   else if (s.st === 'count') text = (s.pu ? '⚡ Power-ups AN' : 'Power-ups AUS') + (s.coin ? ' (Münzwurf)' : '') + '\n' + Math.max(1, Math.ceil(s.c / 1000));
   else if (s.st === 'goal') text = 'Punkt!';
   else if (s.st === 'pause') text = 'Pausiert\n' + (g.offline ? (pg.paused ? 'P = weiter' : 'Gleich geht\'s weiter…') : s.aw && s.aw[op1] ? 'Warte auf ' + g.opName + '…' : 'Gleich geht\'s weiter…');
@@ -5052,8 +5052,9 @@ function pgFrame(g, ts) {
    connects with the game's key and its chat id; the server keeps the lobby, the game and the score. */
 const SG_GAMES = ['kick', 'tron', 'breach'], SG_MAX = 4;
 const SG_TITLE = {kick: '⚽ Fußball', tron: '🏍️ Neon Rush', breach: '⚔️ Breach'};
-const SG_HINT = {kick: 'Pfeiltasten oder WASD laufen, Leertaste schießen', tron: 'Pfeiltasten oder WASD lenken, Leertaste hält den Boost',
-  breach: 'Ins Bild klicken · Maus zielen · WASD laufen · Shift leise · Klick schießen · R laden · F Sprengladung · E entschärfen · +/− Mausempfindlichkeit'};
+const SG_HINT = {kick: 'Pfeiltasten oder WASD laufen, Leertaste schießen', tron: 'Pfeiltasten oder WASD lenken, Leertaste gedrückt halten = Boost',
+  breach: 'Erst ins Bild klicken (Maus wird gefangen, Esc gibt sie frei) · Maus zielen, Klick schießen · WASD laufen, Shift = leise · R nachladen · F Sprengladung bzw. Wand verstärken · E halten = entschärfen · +/− Maus schneller/langsamer'};
+const BR_HINT_SHORT = 'Maus zielen · Klick schießen · WASD · Shift leise · R · F · E · +/− · P = Pause';
 let sgGame = null;
 
 // The seat's secret: the game server gives the seat back only to a page that brings it (also after a reload).
@@ -5333,8 +5334,8 @@ function renderSgChrome(g) {
   const ui = sgUi(g);
   if (!sgLive(g) || !g.el || ui.grid.dataset.gid !== g.gid) return;
   const s = g.sg.s, lobby = g.el.lobby;
-  ui.status.textContent = SG_TITLE[g.game] + (g.offline ? ' gegen ' + (g.game === 'kick' && g.offline.mode === 2 ? '3 Bots' : g.game === 'kick' || g.game === 'breach' ? 'Bot' : g.offline.bots + (g.offline.bots === 1 ? ' Bot' : ' Bots')) + ' · ' + OFF_LEVEL_NAMES[g.offline.lvl] : '')
-    + (g.game === 'breach' && g.sg.def ? ' · Karte: ' + g.sg.def.name : '') + (g.over ? '' : ' — ' + SG_HINT[g.game]);
+  ui.status.textContent = SG_TITLE[g.game] + (g.offline ? ' gegen ' + (g.game === 'kick' && g.offline.mode === 2 ? '2 Bots (mit Bot im Team)' : g.game === 'kick' || g.game === 'breach' ? 'Bot' : g.offline.bots + (g.offline.bots === 1 ? ' Bot' : ' Bots')) + ' · ' + OFF_LEVEL_NAMES[g.offline.lvl] : '')
+    + (g.game === 'breach' && g.sg.def ? ' · Karte: ' + g.sg.def.name : '') + (g.over ? '' : ' — ' + (g.game === 'breach' ? BR_HINT_SHORT : SG_HINT[g.game]));
   const res = ui.result;
   res.hidden = false;
   const mine = s && s.pl.find(p => p.pid === me.id), left = mine ? mine.ps : 0;
@@ -5344,7 +5345,7 @@ function renderSgChrome(g) {
     : g.over
     ? [el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})]
     : [s && s.st === 'pause' && s.pb ? el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Weiter', onclick: () => sgSend(g, {t: 'resume'})})
-      : el('button', {class: 'vbtn', type: 'button', text: g.offline ? 'Pause' : 'Pause (' + left + ')', title: g.offline ? 'Taste P' : 'Taste P · jeder hat 2 Pausen pro Spiel',
+      : el('button', {class: 'vbtn', type: 'button', text: g.offline ? 'Pause' : 'Pause (noch ' + left + ')', title: g.offline ? 'Taste P' : 'Taste P · jeder hat 2 Pausen pro Spiel',
         disabled: !s || s.st !== 'play' || (!left && !g.offline), onclick: () => sgSend(g, {t: 'pause'})}),
       // Breach in full screen: the picture fills the screen and the mouse is captured right away.
       g.game === 'breach' ? el('button', {class: 'vbtn', type: 'button', text: '⛶ Vollbild', title: 'Esc beendet das Vollbild',
@@ -5370,7 +5371,7 @@ function renderSgChrome(g) {
   const host = s.pl[0], iHost = host && host.pid === me.id;
   const startBtn = iHost && !g.duo ? el('button', {class: 'vbtn sg-start', type: 'button', text: (g.game === 'kick' ? '▶ Anpfiff' : '▶ Start') + ' (' + s.pl.length + '/' + SG_MAX + ')',
     disabled: s.pl.length < 2, onclick: () => sgSend(g, {t: 'start'})}) : null;
-  const wait = g.duo ? 'Warte auf ' + g.opName + '…' : iHost ? (s.pl.length < 2 ? 'Warte auf Mitspieler – im Gruppenchat können sie auf „Mitspielen“ klicken.' : '')
+  const wait = g.duo ? 'Warte auf ' + g.opName + '…' : iHost ? (s.pl.length < 2 ? 'Warte auf Mitspieler – im „Alle“-Chat können sie auf „Mitspielen“ klicken.' : '')
     : 'Warte, bis ' + (host ? host.name : 'der Gastgeber') + ' startet…';
   let body;
   if (g.game === 'kick') {
@@ -5406,19 +5407,19 @@ function sgFrame(g, ts) {
   let score = '';
   if (s && g.game === 'kick') {
     score = sg.team === 0 ? 'Du spielst 🔴 Rot → nach rechts' : sg.team === 1 ? 'Du spielst 🔵 Blau ← nach links' : '';
-  } else if (s && g.game === 'breach') score = 'Wer zuerst 4 Runden gewinnt';
-  else if (s) score = 'Erster mit 3 Runden gewinnt';
+  } else if (s && g.game === 'breach') score = 'Bis 4 Rundensiege';
+  else if (s) score = 'Bis 3 Rundensiege';
   if (sg.rtt && !g.offline) score += '     Ping ' + Math.round(sg.rtt) + ' ms';
   if (g.el.score.textContent !== score) g.el.score.textContent = score;
   let text = '';
   if (sg.conn === 'full') text = 'Da ist kein Platz mehr frei\n(oder das Spiel läuft schon).';
   else if (!s && sg.conn === 'lost') text = 'Spielserver nicht erreichbar – neuer Versuch…';
   else if (!s) text = 'Verbinde mit dem Spielserver…';
-  else if (g.over && s.st === 'over') text = g.winner ? '🏆 Gewonnen!' : g.game === 'kick' ? (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt' : ((s.pl.find(p => p.pid === s.w) || {}).name || 'Niemand') + ' gewinnt';
+  else if (g.over && s.st === 'over') text = g.winner ? '🏆 Gewonnen!' : g.game === 'kick' ? 'Verloren – ' + (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt' : ((s.pl.find(p => p.pid === s.w) || {}).name || 'Niemand') + ' gewinnt';
   else if (g.over) text = '';
   else if (sg.conn === 'lost') text = 'Verbindung weg – neuer Versuch…';
   else if (s.st === 'count') text = (g.game === 'kick' ? 'Anstoß in\n' : g.game === 'breach' ? 'Runde ' + s.rd + ' · ' + (sg.side === 'atk' ? 'Du greifst an' : 'Du verteidigst die Bombe') + '\n' : 'Runde ' + s.rd + '\n') + Math.max(1, Math.ceil(s.c / 1000));
-  else if (s.st === 'pause' && s.pb) text = (s.pb === me.id ? 'Du hast' : ((s.pl.find(p => p.pid === s.pb) || {}).name || 'Jemand') + ' hat') + ' pausiert\nspätestens in ' + Math.ceil(s.pz / 1000) + ' s geht\'s weiter';
+  else if (s.st === 'pause' && s.pb) text = (s.pb === me.id ? 'Du hast' : ((s.pl.find(p => p.pid === s.pb) || {}).name || 'Jemand') + ' hat') + ' pausiert\nSpätestens in ' + Math.ceil(s.pz / 1000) + ' s geht\'s weiter';
   else if (s.st === 'pause') text = 'Pausiert\n' + (s.pl.some(p => p.aw && p.pid !== me.id) ? 'Warte auf ' + s.pl.filter(p => p.aw && p.pid !== me.id).map(p => p.name).join(', ') + '…' : 'Gleich geht\'s weiter…');
   else if (s.st === 'resume') text = 'Weiter in\n' + Math.max(1, Math.ceil(s.c / 1000));
   const vt = s && s.st === 'vote' && g.el.lobby.querySelector('.sg-votet');
@@ -5593,8 +5594,8 @@ function bzEvent(g, ev, s) {
     sgFloat(g, x, y - 30, icon + ' ' + name, col);
     sgBurst(g, x, y, 24, [col, '#ffffff'], 300, {life: 0.6, size: 4});
     sg.rings.push({x, y, r0: 10, r1: 60, life: 0, max: 0.4, c: col, w: 4});
-    if (ev.kind === 'god') { sgBanner(g, '✨ GÖTTLICH ✨', (pl ? pl.name : '') + ' – 8 Sekunden unaufhaltsam', '#ffd23f'); sg.shake = 0.8; }
-    else if (mineGot || ['dwarf', 'ice'].includes(ev.kind) && sg.team !== ev.team) sgBanner(g, icon + ' ' + name, mineGot ? BZ_TIP[ev.kind] : (pl ? pl.name : '') + ': ' + BZ_TIP[ev.kind], col);
+    if (ev.kind === 'god') { sgBanner(g, '✨ GÖTTLICH ✨', (pl ? pl.name : '') + ': 8 s Turbo, Hammerschuss und Mauer', '#ffd23f'); sg.shake = 0.8; }
+    else if (mineGot || ['dwarf', 'ice'].includes(ev.kind) && sg.team !== ev.team) sgBanner(g, icon + ' ' + name, mineGot ? BZ_TIP[ev.kind] : (pl ? pl.name : 'Jemand') + ({dwarf: ' hat euch geschrumpft – 8 s halb so groß', ice: ': Ihr rutscht 6 s auf Glatteis'}[ev.kind] || ': ' + BZ_TIP[ev.kind]), col);
   } else if (ev.k === 'gone' && s.it === null) {
     // nothing to show: the item just fades
   } else if (ev.k === 'wallhit') {
@@ -5859,7 +5860,7 @@ function nrFull(g, m) {
 // The power-ups: icon, colour, name and what the pickup says.
 const NR_PU = {nitro: ['🔥', '#ff7a1a', 'NITRO', 'Boost-Leiste wieder voll'], ghost: ['👻', '#c4b5fd', 'GEIST', '3 s durch Spuren fahren'],
   bomb: ['💣', '#ff4d4d', 'BOMBE', 'Alle Spuren um dich herum gesprengt'], gap: ['✂️', '#94a3b8', 'LÜCKE', '3 s keine Spur'],
-  brake: ['🐢', '#4ade80', 'BREMSE', 'Die anderen 4 s halb so schnell'], confuse: ['🔄', '#f472b6', 'VERWIRRUNG', 'Bei den anderen 4 s alle Richtungen vertauscht'],
+  brake: ['🐢', '#4ade80', 'BREMSE', 'Die anderen 4 s halb so schnell'], confuse: ['🔄', '#f472b6', 'VERWIRRUNG', 'Bei den anderen 4 s Steuerung umgedreht'],
   shield: ['🛡️', '#60a5fa', 'SCHILD', 'Einmal einen Crash überleben'], god: ['✨', '#ffd23f', 'GÖTTLICH', '5 s unverwundbar und doppelt so schnell']};
 // When a key pressed now will have reached the server, on the clock the trail cells are stamped with: half the
 // round trip plus a margin for how much the network wobbles, so a turn practically never arrives too late.
@@ -5949,9 +5950,9 @@ function nrEvent(g, ev, s) {
       sg.shake = 1.2;
     }
     const others = ['brake', 'confuse'].includes(ev.kind);
-    if (ev.kind === 'god') sgBanner(g, '✨ GÖTTLICH ✨', (s.pl[i] ? s.pl[i].name : '') + ' – 5 Sekunden unaufhaltsam', '#ffd23f');
+    if (ev.kind === 'god') sgBanner(g, '✨ GÖTTLICH ✨', (s.pl[i] ? s.pl[i].name : '') + ': 5 s unverwundbar und doppelt so schnell', '#ffd23f');
     else if (ev.pid === me.id) sgBanner(g, icon + ' ' + name, tip, col);
-    else if (others && s.pl.some(p => p.pid === me.id && p.al)) sgBanner(g, icon + ' ' + name, (s.pl[i] ? s.pl[i].name : 'Jemand') + ': ' + tip, col);
+    else if (others && s.pl.some(p => p.pid === me.id && p.al)) sgBanner(g, icon + ' ' + name, (s.pl[i] ? s.pl[i].name : 'Jemand') + (ev.kind === 'brake' ? ' bremst dich – 4 s halb so schnell' : ': 4 s Steuerung umgedreht (links = rechts, hoch = runter)'), col);
   } else if (ev.k === 'shield') {
     const i = s.pl.findIndex(p => p.pid === ev.pid), h = sg.heads && sg.heads[i];
     if (h) { sg.rings.push({x: h[0], y: h[1], r0: 6, r1: 40, life: 0, max: 0.4, c: '#60a5fa', w: 6}); sgFloat(g, h[0], h[1] - 18, '🛡️ GERETTET', '#60a5fa'); }
@@ -7998,19 +7999,26 @@ function offShow(game) {
   const wins = offWins[game] || {};
   const blocked = offBlocked(game);
   $('osetup').replaceChildren(el('div', {class: 'osetbox'},
-    el('div', {class: 'upddlg-head', text: pong ? '🏓 Ping Pong gegen einen Bot' : SG_TITLE[game] + (game === 'breach' ? ' gegen einen Bot' : ' gegen Bots')}),
+    el('div', {class: 'upddlg-head', text: pong ? '🏓 Ping Pong gegen einen Bot' : SG_TITLE[game] + (game === 'breach' ? ' gegen einen Bot' : ' gegen den Computer')}),
     el('div', {class: 'olabel', text: 'Schwierigkeit'}),
     el('div', {class: 'orow'}, ...Object.entries(OFF_LEVEL_NAMES).map(([k, v]) => opt('lvl', k, v + (wins[k] ? ' · ' + wins[k] + ' 🏆' : '')))),
     ...(game === 'breach' ? [el('div', {class: 'olabel', text: 'Karte'}),
       el('div', {class: 'orow'}, opt('map', 'rand', '🎲 Zufall'), ...SG_LOCAL.br.MAPS.map((m, i) => opt('map', i, (i ? '🏭 ' : '🏠 ') + m.name)))] : []),
-    ...(pong ? [el('p', {text: 'Das Ping Pong aus dem Chat, gegen einen Bot. Wer zuerst 7 Punkte hat, gewinnt (ab 6:6 braucht es 2 Punkte Vorsprung, höchstens bis 10).'}),
+    ...(pong ? [el('p', {text: 'Das Ping Pong aus dem Chat, gegen einen Bot. Wer zuerst 7 Punkte hat, gewinnt (ab 6:6 brauchst du 2 Punkte Vorsprung – bei 9:9 entscheidet der nächste Punkt).'}),
+      el('p', {text: 'Power-ups kriegt, wer sie mit dem Ball trifft: 🟨 Riesen-Schläger · 🔻 Mini-Schläger für den Gegner · ⏳ Zeitlupe: der Ball kommt langsamer auf dich zu · 🛡️ Schutzwand hält einmal · 🌀 Kurvenball: beim Treffen den Schläger bewegen · 🧲 Magnet: der Ball bleibt kleben, zielen und klicken (nach 3 s geht er von allein).'}),
       el('div', {class: 'olabel', text: 'Power-ups'}),
       el('div', {class: 'orow'}, opt('pu', true, '⚡ An'), opt('pu', false, 'Aus'))]
-    : game === 'breach' ? [el('p', {text: 'Angreifer gegen Verteidiger, nach jeder Runde wird gewechselt, wer zuerst 4 Runden gewinnt, gewinnt. Ein Leben pro Runde. Angreifer: Verteidiger ausschalten oder die Bombe entschärfen (E 7 s halten). Verteidiger: überleben, bis die 2 Minuten um sind. Vor jeder Runde 15 s Vorbereitung: der Verteidiger kann bis zu 2 Ziegelwände mit Stahl verstärken (F), die dann keine Sprengladung mehr aufkriegt.'})] : [
+    : game === 'breach' ? [
+      el('p', {text: 'Angreifer gegen Verteidiger, 1 Leben pro Runde. Nach jeder Runde werden die Seiten getauscht. Wer zuerst 4 Runden holt, gewinnt.'}),
+      el('p', {text: '⚔ Angreifer: Verteidiger ausschalten oder die Bombe entschärfen (E 7 s gedrückt halten). Mit F klebst du eine Sprengladung an eine Ziegelwand – nach 2 s fliegt ein Loch rein.'}),
+      el('p', {text: '🛡 Verteidiger: Angreifer ausschalten oder 2 Minuten durchhalten. In den 15 s Vorbereitung kannst du 2 Ziegelwände mit F verstärken – da kommt dann weder Sprengladung noch Kugel durch.'}),
+      el('p', {text: '🤫 Rennen ist laut, mit Shift schleichst du leise. Was du hören würdest, zeigen Pfeile ums Fadenkreuz: 👣 Schritte, 🔫 Schüsse, 💥 Explosionen.'})] : [
       el('div', {class: 'olabel', text: game === 'kick' ? 'Modus' : 'Gegner'}),
       game === 'kick'
         ? el('div', {class: 'orow'}, opt('mode', 1, '1 gegen 1'), opt('mode', 2, '2 gegen 2 (du + Bot)'))
         : el('div', {class: 'orow'}, opt('bots', 1, '1 Bot'), opt('bots', 2, '2 Bots'), opt('bots', 3, '3 Bots')),
+      el('p', {text: game === 'kick' ? 'Wer zuerst 3 Tore schießt oder nach 3 Minuten vorne liegt, gewinnt. Bei Gleichstand entscheidet das nächste Tor. Power-ups: drüberlaufen oder den Ball durchschießen.'
+        : 'Jedes Bike zieht eine Lichtspur. Wer in eine Spur, die Wand oder ein Bike fährt, ist raus – der Letzte gewinnt die Runde. Bis 3 Rundensiege.'}),
       el('div', {class: 'olabel', text: 'Power-ups'}),
       el('div', {class: 'orow'}, opt('pu', true, '⚡ An'), opt('pu', false, 'Aus'))]),
     el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Los geht\'s', disabled: blocked, onclick: () => offStart(game)}),
@@ -8205,7 +8213,7 @@ function brEvent(g, ev, s) {
     if (!mine) sgFloat(g, BR_RW / 2, 70, '💥 Sprengladung!', '#ff6b6b');
   } else if (ev.k === 'prep') {
     const def = (s.pl.find(p => p.pid === me.id) || {}).side === 'def';
-    sgBanner(g, 'VORBEREITUNG', def ? 'F vor einer Ziegelwand: mit Stahl verstärken (2×)' : 'Der Verteidiger bereitet sich vor – gleich geht\'s los', '#9fd3ff');
+    sgBanner(g, 'VORBEREITUNG', def ? 'Vor Ziegelwand stellen + F = Stahl (2×)' : 'Der Verteidiger baut auf – gleich geht\'s los', '#9fd3ff');
   } else if (ev.k === 'go') sgBanner(g, 'LOS!', '', '#ffffff');
   else if (ev.k === 'reinforce' && mine) sgFloat(g, BR_RW / 2, 80, '🛡 Wand verstärkt', '#9fd3ff');
   else if (ev.k === 'defusing') sgBanner(g, mine ? 'ENTSCHÄRFEN…' : 'BOMBE WIRD ENTSCHÄRFT!', mine ? 'Stillhalten und E halten' : 'Schnell zur Bombe!', '#ffd23f');
@@ -8221,7 +8229,8 @@ function brEvent(g, ev, s) {
     const won = ev.pid === me.id, w = s.pl.find(p => p.pid === ev.pid);
     // Lost a duel: how close it was.
     const close = !won && ev.why === 'kill' && w && ev.hp > 0 ? ' · ' + w.name + ' hatte noch ' + ev.hp + ' ♥' : '';
-    sgBanner(g, won ? 'RUNDE GEWONNEN' : 'RUNDE VERLOREN', (BR_WHY[ev.why] || '') + close + ' · Stand ' + s.pl.map(p => p.sc).join(':'), won ? '#7bd88f' : '#ff6b6b');
+    const why = ev.why === 'kill' ? (won ? 'Gegner ausgeschaltet' : 'Du wurdest ausgeschaltet') : (BR_WHY[ev.why] || '');
+    sgBanner(g, won ? 'RUNDE GEWONNEN' : 'RUNDE VERLOREN', why + close + ' · Stand ' + s.pl.map(p => p.sc).join(':'), won ? '#7bd88f' : '#ff6b6b');
   } else if (ev.k === 'over') {
     sgBanner(g, ev.pid === me.id ? 'SIEG!' : 'NIEDERLAGE', 'Endstand ' + s.pl.map(p => p.sc).join(':'), ev.pid === me.id ? '#ffd23f' : '#ffffff');
   }
@@ -8413,8 +8422,8 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
   const pill = (x, y, w, text, col) => { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(x, y, w, 26, 13); ctx.fill(); ctx.fillStyle = col; ctx.font = '700 14px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + 10, y + 13); };
   pill(10, vh - 36, 86, '♥ ' + mine.hp, mine.hp > 40 ? '#7bd88f' : '#ff6b6b');
   pill(102, vh - 36, 112, (mine.rl ? 'Lädt…' : '▮ ' + mine.mag + '/' + BR.GUN[mine.side].mag), mine.mag > 5 || mine.rl ? '#ffffff' : '#ff6b6b');
-  if (mine.side === 'atk') pill(220, vh - 36, 64, '💣 ' + mine.ch, '#ffb020');
-  pill(10, vh - 66, 104, (moving && !(sg.keys & 16) ? '👣 LAUT' : '🤫 leise'), moving && !(sg.keys & 16) ? '#ffb020' : '#9fe0b0');
+  if (mine.side === 'atk') pill(220, vh - 36, 64, '🧨 ' + mine.ch, '#ffb020');
+  pill(10, vh - 66, 104, (moving && !(sg.keys & 16) ? '👣 LAUT' : '🤫 LEISE'), moving && !(sg.keys & 16) ? '#ffb020' : '#9fe0b0');
   const sec = Math.ceil((s.st === 'prep' ? s.c : s.rl) / 1000), clock = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
   // Side, clock and score in one pill, laid out by their real widths.
   ctx.font = '800 15px "Segoe UI", system-ui, sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
@@ -9050,7 +9059,7 @@ function renderMsgs() {
   if (c === ALL) for (const t of mpTables.values()) {
     if (t.host === me.id || !people.has(t.host) || Date.now() - t.ts > 45000 || (mpGame && mpGame.gid === t.gid)) continue;
     if (t.game) cmsgs.appendChild(el('div', {class: 'cmpinvite'},
-      el('span', {text: SG_TITLE[t.game] + ': ' + t.name + ' hat einen Tisch eröffnet (' + t.n + '/' + SG_MAX + ')'}),
+      el('span', {text: SG_TITLE[t.game] + ': ' + t.name + ' sucht Mitspieler (' + t.n + '/' + SG_MAX + ')'}),
       el('button', {class: 'mpaccept', text: 'Mitspielen', disabled: mpRunning() || !mq || t.n >= SG_MAX, onclick: () => sgJoinTable(t)})));
     else cmsgs.appendChild(el('div', {class: 'cmpinvite'},
       el('span', {text: '🃏 ' + t.name + ' hat einen Uno-Tisch eröffnet (' + t.n + '/' + UNO_MAX + ')'}),
@@ -9074,8 +9083,8 @@ function updateComposer() {
   $('cmpUno').textContent = conv === ALL ? 'Uno-Tisch eröffnen (2–6)' : 'Uno';
   $('cmpKick').hidden = $('cmpTron').hidden = !OWN_BROKER.url;
   $('cmpBreach').hidden = !OWN_BROKER.url || conv === ALL;
-  $('cmpKick').textContent = conv === ALL ? '⚽ Fußball-Tisch eröffnen (2–4)' : '⚽ Fußball';
-  $('cmpTron').textContent = conv === ALL ? '🏍️ Neon-Rush-Tisch eröffnen (2–4)' : '🏍️ Neon Rush';
+  $('cmpKick').textContent = conv === ALL ? '⚽ Fußball-Runde eröffnen (2–4)' : '⚽ Fußball';
+  $('cmpTron').textContent = conv === ALL ? '🏍️ Neon-Rush-Runde eröffnen (2–4)' : '🏍️ Neon Rush';
   if (cin.disabled) closePops();
 }
 
