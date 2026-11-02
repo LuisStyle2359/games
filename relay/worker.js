@@ -14,6 +14,8 @@ export default {
     const game = new URL(req.url).pathname.match(/^\/game\/([A-Za-z0-9]{8,48})$/);
     // Pinned to western Europe, where everyone plays; otherwise an object lives wherever it was first used.
     if (game) return env.ARENA.get(env.ARENA.idFromName(game[1]), {locationHint: 'weur'}).fetch(req);
+    const room = new URL(req.url).pathname.match(/^\/(kick|tron)\/([A-Za-z0-9]{8,48})$/);
+    if (room) { const ns = room[1] === 'kick' ? env.KICK : env.TRON; return ns.get(ns.idFromName(room[2]), {locationHint: 'weur'}).fetch(req); }
     return env.HUB.get(env.HUB.idFromName('eu'), {locationHint: 'weur'}).fetch(req);
   }
 };
@@ -585,5 +587,461 @@ export class Arena {
       aw: this.away, cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
       aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
+  }
+}
+
+// Bolzplatz and Neon Rush: game rooms for two to four players, run on the server like Ping Pong. Players join
+// with the room's key and their chat id; the first one in hosts. From a direct invitation (auto=2) the match
+// starts as soon as both are there; at a table in the group chat the host starts it. Whoever drops out has
+// 15 s to come back. When every player has the game out of sight, a running match pauses.
+class Room {
+  constructor(ctx, max, tickMs) {
+    this.ctx = ctx;
+    this.key = '';
+    this.players = [];
+    this.max = max;
+    this.tickMs = tickMs;
+    this.st = 'lobby';
+    this.until = 0;
+    this.auto = 0;
+    this.timer = 0;
+    this.ev = {n: 0};
+    this.w = null;
+    this.pausedAt = 0;
+  }
+
+  async fetch(req) {
+    const u = new URL(req.url), key = u.searchParams.get('key') || '', pid = u.searchParams.get('pid') || '';
+    if (!/^[a-z0-9]{12,40}$/.test(key) || !/^[A-Za-z0-9_-]{4,40}$/.test(pid)) return new Response('bad request', {status: 400});
+    if (this.key && this.key !== key) return new Response('forbidden', {status: 403});
+    let p = this.players.find(x => x.pid === pid);
+    if (!p && (this.st !== 'lobby' || this.players.length >= this.max)) return new Response('full', {status: 409});
+    this.key = key;
+    const [client, server] = Object.values(new WebSocketPair());
+    server.accept();
+    if (!p) { p = {pid, ws: null, left: 0, away: false}; this.players.push(p); this.joined(p); }
+    if (p.ws) try { p.ws.close(1000, 'replaced'); } catch (e) {}
+    p.ws = server;
+    p.name = (u.searchParams.get('name') || '').slice(0, 24) || 'Spieler';
+    p.left = 0;
+    p.away = false;
+    if (Number(u.searchParams.get('auto')) === 2) this.auto = 2;
+    server.addEventListener('message', e => this.onMessage(p, e.data));
+    const gone = () => {
+      if (p.ws !== server) return;
+      p.ws = null;
+      p.left = Date.now();
+      if (this.st === 'lobby' && !this.auto) this.remove(p);
+    };
+    server.addEventListener('close', gone);
+    server.addEventListener('error', gone);
+    this.full(p);
+    if (!this.timer) { this.last = Date.now(); this.timer = setInterval(() => this.loop(), this.tickMs); }
+    return new Response(null, {status: 101, webSocket: client});
+  }
+
+  remove(p) {
+    const i = this.players.indexOf(p);
+    if (i < 0) return;
+    this.players.splice(i, 1);
+    this.removed(p, i);
+  }
+
+  onMessage(p, data) {
+    let m;
+    try { m = JSON.parse(data); } catch (e) { return; }
+    if (m.t === 'ping' && Number.isFinite(m.c)) { try { p.ws.send(JSON.stringify({t: 'pong', c: m.c})); } catch (e) {} }
+    else if (m.t === 'away' && typeof m.v === 'boolean') p.away = m.v;
+    else if (m.t === 'start' && this.st === 'lobby' && this.players[0] === p && this.players.length >= 2) this.begin(Date.now());
+    else if (m.t === 'quit') { if (this.st === 'lobby') { try { p.ws.close(1000, 'bye'); } catch (e) {} this.remove(p); } else this.drop(p); }
+    else this.input(p, m);
+  }
+
+  event(k, extra) { this.ev = {n: this.ev.n + 1, k, ...extra}; }
+
+  loop() {
+    const now = Date.now();
+    if (this.st === 'over') {
+      if (now > this.until || !this.players.some(p => p.ws)) { clearInterval(this.timer); this.timer = 0; }
+    } else if (this.st === 'lobby') {
+      if (this.auto && this.players.length >= this.auto && this.players.every(p => p.ws)) this.begin(now);
+      if (!this.players.some(p => p.ws) && now - Math.max(0, ...this.players.map(p => p.left)) > 60000) { clearInterval(this.timer); this.timer = 0; }
+    } else {
+      for (const p of [...this.players]) if (!p.ws && now - p.left > 15000) this.drop(p);
+      const on = this.players.filter(p => p.ws);
+      if (this.st === 'pause') {
+        if (on.length && on.every(p => !p.away)) { this.st = 'resume'; this.until = now + 3000; this.pauseLen = now - this.pausedAt + 3000; }
+      } else if (this.st === 'play' && on.length && on.every(p => p.away)) {
+        this.st = 'pause';
+        this.pausedAt = now;
+      } else if (this.st === 'resume' && now >= this.until) {
+        this.st = 'play';
+        this.resumed(this.pauseLen);
+      }
+    }
+    this.advance(now);
+    this.last = now;
+    this.send(now);
+  }
+
+  // Everyone's own copy of the state, plus the full picture once on joining.
+  broadcast(obj) {
+    const s = JSON.stringify(obj);
+    for (const p of this.players) if (p.ws) try { p.ws.send(s); } catch (e) {}
+  }
+  roster() { return this.players.map(p => ({pid: p.pid, name: p.name, on: !!p.ws, aw: p.away, ...this.extra(p)})); }
+  joined() {}
+  removed() {}
+  full() {}
+  resumed() {}
+  extra() { return {}; }
+}
+
+// ⚽ Bolzplatz: top-down football like Haxball. Round players, a ball and two goals; arrow keys or WASD to run,
+// Space or X to kick. Physics run 60 times a second in pixels per tick, with the classic Haxball constants:
+// players accelerate by 0.1 (0.07 while holding kick), everything slows by a fixed factor each tick, and a kick
+// adds 5 to the ball's speed. First to 3 goals or the lead after 3 minutes; a draw goes to a golden goal.
+const KW = 760, KH = 380, KM = 32, GOAL_H = 124, GOAL_D = 38, POST_R = 6, KPR = 15, KBR = 9, KCC = 70,
+  K_ACC = 0.1, K_ACC_KICK = 0.07, K_DAMP = 0.96, B_DAMP = 0.99, K_KICK = 5, K_REACH = 4, K_LIMIT = 3, K_TIME = 180000;
+export class Kick extends Room {
+  constructor(ctx) {
+    super(ctx, 4, 1000 / 60);
+    this.sc = [0, 0];
+    this.b = {x: KW / 2, y: KH / 2, vx: 0, vy: 0};
+    this.tl = K_TIME;
+    this.ot = false;
+    this.ko = -1;
+    this.touch = null;
+    this.acc = 0;
+    this.tick = 0;
+  }
+  joined(p) {
+    const n = [0, 1].map(t => this.players.filter(x => x !== p && x.team === t).length);
+    Object.assign(p, {team: n[0] <= n[1] ? 0 : 1, x: 0, y: 0, vx: 0, vy: 0, k: 0, q: [], ack: 0, armed: true, owed: 0, started: false});
+  }
+  extra(p) { return {team: p.team}; }
+  input(p, m) {
+    if (m.t === 'team' && this.st === 'lobby' && (m.v === 0 || m.v === 1)) {
+      if (this.players.filter(x => x.team === m.v).length < 2) p.team = m.v;
+    } else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f) && this.st === 'play') {
+      // The owner's face-ball prank, passed on by its victim: the ball wears the face until the next goal.
+      this.face = m.f;
+    } else if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i)) {
+      p.q.push([m.k & 31, m.i]);
+      if (p.q.length > 12) p.q.splice(0, p.q.length - 12);
+    }
+  }
+  begin(now) {
+    // Teams that ended up uneven in the lobby get evened out.
+    for (;;) {
+      const n = [0, 1].map(t => this.players.filter(x => x.team === t).length);
+      if (Math.abs(n[0] - n[1]) < 2) break;
+      const from = n[0] > n[1] ? 0 : 1;
+      this.players.filter(x => x.team === from).pop().team = 1 - from;
+    }
+    if (!this.players.some(p => p.team === 0)) this.players[0].team = 0;
+    if (!this.players.some(p => p.team === 1)) this.players[this.players.length - 1].team = 1;
+    this.kickoff(Math.random() < 0.5 ? 0 : 1);
+    this.st = 'count';
+    this.until = now + 3000;
+  }
+  // Positions for a kickoff: each team in its own half, the ball on the spot.
+  kickoff(team) {
+    Object.assign(this.b, {x: KW / 2, y: KH / 2, vx: 0, vy: 0});
+    for (const t of [0, 1]) {
+      const mates = this.players.filter(p => p.team === t);
+      mates.forEach((p, i) => Object.assign(p, {owed: 0,
+        x: t === 0 ? KW / 2 - 150 : KW / 2 + 150,
+        y: mates.length === 1 ? KH / 2 : KH / 2 + (i ? 70 : -70), vx: 0, vy: 0}));
+    }
+    this.ko = team;
+    this.touch = null;
+  }
+  drop(p) {
+    this.remove(p);
+    if (this.st === 'over' || this.st === 'lobby') return;
+    for (const t of [0, 1]) if (!this.players.some(x => x.team === t)) return this.finish(1 - t);
+  }
+  finish(team) {
+    this.st = 'over';
+    this.w = team;
+    this.until = Date.now() + 10000;
+    this.event('over', {team});
+  }
+  advance(now) {
+    if (this.st === 'count' && now >= this.until) this.st = 'play';
+    if (this.st === 'goal' && now >= this.until) {
+      if (this.sc[0] >= K_LIMIT || this.sc[1] >= K_LIMIT || this.ot) return this.finish(this.sc[0] > this.sc[1] ? 0 : 1);
+      this.kickoff(this.lastGoal === 0 ? 1 : 0);
+      this.st = 'play';
+    }
+    if (this.st !== 'play' && this.st !== 'goal') { this.acc = 0; return; }
+    // Fixed 60 Hz steps, however the timer fires.
+    this.acc += Math.min(100, now - this.last);
+    while (this.acc >= 1000 / 60) {
+      this.acc -= 1000 / 60;
+      this.step();
+      if (this.st === 'play' && !this.ot) {
+        this.tl -= 1000 / 60;
+        if (this.tl <= 0) {
+          this.tl = 0;
+          if (this.sc[0] !== this.sc[1]) return this.finish(this.sc[0] > this.sc[1] ? 0 : 1);
+          this.ot = true;
+          this.event('ot');
+        }
+      }
+    }
+  }
+  step() {
+    this.tick++;
+    const b = this.b, cy = KH / 2;
+    // Every input from a page is one movement step, exactly as that page already showed it, used one per tick
+    // (two while catching up) so others see the player move evenly. When inputs come late, the player runs on
+    // with the last one for up to 8 ticks, and that many late inputs are then skipped, so each input still
+    // counts exactly once.
+    for (const p of this.players) {
+      if (!p.q.length) {
+        if (p.started && p.owed < 8) { p.owed++; kickMove(p, p.k); kickBounds(p, this.ko); }
+        continue;
+      }
+      p.started = true;
+      while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
+      const steps = p.q.length > 4 ? 2 : 1;
+      for (let n = 0; n < steps && p.q.length; n++) {
+        const [k, i] = p.q.shift();
+        p.k = k;
+        p.ack = i;
+        kickMove(p, k);
+        kickBounds(p, this.ko);
+        if (!(k & 16)) p.armed = true;
+        else if (p.armed && Math.hypot(b.x - p.x, b.y - p.y) < KPR + KBR + K_REACH && this.st === 'play') {
+          const d = Math.hypot(b.x - p.x, b.y - p.y) || 1;
+          b.vx += (b.x - p.x) / d * K_KICK;
+          b.vy += (b.y - p.y) / d * K_KICK;
+          p.armed = false;
+          this.touch = p.pid;
+          this.event('kick', {pid: p.pid});
+        }
+      }
+    }
+    b.x += b.vx; b.y += b.vy;
+    b.vx *= B_DAMP; b.vy *= B_DAMP;
+    // Collisions: players with each other, players with the ball (players weigh twice as much).
+    const ps = this.players;
+    for (let i = 0; i < ps.length; i++) {
+      for (let j = i + 1; j < ps.length; j++) discHit(ps[i], ps[j], KPR, KPR, 0.5, 0.5, 0.25);
+      if (discHit(ps[i], b, KPR, KBR, 0.5, 1, 0.25)) this.touch = ps[i].pid;
+    }
+    for (const p of ps) {
+      kickBounds(p, this.ko);
+      for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(p, gx, cy + s * GOAL_H / 2, KPR);
+    }
+    for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(b, gx, cy + s * GOAL_H / 2, KBR);
+    ballBounds(b);
+    if (this.ko >= 0 && Math.hypot(b.vx, b.vy) > 0.01) this.ko = -1;
+    if (this.st === 'play' && (b.x < -KBR || b.x > KW + KBR)) {
+      const team = b.x < 0 ? 1 : 0, scorer = ps.find(p => p.pid === this.touch);
+      this.sc[team]++;
+      this.lastGoal = team;
+      this.face = null;
+      this.st = 'goal';
+      this.until = Date.now() + 2500;
+      this.event('goal', {team, by: scorer ? scorer.name : '', own: !!scorer && scorer.team !== team});
+    }
+  }
+  full(p) { p.ws.send(JSON.stringify(this.state(Date.now()))); }
+  state(now) {
+    const r = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
+    return {t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), tl: Math.round(this.tl), ot: this.ot, sc: this.sc, w: this.w, ko: this.ko,
+      host: this.players[0] && this.players[0].pid, tk: this.tick, ev: this.ev, lim: K_LIMIT, face: this.face || null,
+      b: [r(this.b.x), r(this.b.y), r(this.b.vx), r(this.b.vy)],
+      pl: this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r2(p.x), y: r2(p.y), vx: r2(p.vx), vy: r2(p.vy), k: p.k, a: p.ack}; })};
+  }
+  send(now) { this.broadcast(this.state(now)); }
+}
+// One player's movement for one tick (the page runs the same for its own player, to show it without delay).
+function kickMove(p, k) {
+  let dx = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0), dy = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0);
+  if (dx && dy) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }
+  const a = (k & 16) ? K_ACC_KICK : K_ACC;
+  p.vx += dx * a; p.vy += dy * a;
+  p.x += p.vx; p.y += p.vy;
+  p.vx *= K_DAMP; p.vy *= K_DAMP;
+}
+function kickBounds(p, ko) {
+  p.x = Math.max(-KM + KPR, Math.min(KW + KM - KPR, p.x));
+  p.y = Math.max(-KM + KPR, Math.min(KH + KM - KPR, p.y));
+  if (ko < 0) return;
+  // Kickoff: everyone stays in their own half, and the team without the kickoff out of the centre circle.
+  if (p.team === 0 && p.x > KW / 2 - KPR) { p.x = KW / 2 - KPR; p.vx = Math.min(0, p.vx); }
+  if (p.team === 1 && p.x < KW / 2 + KPR) { p.x = KW / 2 + KPR; p.vx = Math.max(0, p.vx); }
+  if (p.team !== ko) {
+    const dx = p.x - KW / 2, dy = p.y - KH / 2, d = Math.hypot(dx, dy) || 1;
+    if (d < KCC + KPR) { p.x = KW / 2 + dx / d * (KCC + KPR); p.y = KH / 2 + dy / d * (KCC + KPR); }
+  }
+}
+// The ball stays on the pitch except through the goal mouths; inside a goal the net stops it softly.
+function ballBounds(b) {
+  const cy = KH / 2, top = cy - GOAL_H / 2, bot = cy + GOAL_H / 2;
+  if (b.y < KBR) { b.y = KBR; b.vy = -b.vy * 0.5; }
+  if (b.y > KH - KBR) { b.y = KH - KBR; b.vy = -b.vy * 0.5; }
+  for (const side of [0, 1]) {
+    const inGoal = side === 0 ? b.x < 0 : b.x > KW, line = side === 0 ? 0 : KW, s = side === 0 ? 1 : -1;
+    if (inGoal) {
+      if (b.y < top + KBR) { b.y = top + KBR; b.vy = Math.abs(b.vy) * 0.1; }
+      if (b.y > bot - KBR) { b.y = bot - KBR; b.vy = -Math.abs(b.vy) * 0.1; }
+      const back = line - s * (GOAL_D - KBR);
+      if (side === 0 ? b.x < back : b.x > back) { b.x = back; b.vx = s * Math.abs(b.vx) * 0.1; }
+    } else if ((b.y < top || b.y > bot) && (side === 0 ? b.x < KBR : b.x > KW - KBR)) {
+      b.x = side === 0 ? KBR : KW - KBR;
+      b.vx = s * Math.abs(b.vx) * 0.5;
+    }
+  }
+}
+// Two discs that overlap are pushed apart by their weight, and bounce (bc = how much speed the bounce keeps).
+function discHit(a, b, ra, rb, ia, ib, bc) {
+  const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+  if (d >= ra + rb || d === 0) return false;
+  const nx = dx / d, ny = dy / d, over = ra + rb - d, im = ia + ib;
+  a.x -= nx * over * ia / im; a.y -= ny * over * ia / im;
+  b.x += nx * over * ib / im; b.y += ny * over * ib / im;
+  const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+  if (rv < 0) {
+    const j = -(1 + bc) * rv / im;
+    a.vx -= nx * j * ia; a.vy -= ny * j * ia;
+    b.vx += nx * j * ib; b.vy += ny * j * ib;
+  }
+  return true;
+}
+function postHit(o, px, py, r) {
+  const dx = o.x - px, dy = o.y - py, d = Math.hypot(dx, dy);
+  if (d >= r + POST_R || d === 0) return;
+  const nx = dx / d, ny = dy / d;
+  o.x = px + nx * (r + POST_R); o.y = py + ny * (r + POST_R);
+  const rv = o.vx * nx + o.vy * ny;
+  if (rv < 0) { o.vx -= 1.5 * rv * nx; o.vy -= 1.5 * rv * ny; }
+}
+
+// 🏍️ Neon Rush: light bikes on a grid. Every bike leaves a wall behind it; whoever drives into a wall, a trail
+// or another bike is out, the last one riding wins the round. First to 3 rounds. Arrow keys or WASD turn
+// (turns are queued, so a quick double turn works), Space boosts to double speed while the boost bar lasts.
+const TW = 80, TH = 50, T_HZ = 24, T_SPEED = 12, T_FUEL = 2000, T_WIN = 3;
+// Start lanes are offset, so nobody rides head-on into anybody else.
+const T_SPAWN = [[6, 15, 1], [73, 34, 3], [60, 4, 2], [19, 45, 0]], T_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+export class Tron extends Room {
+  constructor(ctx) {
+    super(ctx, 4, 1000 / T_HZ);
+    this.grid = new Uint8Array(TW * TH);
+    this.rd = 0;
+    this.tk = 0;
+    this.mv = [];
+    this.ghosts = [];
+  }
+  joined(p) { Object.assign(p, {sc: 0, alive: false, x: 0, y: 0, d: 1, q: [], fuel: T_FUEL, boost: false, acc: 0, trail: []}); }
+  extra(p) { return {sc: p.sc, al: p.alive, x: p.x, y: p.y, d: p.d, f: Math.round(p.fuel), bo: p.boost, fc: p.face || null}; }
+  input(p, m) {
+    // A turn can name the move it is meant for (the page has already shown it there); it waits for that move.
+    if (m.t === 'turn' && Number.isInteger(m.d) && m.d >= 0 && m.d < 4 && p.q.length < 3) p.q.push({d: m.d, n: Number.isInteger(m.n) ? m.n : 0});
+    else if (m.t === 'boost' && typeof m.v === 'boolean') p.boost = m.v;
+    else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f) && this.st === 'play') p.face = m.f;
+    else if (m.t === 'full') this.full(p);
+  }
+  begin(now) { this.round(now); }
+  round(now) {
+    this.rd++;
+    this.grid.fill(0);
+    this.ghosts = [];
+    this.players.forEach((p, i) => {
+      const [x, y, d] = T_SPAWN[i];
+      Object.assign(p, {alive: true, x, y, d, q: [], fuel: T_FUEL, acc: 0, trail: [[x, y]], face: null, mc: 0});
+      this.grid[y * TW + x] = i + 1;
+    });
+    this.st = 'count';
+    this.until = now + 3000;
+    for (const p of this.players) this.full(p);
+  }
+  drop(p) {
+    const i = this.players.indexOf(p);
+    this.remove(p);
+    if (i >= 0 && p.trail.length) this.ghosts.push(p.trail);
+    if (i >= 0) {
+      // The grid marks trails by seat; seats after the one that left move down by one.
+      for (let c = 0; c < this.grid.length; c++) {
+        const v = this.grid[c];
+        if (v === i + 1) this.grid[c] = 255;
+        else if (v > i + 1 && v !== 255) this.grid[c] = v - 1;
+      }
+    }
+    if (this.st === 'lobby' || this.st === 'over') return;
+    if (this.players.length < 2) return this.finish(this.players[0] || null);
+    this.checkRound(Date.now());
+    for (const q of this.players) this.full(q);
+  }
+  finish(p) {
+    this.st = 'over';
+    this.w = p ? p.pid : null;
+    this.until = Date.now() + 10000;
+    this.event('over', {pid: this.w});
+  }
+  checkRound(now) {
+    if (this.st !== 'play') return;
+    const alive = this.players.filter(p => p.alive);
+    if (alive.length > 1) return;
+    const win = alive[0] || null;
+    if (win) win.sc++;
+    this.event('round', {pid: win ? win.pid : null});
+    if (win && win.sc >= T_WIN) return this.finish(win);
+    this.st = 'roundover';
+    this.until = now + 2500;
+  }
+  advance(now) {
+    this.mv = [];
+    if (this.st === 'count' && now >= this.until) this.st = 'play';
+    if (this.st === 'roundover' && now >= this.until) this.round(now);
+    if (this.st !== 'play') return;
+    this.tk++;
+    // Each bike moves 0, 1 or 2 cells this tick; moves happen in two rounds so bikes move at the same time.
+    const steps = this.players.map(p => {
+      if (!p.alive) return 0;
+      const fast = p.boost && p.fuel > 0;
+      if (fast) p.fuel = Math.max(0, p.fuel - 1000 / T_HZ);
+      p.acc += (fast ? 2 : 1) * T_SPEED / T_HZ;
+      const n = Math.floor(p.acc);
+      p.acc -= n;
+      return n;
+    });
+    for (let r = 0; r < 2; r++) {
+      const target = new Map();
+      this.players.forEach((p, i) => {
+        if (!p.alive || steps[i] <= r) return;
+        while (p.q.length && !(p.q[0].n > p.mc + 1)) {
+          const d = p.q.shift().d;
+          if (d !== p.d && d !== (p.d + 2) % 4) { p.d = d; break; }
+        }
+        const nx = p.x + T_DIR[p.d][0], ny = p.y + T_DIR[p.d][1];
+        if (nx < 0 || ny < 0 || nx >= TW || ny >= TH || this.grid[ny * TW + nx]) { this.crash(p, i); return; }
+        const c = ny * TW + nx;
+        if (target.has(c)) { this.crash(p, i); const o = target.get(c); if (o.p.alive) this.crash(o.p, o.i); return; }
+        target.set(c, {p, i, nx, ny});
+      });
+      for (const [c, {p, i, nx, ny}] of target) {
+        if (!p.alive) continue;
+        p.x = nx; p.y = ny;
+        p.mc++;
+        p.trail.push([nx, ny]);
+        this.grid[c] = i + 1;
+        this.mv.push([i, nx, ny]);
+      }
+    }
+    this.checkRound(now);
+  }
+  crash(p, i) {
+    p.alive = false;
+    this.event('crash', {pid: p.pid, x: p.x, y: p.y});
+  }
+  full(p) { if (p.ws) try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, trails: this.players.map(q => q.trail), ghosts: this.ghosts})); } catch (e) {} }
+  send(now) {
+    this.broadcast({t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), tk: this.tk, rd: this.rd, win: T_WIN, w: this.w,
+      host: this.players[0] && this.players[0].pid, ev: this.ev, pl: this.roster(), mv: this.mv});
   }
 }

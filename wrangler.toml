@@ -12,6 +12,14 @@ class_name = "Hub"
 name = "ARENA"
 class_name = "Arena"
 
+[[durable_objects.bindings]]
+name = "KICK"
+class_name = "Kick"
+
+[[durable_objects.bindings]]
+name = "TRON"
+class_name = "Tron"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Hub"]
@@ -19,3 +27,7 @@ new_sqlite_classes = ["Hub"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Arena"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["Kick", "Tron"]
