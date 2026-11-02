@@ -1330,11 +1330,11 @@ const BR_MAP = [
   '#ooooooooooooooooooooooooooooaa#',
   '#aooooooooooooooooooooooooooooo#',
   '################################'];
-const BR_W = 32, BR_H = 18, BR_R = 0.25, BR_RUN = 3, BR_WALK = 1.4, BR_WIN = 4, BR_ROUND = 120000, BR_DEFUSE = 7000;
+const BR_W = 32, BR_H = 18, BR_R = 0.25, BR_RUN = 3, BR_WALK = 1.4, BR_WIN = 4, BR_ROUND = 120000, BR_DEFUSE = 7000, BR_PREP = 15000, BR_REINF = 2;
 // Weapons: damage close up and far away (falls off over 4..16 units), shots per second, magazine, reload ms, spread.
 const BR_GUN = {atk: {name: 'Sturmgewehr', dmg: 34, far: 22, rate: 9, mag: 30, reload: 2200, spread: 0.012},
   def: {name: 'MP', dmg: 26, far: 14, rate: 13, mag: 32, reload: 1900, spread: 0.02}};
-// Map cells: 0 floor, 1 concrete, 2 brick (with hit points), 3 bomb (stands on floor, blocks nothing).
+// Map cells: 0 floor, 1 concrete, 2 brick (with hit points), 3 reinforced brick (steel behind it: bullets and charges do nothing).
 function brGrid() {
   const g = new Uint8Array(BR_W * BR_H), hp = new Uint8Array(BR_W * BR_H);
   BR_MAP.forEach((row, y) => [...row].forEach((c, x) => { g[y * BR_W + x] = c === '#' ? 1 : c === '=' ? 2 : 0; hp[y * BR_W + x] = c === '=' ? 100 : 0; }));
@@ -1342,7 +1342,7 @@ function brGrid() {
 }
 const brSpots = ch => BR_MAP.flatMap((row, y) => [...row].map((c, x) => c === ch ? [x + 0.5, y + 0.5] : null)).filter(Boolean);
 const BR_BOMB = brSpots('B')[0];
-function brSolid(g, x, y) { const cx = Math.floor(x), cy = Math.floor(y); return cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H || g[cy * BR_W + cx] === 1 || g[cy * BR_W + cx] === 2; }
+function brSolid(g, x, y) { const cx = Math.floor(x), cy = Math.floor(y); return cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H || g[cy * BR_W + cx] > 0; }
 // One movement step (1/60 s) from keys k (1 W, 2 S, 4 A, 8 D, 16 walk) and view angle a; slides along walls.
 function brMove(p, k, a, g) {
   let f = ((k & 1) ? 1 : 0) - ((k & 2) ? 1 : 0), s = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0);
@@ -1365,7 +1365,7 @@ function brRay(g, x, y, a, max = 40) {
     if (tx < ty) { d = tx; tx += tdx; cx += sx; } else { d = ty; ty += tdy; cy += sy; }
     if (cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H) return {d, cell: -1};
     const v = g[cy * BR_W + cx];
-    if (v === 1 || v === 2) return {d, cell: cy * BR_W + cx};
+    if (v > 0) return {d, cell: cy * BR_W + cx};
   }
   return {d: max, cell: -1};
 }
@@ -1382,17 +1382,18 @@ export class Breach extends Room {
     this.rl = BR_ROUND;
   }
   joined(p) { Object.assign(p, {sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
-    mag: 30, reload: 0, cd: 0, nade: 2, hist: [], kills: 0}); }
+    mag: 30, reload: 0, cd: 0, nade: 2, rf: 0, hist: [], kills: 0}); }
   // No power-ups in Breach, so nothing to vote on: the match starts right away.
   vote(now) { this.begin(now); }
   // After a pause nobody can fire for a moment, so lining up on a frozen enemy during the pause gives nothing.
   resume(now) { super.resume(now); for (const p of this.players) p.cd = Math.max(p.cd, 350); }
-  extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, kills: p.kills}; }
+  extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, rf: p.rf, kills: p.kills}; }
   input(p, m) {
     if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i) && Number.isFinite(m.a)) {
       p.q.push([m.k & 255, m.i, m.a, Number.isFinite(m.rt) ? m.rt : 0]);
       if (p.q.length > 12) p.q.splice(0, p.q.length - 12);
     } else if (m.t === 'charge' && this.st === 'play') this.place(p);
+    else if (m.t === 'charge' && this.st === 'prep') this.reinforce(p);
     else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f)) p.face = m.f;
     else if (m.t === 'full') this.full(p);
   }
@@ -1414,7 +1415,7 @@ export class Breach extends Room {
       const spots = brSpots(p.side === 'atk' ? 'a' : 'd'), [x, y] = spots[Math.floor(Math.random() * spots.length)];
       const gun = BR_GUN[p.side];
       Object.assign(p, {x, y, a: Math.atan2(BR_BOMB[1] - y, BR_BOMB[0] - x), vx: 0, vy: 0, hp: 100, alive: true, q: [], owed: 0, started: false,
-        mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, hist: [], face: null});
+        mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, rf: p.side === 'def' ? BR_REINF : 0, hist: [], face: null});
     }
     this.st = 'count';
     this.until = now + 4000;
@@ -1441,25 +1442,28 @@ export class Breach extends Room {
     this.until = Date.now() + 3500;
   }
   advance(now) {
-    if (this.st === 'count' && now >= this.until) this.st = 'play';
+    // After the countdown, 15 s to prepare: the defender moves and reinforces walls, the attacker waits.
+    if (this.st === 'count' && now >= this.until) { this.st = 'prep'; this.until = now + BR_PREP; this.event('prep', {}); }
+    if (this.st === 'prep' && now >= this.until) { this.st = 'play'; this.event('go', {}); }
     if (this.st === 'roundover' && now >= this.until) {
       for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
       this.round(now);
     }
     // While counting down players may turn but not move.
-    if (this.st !== 'play') {
+    if (this.st !== 'play' && this.st !== 'prep') {
       this.acc = 0;
       for (const p of this.players) while (p.q.length) { const [, i, a] = p.q.shift(); p.ack = i; p.a = a; }
       return;
     }
     this.acc += Math.min(100, now - this.last);
-    while (this.acc >= 1000 / 60 && this.st === 'play') {
+    while (this.acc >= 1000 / 60 && (this.st === 'play' || this.st === 'prep')) {
       this.acc -= 1000 / 60;
       this.step(now);
     }
   }
   step(now) {
     this.tick++;
+    const prep = this.st === 'prep';
     if (this.think) this.think();
     const [atk, def] = ['atk', 'def'].map(s => this.players.find(p => p.side === s));
     for (const p of this.players) {
@@ -1467,6 +1471,8 @@ export class Breach extends Room {
       if (p.cd > 0) p.cd -= 1000 / 60;
       // Inputs as in Fußball: one per tick, two to catch up, and a late player runs on with the last input.
       const run = (k, a, rt) => {
+        // Preparing: nobody shoots, and the attacker stays at the spawn (looking around is fine).
+        if (prep) k = p.side === 'atk' ? 0 : k & ~(32 | 128);
         p.k = k; p.a = a;
         if (!p.alive) return;
         brMove(p, k, a, this.map.g);
@@ -1489,6 +1495,7 @@ export class Breach extends Room {
       p.hist.push([this.tick, now, p.x, p.y]);
       if (p.hist.length > 40) p.hist.shift();
     }
+    if (prep) return;
     // Breach charges go off 2 s after they are placed.
     for (const c of this.charges) if ((c.t -= 1000 / 60) <= 0) this.blow(c);
     this.charges = this.charges.filter(c => c.t > 0);
@@ -1554,6 +1561,16 @@ export class Breach extends Room {
     p.nade--;
     this.charges.push({cell: w.cell, t: 2000, x: p.x + Math.cos(p.a) * (w.d - 0.05), y: p.y + Math.sin(p.a) * (w.d - 0.05), pid: p.pid});
     this.event('charge', {pid: p.pid, cell: w.cell, x: this.charges[this.charges.length - 1].x, y: this.charges[this.charges.length - 1].y});
+  }
+  // F while preparing: the defender puts steel behind the brick wall in front of them (twice per round).
+  reinforce(p) {
+    if (!p.alive || p.side !== 'def' || p.rf <= 0) return;
+    const w = brRay(this.map.g, p.x, p.y, p.a, 1.3);
+    if (w.cell < 0 || this.map.g[w.cell] !== 2) return;
+    p.rf--;
+    this.map.g[w.cell] = 3;
+    this.changed.push([w.cell % BR_W, Math.floor(w.cell / BR_W), 3]);
+    this.event('reinforce', {pid: p.pid, x: p.x + Math.cos(p.a) * (w.d - 0.05), y: p.y + Math.sin(p.a) * (w.d - 0.05)});
   }
   blow(c) {
     const cx = c.cell % BR_W, cy = Math.floor(c.cell / BR_W);

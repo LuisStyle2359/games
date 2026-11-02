@@ -447,6 +447,8 @@ tbody tr.sel td { background: var(--select); }
 }
 /* In an app window the real window title bar already shows the title, so drop the drawn one. */
 :root.app-mode .titlebar { display: none; }
+.dr-stage:fullscreen { background: #000; display: flex; align-items: center; justify-content: center; }
+.dr-stage:fullscreen .dr-over { font-size: 34px !important; }
 </style>
 <script>
 if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('app-mode');
@@ -2029,7 +2031,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5041,7 +5043,7 @@ function pgFrame(g, ts) {
 const SG_GAMES = ['kick', 'tron', 'breach'], SG_MAX = 4;
 const SG_TITLE = {kick: '⚽ Fußball', tron: '🏍️ Neon Rush', breach: '⚔️ Breach'};
 const SG_HINT = {kick: 'Pfeiltasten oder WASD laufen, Leertaste schießen', tron: 'Pfeiltasten oder WASD lenken, Leertaste hält den Boost',
-  breach: 'Ins Bild klicken · Maus zielen · WASD laufen · Shift leise · Klick schießen · R laden · F Sprengladung · E entschärfen'};
+  breach: 'Ins Bild klicken · Maus zielen · WASD laufen · Shift leise · Klick schießen · R laden · F Sprengladung · E entschärfen · +/− Mausempfindlichkeit'};
 let sgGame = null;
 
 function sgInit(g, key, duo) {
@@ -5209,7 +5211,9 @@ const SG_KEYS = {arrowup: 1, w: 1, arrowdown: 2, s: 2, arrowleft: 4, a: 4, arrow
 // Breach: W/S forward and back, A/D sideways, Shift walks quietly, R reloads, E defuses (bits as the server reads them).
 const BR_KEYS = {w: 1, arrowup: 1, s: 2, arrowdown: 2, a: 4, d: 8, shift: 16, r: 64, e: 128};
 // The mouse turns the view once the picture has captured it (a click into the picture); its button fires.
-document.addEventListener('mousemove', e => { const g = sgGame; if (g && g.game === 'breach' && g.el && document.pointerLockElement === g.el.canvas) g.sg.ang += e.movementX * 0.0028; });
+// Mouse speed: + and - during the game, remembered.
+let brSens = Math.max(0.0008, Math.min(0.008, Number(store.get('brSens', 0.0028)) || 0.0028));
+document.addEventListener('mousemove', e => { const g = sgGame; if (g && g.game === 'breach' && g.el && document.pointerLockElement === g.el.canvas && !(g.sg.s && ['pause', 'resume'].includes(g.sg.s.st))) g.sg.ang += e.movementX * brSens; });
 document.addEventListener('mousedown', e => { const g = sgGame; if (g && g.game === 'breach' && g.el && document.pointerLockElement === g.el.canvas && e.button === 0) { g.sg.fire = true; e.preventDefault(); } });
 document.addEventListener('mouseup', e => { const g = sgGame; if (g && g.game === 'breach' && e.button === 0) g.sg.fire = false; });
 document.addEventListener('pointerlockchange', () => { const g = sgGame; if (g && g.game === 'breach' && g.el && document.pointerLockElement !== g.el.canvas) { g.sg.fire = false; g.sg.keys = 0; } });
@@ -5230,6 +5234,11 @@ document.addEventListener('keydown', e => {
   if (g.game === 'breach') {
     const key = e.key.toLowerCase(), b = BR_KEYS[key];
     if (key === 'f' && !e.repeat) sgSend(g, {t: 'charge'});
+    else if (key === '+' || key === '-' || key === '=') {
+      brSens = Math.max(0.0008, Math.min(0.008, brSens * (key === '-' ? 1 / 1.15 : 1.15)));
+      store.set('brSens', brSens);
+      sgFloat(g, BR_RW / 2, 90, 'Mausempfindlichkeit ' + Math.round(brSens / 0.0028 * 100) + ' %', '#ffffff');
+    }
     else if (key === 'arrowleft' || key === 'arrowright') g.sg.turn = key === 'arrowleft' ? -1 : 1;
     else if (!b) return;
     e.preventDefault();
@@ -5315,7 +5324,10 @@ function renderSgChrome(g) {
     : [s && s.st === 'pause' && s.pb ? el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Weiter', onclick: () => sgSend(g, {t: 'resume'})})
       : el('button', {class: 'vbtn', type: 'button', text: g.offline ? 'Pause' : 'Pause (' + left + ')', title: g.offline ? 'Taste P' : 'Taste P · jeder hat 2 Pausen pro Spiel',
         disabled: !s || s.st !== 'play' || (!left && !g.offline), onclick: () => sgSend(g, {t: 'pause'})}),
-      el('button', {class: 'vbtn', text: g.offline ? 'Aufgeben' : 'Verlassen', onclick: () => sgLeave(g)})]));
+      // Breach in full screen: the picture fills the screen and the mouse is captured right away.
+      g.game === 'breach' ? el('button', {class: 'vbtn', type: 'button', text: '⛶ Vollbild', title: 'Esc beendet das Vollbild',
+        onclick: () => { const st = g.el.stage; Promise.resolve(st.requestFullscreen && st.requestFullscreen()).then(() => { try { g.el.canvas.requestPointerLock(); } catch (e) {} }).catch(() => {}); }}) : null,
+      el('button', {class: 'vbtn', text: g.offline ? 'Aufgeben' : 'Verlassen', onclick: () => sgLeave(g)})].filter(Boolean)));
   // Before the start everyone votes for or against power-ups.
   if (s && s.st === 'vote' && !g.over) {
     const vt = s.vt || {}, mineV = vt[me.id];
@@ -7270,11 +7282,11 @@ const BR_MAP = [
   '#ooooooooooooooooooooooooooooaa#',
   '#aooooooooooooooooooooooooooooo#',
   '################################'];
-const BR_W = 32, BR_H = 18, BR_R = 0.25, BR_RUN = 3, BR_WALK = 1.4, BR_WIN = 4, BR_ROUND = 120000, BR_DEFUSE = 7000;
+const BR_W = 32, BR_H = 18, BR_R = 0.25, BR_RUN = 3, BR_WALK = 1.4, BR_WIN = 4, BR_ROUND = 120000, BR_DEFUSE = 7000, BR_PREP = 15000, BR_REINF = 2;
 // Weapons: damage close up and far away (falls off over 4..16 units), shots per second, magazine, reload ms, spread.
 const BR_GUN = {atk: {name: 'Sturmgewehr', dmg: 34, far: 22, rate: 9, mag: 30, reload: 2200, spread: 0.012},
   def: {name: 'MP', dmg: 26, far: 14, rate: 13, mag: 32, reload: 1900, spread: 0.02}};
-// Map cells: 0 floor, 1 concrete, 2 brick (with hit points), 3 bomb (stands on floor, blocks nothing).
+// Map cells: 0 floor, 1 concrete, 2 brick (with hit points), 3 reinforced brick (steel behind it: bullets and charges do nothing).
 function brGrid() {
   const g = new Uint8Array(BR_W * BR_H), hp = new Uint8Array(BR_W * BR_H);
   BR_MAP.forEach((row, y) => [...row].forEach((c, x) => { g[y * BR_W + x] = c === '#' ? 1 : c === '=' ? 2 : 0; hp[y * BR_W + x] = c === '=' ? 100 : 0; }));
@@ -7282,7 +7294,7 @@ function brGrid() {
 }
 const brSpots = ch => BR_MAP.flatMap((row, y) => [...row].map((c, x) => c === ch ? [x + 0.5, y + 0.5] : null)).filter(Boolean);
 const BR_BOMB = brSpots('B')[0];
-function brSolid(g, x, y) { const cx = Math.floor(x), cy = Math.floor(y); return cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H || g[cy * BR_W + cx] === 1 || g[cy * BR_W + cx] === 2; }
+function brSolid(g, x, y) { const cx = Math.floor(x), cy = Math.floor(y); return cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H || g[cy * BR_W + cx] > 0; }
 // One movement step (1/60 s) from keys k (1 W, 2 S, 4 A, 8 D, 16 walk) and view angle a; slides along walls.
 function brMove(p, k, a, g) {
   let f = ((k & 1) ? 1 : 0) - ((k & 2) ? 1 : 0), s = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0);
@@ -7305,7 +7317,7 @@ function brRay(g, x, y, a, max = 40) {
     if (tx < ty) { d = tx; tx += tdx; cx += sx; } else { d = ty; ty += tdy; cy += sy; }
     if (cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H) return {d, cell: -1};
     const v = g[cy * BR_W + cx];
-    if (v === 1 || v === 2) return {d, cell: cy * BR_W + cx};
+    if (v > 0) return {d, cell: cy * BR_W + cx};
   }
   return {d: max, cell: -1};
 }
@@ -7322,17 +7334,18 @@ class Breach extends Room {
     this.rl = BR_ROUND;
   }
   joined(p) { Object.assign(p, {sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
-    mag: 30, reload: 0, cd: 0, nade: 2, hist: [], kills: 0}); }
+    mag: 30, reload: 0, cd: 0, nade: 2, rf: 0, hist: [], kills: 0}); }
   // No power-ups in Breach, so nothing to vote on: the match starts right away.
   vote(now) { this.begin(now); }
   // After a pause nobody can fire for a moment, so lining up on a frozen enemy during the pause gives nothing.
   resume(now) { super.resume(now); for (const p of this.players) p.cd = Math.max(p.cd, 350); }
-  extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, kills: p.kills}; }
+  extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, rf: p.rf, kills: p.kills}; }
   input(p, m) {
     if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i) && Number.isFinite(m.a)) {
       p.q.push([m.k & 255, m.i, m.a, Number.isFinite(m.rt) ? m.rt : 0]);
       if (p.q.length > 12) p.q.splice(0, p.q.length - 12);
     } else if (m.t === 'charge' && this.st === 'play') this.place(p);
+    else if (m.t === 'charge' && this.st === 'prep') this.reinforce(p);
     else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f)) p.face = m.f;
     else if (m.t === 'full') this.full(p);
   }
@@ -7354,7 +7367,7 @@ class Breach extends Room {
       const spots = brSpots(p.side === 'atk' ? 'a' : 'd'), [x, y] = spots[Math.floor(Math.random() * spots.length)];
       const gun = BR_GUN[p.side];
       Object.assign(p, {x, y, a: Math.atan2(BR_BOMB[1] - y, BR_BOMB[0] - x), vx: 0, vy: 0, hp: 100, alive: true, q: [], owed: 0, started: false,
-        mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, hist: [], face: null});
+        mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, rf: p.side === 'def' ? BR_REINF : 0, hist: [], face: null});
     }
     this.st = 'count';
     this.until = now + 4000;
@@ -7381,25 +7394,28 @@ class Breach extends Room {
     this.until = Date.now() + 3500;
   }
   advance(now) {
-    if (this.st === 'count' && now >= this.until) this.st = 'play';
+    // After the countdown, 15 s to prepare: the defender moves and reinforces walls, the attacker waits.
+    if (this.st === 'count' && now >= this.until) { this.st = 'prep'; this.until = now + BR_PREP; this.event('prep', {}); }
+    if (this.st === 'prep' && now >= this.until) { this.st = 'play'; this.event('go', {}); }
     if (this.st === 'roundover' && now >= this.until) {
       for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
       this.round(now);
     }
     // While counting down players may turn but not move.
-    if (this.st !== 'play') {
+    if (this.st !== 'play' && this.st !== 'prep') {
       this.acc = 0;
       for (const p of this.players) while (p.q.length) { const [, i, a] = p.q.shift(); p.ack = i; p.a = a; }
       return;
     }
     this.acc += Math.min(100, now - this.last);
-    while (this.acc >= 1000 / 60 && this.st === 'play') {
+    while (this.acc >= 1000 / 60 && (this.st === 'play' || this.st === 'prep')) {
       this.acc -= 1000 / 60;
       this.step(now);
     }
   }
   step(now) {
     this.tick++;
+    const prep = this.st === 'prep';
     if (this.think) this.think();
     const [atk, def] = ['atk', 'def'].map(s => this.players.find(p => p.side === s));
     for (const p of this.players) {
@@ -7407,6 +7423,8 @@ class Breach extends Room {
       if (p.cd > 0) p.cd -= 1000 / 60;
       // Inputs as in Fußball: one per tick, two to catch up, and a late player runs on with the last input.
       const run = (k, a, rt) => {
+        // Preparing: nobody shoots, and the attacker stays at the spawn (looking around is fine).
+        if (prep) k = p.side === 'atk' ? 0 : k & ~(32 | 128);
         p.k = k; p.a = a;
         if (!p.alive) return;
         brMove(p, k, a, this.map.g);
@@ -7429,6 +7447,7 @@ class Breach extends Room {
       p.hist.push([this.tick, now, p.x, p.y]);
       if (p.hist.length > 40) p.hist.shift();
     }
+    if (prep) return;
     // Breach charges go off 2 s after they are placed.
     for (const c of this.charges) if ((c.t -= 1000 / 60) <= 0) this.blow(c);
     this.charges = this.charges.filter(c => c.t > 0);
@@ -7494,6 +7513,16 @@ class Breach extends Room {
     p.nade--;
     this.charges.push({cell: w.cell, t: 2000, x: p.x + Math.cos(p.a) * (w.d - 0.05), y: p.y + Math.sin(p.a) * (w.d - 0.05), pid: p.pid});
     this.event('charge', {pid: p.pid, cell: w.cell, x: this.charges[this.charges.length - 1].x, y: this.charges[this.charges.length - 1].y});
+  }
+  // F while preparing: the defender puts steel behind the brick wall in front of them (twice per round).
+  reinforce(p) {
+    if (!p.alive || p.side !== 'def' || p.rf <= 0) return;
+    const w = brRay(this.map.g, p.x, p.y, p.a, 1.3);
+    if (w.cell < 0 || this.map.g[w.cell] !== 2) return;
+    p.rf--;
+    this.map.g[w.cell] = 3;
+    this.changed.push([w.cell % BR_W, Math.floor(w.cell / BR_W), 3]);
+    this.event('reinforce', {pid: p.pid, x: p.x + Math.cos(p.a) * (w.d - 0.05), y: p.y + Math.sin(p.a) * (w.d - 0.05)});
   }
   blow(c) {
     const cx = c.cell % BR_W, cy = Math.floor(c.cell / BR_W);
@@ -7956,9 +7985,16 @@ function brTextures() {
     art.forEach((row, y) => [...row].forEach((c, x) => { t[y * 24 + x] = c === '.' ? 0 : C[c]; }));
     return t;
   };
-  BR_TEX = {concrete, brick, wood, grass, ceil, atk: soldier(BR_COL.atk), def: soldier(BR_COL.def)};
+  // Reinforced wall: steel plates with rivets.
+  const steel = tex((x, y) => {
+    const n = rnd() * 10, edge = x % 32 < 2 || y % 32 < 2, rivet = (x % 32 === 5 || x % 32 === 26) && (y % 32 === 5 || y % 32 === 26);
+    return rivet ? brRGB(190, 196, 205) : edge ? brRGB(52, 58, 66) : brRGB(98 + n, 108 + n, 120 + n);
+  });
+  BR_TEX = {concrete, brick, steel, wood, grass, ceil, atk: soldier(BR_COL.atk), def: soldier(BR_COL.def)};
   return BR_TEX;
 }
+// Who may move: everyone while playing, only the defender while preparing.
+const brCanMove = (st, side) => st === 'play' || (st === 'prep' && side === 'def');
 // The map as the page knows it: floor, concrete, brick; which cells are outside (grass and sky).
 function brFull(g, m) {
   const sg = g.sg;
@@ -7977,7 +8013,7 @@ function brSnapshot(g, m) {
   sg.side = mine.side;
   if (!Number.isFinite(sg.ang)) sg.ang = mine.a;
   const p = {x: mine.x, y: mine.y, vx: 0, vy: 0};
-  if (m.st !== 'play' || !sg.me || !mine.al) {
+  if (!brCanMove(m.st, mine.side) || !sg.me || !mine.al) {
     sg.me = p; sg.hist = []; sg.vis = {x: 0, y: 0};
     if (m.st === 'count' && (sg.ang === undefined || sg.rdSeen !== m.rd)) { sg.ang = mine.a; sg.rdSeen = m.rd; }
     return;
@@ -8001,13 +8037,13 @@ function brTicks(g, now) {
   if (!sg.simAt) sg.simAt = now;
   let n = Math.floor((now - sg.simAt) / (1000 / 60));
   if (n > 6) { sg.simAt = now - 6 * 1000 / 60; n = 6; }
-  const mine = s.pl.find(p => p.pid === me.id), live = s.st === 'play' && mine && mine.al;
+  const mine = s.pl.find(p => p.pid === me.id), live = mine && mine.al && brCanMove(s.st, mine.side);
   for (let i = 0; i < n; i++) {
     sg.simAt += 1000 / 60;
     // A key tapped between two ticks (R, a short step) still counts once.
     let k = sg.keys | (sg.tap || 0) | (sg.fire ? 32 : 0);
     sg.tap = 0;
-    if (!live) k &= ~32;
+    if (!live || s.st !== 'play') k &= ~(32 | 128);
     sgSend(g, {t: 'in', k, a: Math.round(sg.ang * 1000) / 1000, i: ++sg.seq, rt: Math.round(pgMs() - sg.off - brDelay(sg))});
     if (live && sg.me) { sg.hist.push([sg.seq, k, sg.ang]); BR.move(sg.me, k, sg.ang, sg.grid); }
     if (live && (k & 32)) brShootFx(g);
@@ -8038,7 +8074,12 @@ function brEvent(g, ev, s) {
     // A charge ticks for 2 s: an arrow to it for everyone, and a text for the one it surprises.
     if (Number.isFinite(ev.x)) (sg.cues || (sg.cues = [])).push({x: ev.x, y: ev.y, at: performance.now(), kind: 'charge', life: 2000});
     if (!mine) sgFloat(g, BR_RW / 2, 70, '💥 Sprengladung!', '#ff6b6b');
-  } else if (ev.k === 'defusing') sgBanner(g, mine ? 'ENTSCHÄRFEN…' : 'BOMBE WIRD ENTSCHÄRFT!', mine ? 'Stillhalten und E halten' : 'Schnell zur Bombe!', '#ffd23f');
+  } else if (ev.k === 'prep') {
+    const def = (s.pl.find(p => p.pid === me.id) || {}).side === 'def';
+    sgBanner(g, 'VORBEREITUNG', def ? 'F vor einer Ziegelwand: mit Stahl verstärken (2×)' : 'Der Verteidiger bereitet sich vor – gleich geht\'s los', '#9fd3ff');
+  } else if (ev.k === 'go') sgBanner(g, 'LOS!', '', '#ffffff');
+  else if (ev.k === 'reinforce' && mine) sgFloat(g, BR_RW / 2, 80, '🛡 Wand verstärkt', '#9fd3ff');
+  else if (ev.k === 'defusing') sgBanner(g, mine ? 'ENTSCHÄRFEN…' : 'BOMBE WIRD ENTSCHÄRFT!', mine ? 'Stillhalten und E halten' : 'Schnell zur Bombe!', '#ffd23f');
   else if (ev.k === 'kill') {
     if (mine) sgBanner(g, 'AUSGESCHALTET', ((s.pl.find(p => p.pid === ev.to) || {}).name || '') + ' ist raus', '#ffffff');
     else if (ev.to === me.id) {
@@ -8104,7 +8145,7 @@ function brDraw(g, cv, now, dt) {
     if (hit.cell < 0) continue;
     const hx = px + Math.cos(ra) * hit.d, hy = py + Math.sin(ra) * hit.d, fracX = hx - Math.floor(hx), fracY = hy - Math.floor(hy);
     const vertical = Math.abs(fracX - 0.5) > Math.abs(fracY - 0.5) && (fracX < 0.002 || fracX > 0.998);
-    const u = ((vertical ? fracY : fracX) * 64) & 63, tex = grid[hit.cell] === 2 ? T.brick : T.concrete;
+    const u = ((vertical ? fracY : fracX) * 64) & 63, tex = grid[hit.cell] === 2 ? T.brick : grid[hit.cell] === 3 ? T.steel : T.concrete;
     const hgt = BR_PLANE / Math.max(0.05, perp), top = horizon - hgt / 2, y0 = Math.max(0, Math.ceil(top)), y1 = Math.min(BR_RH, Math.floor(horizon + hgt / 2));
     const shade = Math.max(0.2, 1 - perp / 16) * (vertical ? 0.82 : 1);
     for (let y = y0; y < y1; y++) {
@@ -8232,18 +8273,34 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
   sg.cues = (sg.cues || []).filter(c => now - c.at < (c.life || 1500));
   const CUE = {boom: ['#ffb020', '💥'], charge: ['#ff6b6b', '⏱💣'], killer: ['#ff4d4d', '☠'], shot: ['#ff4d4d', '🔫']};
   for (const c of sg.cues) { const [col, label] = CUE[c.kind] || CUE.shot; arrow(c.x, c.y, col, Math.max(0.3, 1 - (now - c.at) / (c.life || 1500)), label); }
+  // Where the bomb is: a small marker on the ring, always (the house is a maze the first few times).
+  if (s.st === 'play' || s.st === 'count' || s.st === 'prep') arrow(BR.BOMB[0], BR.BOMB[1], '#ffd23f', 0.35, Math.hypot(BR.BOMB[0] - px, BR.BOMB[1] - py) > 2.5 ? '💣' : '');
   // Health, ammo, charges at the bottom left; clock and score at the top.
   const pill = (x, y, w, text, col) => { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(x, y, w, 26, 13); ctx.fill(); ctx.fillStyle = col; ctx.font = '700 14px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + 10, y + 13); };
   pill(10, vh - 36, 86, '♥ ' + mine.hp, mine.hp > 40 ? '#7bd88f' : '#ff6b6b');
   pill(102, vh - 36, 112, (mine.rl ? 'Lädt…' : '▮ ' + mine.mag + '/' + BR.GUN[mine.side].mag), mine.mag > 5 || mine.rl ? '#ffffff' : '#ff6b6b');
   if (mine.side === 'atk') pill(220, vh - 36, 64, '💣 ' + mine.ch, '#ffb020');
   pill(10, vh - 66, 104, (moving && !(sg.keys & 16) ? '👣 LAUT' : '🤫 leise'), moving && !(sg.keys & 16) ? '#ffb020' : '#9fe0b0');
-  const sec = Math.ceil(s.rl / 1000), clock = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
-  ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(vw / 2 - 110, 4, 220, 34, 17); ctx.fill();
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '800 15px "Segoe UI", system-ui, sans-serif';
-  ctx.fillStyle = BR_COL[mine.side]; ctx.fillText((mine.side === 'atk' ? '⚔ ' : '🛡 ') + BR_SIDE[mine.side], vw / 2 - 52, 21);
-  ctx.fillStyle = sec <= 20 && s.st === 'play' ? '#ff6b6b' : '#ffffff'; ctx.fillText(clock, vw / 2 + 10, 21);
-  ctx.fillStyle = '#ffffff'; ctx.fillText(s.pl.map(p => p.sc).join(' : '), vw / 2 + 72, 21);
+  const sec = Math.ceil((s.st === 'prep' ? s.c : s.rl) / 1000), clock = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+  // Side, clock and score in one pill, laid out by their real widths.
+  ctx.font = '800 15px "Segoe UI", system-ui, sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  const parts = [[(mine.side === 'atk' ? '⚔ ' : '🛡 ') + BR_SIDE[mine.side], BR_COL[mine.side]], [clock, sec <= 20 && s.st === 'play' ? '#ff6b6b' : '#ffffff'],
+    [s.pl.map(p => p.sc).join(' : '), '#ffffff']], widths = parts.map(([t]) => ctx.measureText(t).width), total = widths.reduce((a, b) => a + b, 0) + 22 * (parts.length - 1);
+  ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(vw / 2 - total / 2 - 16, 4, total + 32, 34, 17); ctx.fill();
+  let tx = vw / 2 - total / 2;
+  parts.forEach(([t, col], i) => { ctx.fillStyle = col; ctx.fillText(t, tx, 21); tx += widths[i] + 22; });
+  ctx.textAlign = 'center';
+  // Preparing: what to do now.
+  if (s.st === 'prep' && mine.al) {
+    ctx.font = '800 15px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#9fd3ff';
+    ctx.fillText('VORBEREITUNG · noch ' + sec + ' s', cx, 54);
+    if (mine.side === 'def') {
+      const w = BR.ray(sg.grid, px, py, ang, 1.3);
+      ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = mine.rf > 0 && w.cell >= 0 && sg.grid[w.cell] === 2 ? '#ffd23f' : 'rgba(255,255,255,.75)';
+      ctx.fillText(mine.rf > 0 ? (w.cell >= 0 && sg.grid[w.cell] === 2 ? 'F: diese Wand verstärken' : 'Vor eine Ziegelwand stellen') + ' · ' + mine.rf + ' übrig' : 'Alle Verstärkungen gesetzt', cx, cy + 50);
+    }
+  }
   // Defusing: a bar under the crosshair for both.
   if (s.df > 0) {
     const q = s.df / BR.DEFUSE;
@@ -8254,7 +8311,7 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
     ctx.font = '700 13px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#ffd23f'; ctx.fillText('E halten zum Entschärfen', cx, cy + 50);
   }
   // Without the mouse captured: how to start.
-  if (document.pointerLockElement !== g.el.canvas && mine.al && (s.st === 'play' || s.st === 'count')) {
+  if (document.pointerLockElement !== g.el.canvas && mine.al && (s.st === 'play' || s.st === 'count' || s.st === 'prep')) {
     ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(cx - 150, vh - 76, 300, 30, 15); ctx.fill();
     ctx.fillStyle = '#ffffff'; ctx.font = '700 13px "Segoe UI", system-ui, sans-serif'; ctx.fillText('🖱 Ins Bild klicken: Maus steuert die Sicht', cx, vh - 61);
   }
@@ -8265,13 +8322,15 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
    with the level. Attacking it walks the shortest way to the bomb and defuses; defending it holds a spot in
    the bomb room, watches the doors and goes for the bomb when you defuse. */
 const BR_BOT = {
-  leicht: {react: 700, aim: 0.1, turn: 3, fov: 0.6, hear: 6, strafe: 0, stop: false, breach: 0, roam: 0},
-  mittel: {react: 450, aim: 0.055, turn: 5, fov: 0.65, hear: 9, strafe: 0.3, stop: false, breach: 0.25, roam: 0},
-  schwer: {react: 280, aim: 0.03, turn: 8, fov: 0.7, hear: 12, strafe: 0.6, stop: true, breach: 0.45, roam: 35000},
-  profi: {react: 160, aim: 0.015, turn: 12, fov: 0.75, hear: 15, strafe: 1, stop: true, breach: 0.55, roam: 25000}};
+  leicht: {react: 700, aim: 0.1, turn: 3, fov: 0.6, hear: 6, strafe: 0, stop: false, breach: 0, roam: 0, steel: 0},
+  mittel: {react: 450, aim: 0.055, turn: 5, fov: 0.65, hear: 9, strafe: 0.3, stop: false, breach: 0.25, roam: 0, steel: 1},
+  schwer: {react: 280, aim: 0.03, turn: 8, fov: 0.7, hear: 12, strafe: 0.6, stop: true, breach: 0.45, roam: 35000, steel: 2},
+  profi: {react: 160, aim: 0.015, turn: 12, fov: 0.75, hear: 15, strafe: 1, stop: true, breach: 0.55, roam: 25000, steel: 2}};
 // How an attacking bot gets in: through one of the doors, or by blowing a hole into a brick wall (stand there,
 // face the wall, place the charge, back off until it has gone off).
-const BR_ENTRY = {doors: [[15.5, 2.5], [15.5, 15.5], [25.5, 15.5]], walls: [{at: [3.2, 6.5], face: 0}, {at: [28.8, 6.5], face: Math.PI}]};
+const BR_ENTRY = {doors: [[15.5, 2.5], [15.5, 15.5], [25.5, 15.5]], walls: [{at: [3.2, 6.5], face: 0, cell: 6 * 32 + 4}, {at: [28.8, 6.5], face: Math.PI, cell: 6 * 32 + 27}],
+  // Where a defending bot reinforces those two walls from the inside.
+  steel: [{at: [5.5, 6.5], face: Math.PI}, {at: [26.5, 6.5], face: 0}]};
 function brBrain(R, lvl) {
   const P = BR_BOT[lvl] || BR_BOT.mittel, W = BR.W, H = BR.H;
   // Shortest way over the floor from (x, y) to a target cell: the next cell to go to.
@@ -8293,6 +8352,7 @@ function brBrain(R, lvl) {
     for (let c = goal; c !== start; c = from[c]) cells.unshift(c);
     return cells;
   };
+  const g0 = () => R.map.g;
   const turnTo = (p, want, rate) => { let d = want - p.ba; d = Math.atan2(Math.sin(d), Math.cos(d)); p.ba += Math.max(-rate / 60, Math.min(rate / 60, d)); return Math.abs(d); };
   return () => {
     const now = Date.now();
@@ -8304,9 +8364,29 @@ function brBrain(R, lvl) {
         const wall = P.breach && Math.random() < P.breach;
         p.entry = wall ? {...BR_ENTRY.walls[Math.random() < 0.5 ? 0 : 1]} : {at: BR_ENTRY.doors[Math.floor(Math.random() * BR_ENTRY.doors.length)]};
         p.postUntil = now + (P.roam ? P.roam * (0.7 + Math.random() * 0.6) : Infinity);
+        p.steel = [...BR_ENTRY.steel].sort(() => Math.random() - 0.5).slice(0, P.steel);
       }
       const o = R.players.find(q => q !== p), g = R.map.g;
       let k = 0, aimDiff = 9;
+      // Preparing as defender: walk to the walls it wants to reinforce, face them, press F.
+      if (p.alive && R.st === 'prep' && p.side === 'def' && p.steel.length) {
+        const sp = p.steel[0], dist = Math.hypot(sp.at[0] - p.x, sp.at[1] - p.y);
+        let kk = 0;
+        if (dist > 0.3) {
+          if (!p.route || now - (p.routeAt || 0) > 500) { p.route = path(g0(), Math.floor(p.x), Math.floor(p.y), Math.floor(sp.at[0]), Math.floor(sp.at[1])); p.routeAt = now; }
+          if (p.route && p.route.length > 1 && Math.hypot((p.route[0] % W) + 0.5 - p.x, Math.floor(p.route[0] / W) + 0.5 - p.y) < 0.2) p.route.shift();
+          const last = !p.route || p.route.length <= 1, tx = last ? sp.at[0] : (p.route[0] % W) + 0.5, ty = last ? sp.at[1] : Math.floor(p.route[0] / W) + 0.5;
+          const want = Math.atan2(ty - p.y, tx - p.x);
+          turnTo(p, want, P.turn);
+          if (Math.abs(Math.atan2(Math.sin(want - p.ba), Math.cos(want - p.ba))) < 0.6) kk = 1;
+        } else if (turnTo(p, sp.face, P.turn) < 0.05 && Math.abs(Math.atan2(Math.sin(p.a - sp.face), Math.cos(p.a - sp.face))) < 0.08) {
+          R.reinforce(p);
+          p.steel.shift();
+          p.route = null;
+        }
+        p.q.push([kk, p.bseq = (p.bseq || 0) + 1, p.ba, 0]);
+        continue;
+      }
       if (!p.alive || R.st !== 'play' || !o) { p.q.push([0, p.bseq = (p.bseq || 0) + 1, p.ba, 0]); continue; }
       const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy), toO = Math.atan2(dy, dx);
       const clear = o.alive && BR.ray(g, p.x, p.y, toO, d + 1).d >= d - 0.3;
@@ -8329,8 +8409,9 @@ function brBrain(R, lvl) {
         if (heard) turnTo(p, toO, P.turn * 0.6);
         let target = null;
         if (p.side === 'atk') {
-          // The way in first, unless time runs out; then the bomb.
+          // The way in first, unless time runs out; then the bomb. A wall that got steel behind it: a door instead.
           if (p.entry && R.rl < 30000) p.entry = null;
+          if (p.entry && p.entry.cell !== undefined && g[p.entry.cell] === 3 && !p.backUntil) p.entry = {at: BR_ENTRY.doors[Math.floor(Math.random() * BR_ENTRY.doors.length)]};
           if (p.entry && p.backUntil) {
             // Charge placed: back off, wait for the bang, then go.
             if (now < p.backUntil) k |= 2;
