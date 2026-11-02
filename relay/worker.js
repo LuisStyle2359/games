@@ -1561,7 +1561,8 @@ export class Breach extends Room {
       const run = (k, a, rt) => {
         // Preparing: nobody shoots; the attacker stays at the spawn and steers the drone.
         if (prep && p.side === 'atk') { p.k = 0; if (p.drone && p.alive) { p.drone.a = a; brMove(p.drone, k & 31, a, this.map.g); } return; }
-        if (prep) k &= ~(32 | 128);
+        // The defender may shoot while preparing, but only drones are hit then.
+        if (prep) k &= ~128;
         p.k = k; p.a = a;
         if (!p.alive) return;
         brMove(p, k, a, this.map.g);
@@ -1608,6 +1609,22 @@ export class Breach extends Room {
     const moving = Math.hypot(p.vx, p.vy) > 0.5, ang = a + (Math.random() * 2 - 1) * (gun.spread + (moving ? gun.spread * 2 : 0));
     const wall = brRay(this.map.g, p.x, p.y, ang);
     let hitP = null, hd = wall.d;
+    if (this.st === 'prep') {
+      // Preparing: a shot can only take out the attacker's drone (a small target close to the floor).
+      for (const o of this.players) {
+        const dr = o.drone;
+        if (o === p || !dr) continue;
+        const fx = dr.x - p.x, fy = dr.y - p.y, along = fx * Math.cos(ang) + fy * Math.sin(ang), off = Math.abs(-fx * Math.sin(ang) + fy * Math.cos(ang));
+        if (along > 0 && off < 0.2 && along < hd) {
+          o.drone = null;
+          this.event('drone', {pid: p.pid, to: o.pid, x: dr.x, y: dr.y, sx: p.x, sy: p.y});
+          return;
+        }
+      }
+      if (wall.cell >= 0 && this.map.g[wall.cell] === 2) this.wear(wall.cell, 9);
+      this.event('shot', {pid: p.pid, x: p.x + Math.cos(ang) * hd, y: p.y + Math.sin(ang) * hd, sx: p.x, sy: p.y});
+      return;
+    }
     for (const o of this.players) {
       if (o === p || !o.alive) continue;
       let ox = o.x, oy = o.y;

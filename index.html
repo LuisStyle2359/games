@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 53;
+const APP_VERSION = 54;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -7553,7 +7553,8 @@ class Breach extends Room {
       const run = (k, a, rt) => {
         // Preparing: nobody shoots; the attacker stays at the spawn and steers the drone.
         if (prep && p.side === 'atk') { p.k = 0; if (p.drone && p.alive) { p.drone.a = a; brMove(p.drone, k & 31, a, this.map.g); } return; }
-        if (prep) k &= ~(32 | 128);
+        // The defender may shoot while preparing, but only drones are hit then.
+        if (prep) k &= ~128;
         p.k = k; p.a = a;
         if (!p.alive) return;
         brMove(p, k, a, this.map.g);
@@ -7600,6 +7601,22 @@ class Breach extends Room {
     const moving = Math.hypot(p.vx, p.vy) > 0.5, ang = a + (Math.random() * 2 - 1) * (gun.spread + (moving ? gun.spread * 2 : 0));
     const wall = brRay(this.map.g, p.x, p.y, ang);
     let hitP = null, hd = wall.d;
+    if (this.st === 'prep') {
+      // Preparing: a shot can only take out the attacker's drone (a small target close to the floor).
+      for (const o of this.players) {
+        const dr = o.drone;
+        if (o === p || !dr) continue;
+        const fx = dr.x - p.x, fy = dr.y - p.y, along = fx * Math.cos(ang) + fy * Math.sin(ang), off = Math.abs(-fx * Math.sin(ang) + fy * Math.cos(ang));
+        if (along > 0 && off < 0.2 && along < hd) {
+          o.drone = null;
+          this.event('drone', {pid: p.pid, to: o.pid, x: dr.x, y: dr.y, sx: p.x, sy: p.y});
+          return;
+        }
+      }
+      if (wall.cell >= 0 && this.map.g[wall.cell] === 2) this.wear(wall.cell, 9);
+      this.event('shot', {pid: p.pid, x: p.x + Math.cos(ang) * hd, y: p.y + Math.sin(ang) * hd, sx: p.x, sy: p.y});
+      return;
+    }
     for (const o of this.players) {
       if (o === p || !o.alive) continue;
       let ox = o.x, oy = o.y;
@@ -8054,7 +8071,7 @@ function offShow(game) {
       el('p', {text: 'Angreifer gegen Verteidiger, 1 Leben pro Runde. Nach jeder Runde werden die Seiten getauscht. Wer zuerst 4 Runden holt, gewinnt.'}),
       el('p', {text: '⚔ Angreifer: Verteidiger ausschalten oder die Bombe entschärfen (E 7 s gedrückt halten). Mit F klebst du eine Sprengladung an eine Ziegelwand – nach 2 s fliegt ein Loch rein.'}),
       el('p', {text: '🛡 Verteidiger: Angreifer ausschalten oder 2 Minuten durchhalten. In den 15 s Vorbereitung kannst du 2 Ziegelwände mit F verstärken – da kommt dann weder Sprengladung noch Kugel durch.'}),
-      el('p', {text: '📡 In der Vorbereitung steuert der Angreifer eine Drohne (WASD): was sie sieht, sieht er – so findet er den Verteidiger, bevor es losgeht.'}),
+      el('p', {text: '📡 In der Vorbereitung steuert der Angreifer eine Drohne (WASD): was sie sieht, sieht er – so findet er den Verteidiger, bevor es losgeht. Der Verteidiger darf die Drohne abschießen.'}),
       el('p', {text: '🤫 Rennen ist laut, mit Shift schleichst du leise. Was du hören würdest, zeigen Pfeile ums Fadenkreuz: 👣 Schritte, 🔫 Schüsse, 💥 Explosionen.'})] : [
       el('div', {class: 'olabel', text: game === 'kick' ? 'Modus' : 'Gegner'}),
       game === 'kick'
@@ -8230,7 +8247,9 @@ function brTicks(g, now) {
     // A key tapped between two ticks (R, a short step) still counts once.
     let k = sg.keys | (sg.tap || 0) | (sg.fire ? 32 : 0);
     sg.tap = 0;
-    if (!live || s.st !== 'play') k &= ~(32 | 128);
+    // Preparing: no defusing, and only the defender may shoot (at the drone).
+    if (!live || (s.st !== 'play' && !(s.st === 'prep' && mine.side === 'def'))) k &= ~32;
+    if (!live || s.st !== 'play') k &= ~128;
     sgSend(g, {t: 'in', k, a: Math.round(sg.ang * 1000) / 1000, i: ++sg.seq, rt: Math.round(pgMs() - sg.off - brDelay(sg))});
     if (live && sg.me) { sg.hist.push([sg.seq, k, sg.ang]); BR.move(sg.me, k, sg.ang, sg.grid); }
     if (live && (k & 32)) brShootFx(g);
@@ -8261,6 +8280,10 @@ function brEvent(g, ev, s) {
     // A charge ticks for 2 s: an arrow to it for everyone, and a text for the one it surprises.
     if (Number.isFinite(ev.x)) (sg.cues || (sg.cues = [])).push({x: ev.x, y: ev.y, at: performance.now(), kind: 'charge', life: 2000});
     if (!mine) sgFloat(g, BR_RW / 2, 70, '💥 Sprengladung!', '#ff6b6b');
+  } else if (ev.k === 'drone') {
+    (sg.booms || (sg.booms = [])).push({x: ev.x, y: ev.y, at: performance.now()});
+    if (ev.to === me.id) { sgBanner(g, 'DROHNE ZERSTÖRT', 'Abgeschossen – zurück zur Ausgangsposition', '#ff6b6b'); sg.shake = 0.6; }
+    else if (mine) sgFloat(g, BR_RW / 2, 80, '💥 Drohne abgeschossen', '#9fd3ff');
   } else if (ev.k === 'prep') {
     const def = (s.pl.find(p => p.pid === me.id) || {}).side === 'def';
     sgBanner(g, 'VORBEREITUNG', def ? 'Vor Ziegelwand stellen + F = Stahl (2×)' : '📡 Drohne: WASD fahren, Verteidiger suchen', '#9fd3ff');
@@ -8607,6 +8630,19 @@ function brBrain(R, lvl) {
       }
       const o = R.players.find(q => q !== p), g = R.map.g;
       let k = 0, aimDiff = 9;
+      // Preparing as defender: a drone in sight gets shot down first (not by the easiest bot).
+      if (p.alive && R.st === 'prep' && p.side === 'def' && P.steel > 0) {
+        const dr = (R.players.find(q => q !== p) || {}).drone;
+        if (dr) {
+          const dd = Math.hypot(dr.x - p.x, dr.y - p.y), to = Math.atan2(dr.y - p.y, dr.x - p.x);
+          const off = Math.abs(Math.atan2(Math.sin(to - p.ba), Math.cos(to - p.ba)));
+          if (dd < 14 && off < P.fov + 0.4 && BR.ray(g0(), p.x, p.y, to, dd + 0.5).d >= dd - 0.2) {
+            const diff = turnTo(p, to, P.turn);
+            p.q.push([diff < 0.04 ? 32 : 0, p.bseq = (p.bseq || 0) + 1, p.ba, 0]);
+            continue;
+          }
+        }
+      }
       // Preparing as defender: walk to the walls it wants to reinforce, face them, press F.
       if (p.alive && R.st === 'prep' && p.side === 'def' && p.steel.length) {
         const sp = p.steel[0], dist = Math.hypot(sp.at[0] - p.x, sp.at[1] - p.y);
