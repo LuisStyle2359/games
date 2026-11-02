@@ -6,6 +6,8 @@ const PREFIX = 'dv-2563318804-chat/';
 const MAX_PAYLOAD = 256 * 1024;
 const MAX_RETAINED = 16 * 1024;
 const MAX_SUBS = 32;
+// Limits against flooding: messages per socket and second, kept messages per mailbox and in total.
+const MAX_RATE = 40, MAX_MAIL = 100, MAX_KEPT = 5000;
 const enc = new TextEncoder(), dec = new TextDecoder();
 
 export default {
@@ -55,7 +57,7 @@ class Reader {
 }
 
 export class Hub {
-  constructor(ctx) { this.ctx = ctx; }
+  constructor(ctx) { this.ctx = ctx; this.rate = new WeakMap(); this.kept = -1; }
 
   async fetch(req) {
     const [client, server] = Object.values(new WebSocketPair());
@@ -106,6 +108,11 @@ export class Hub {
       const id = qos ? r.u16() : 0;
       const payload = r.rest();
       if (qos === 1) ws.send(new Uint8Array([0x40, 2, id >> 8, id & 255]));
+      // At most MAX_RATE messages a second from one connection; more are dropped.
+      const now = Date.now(), rt = this.rate.get(ws) || {t: now, n: 0};
+      if (now - rt.t > 1000) { rt.t = now; rt.n = 0; }
+      this.rate.set(ws, rt);
+      if (++rt.n > MAX_RATE) return;
       if (topic.startsWith(PREFIX) && !/[+#]/.test(topic) && payload.length <= MAX_PAYLOAD) await this.publish(topic, payload, !!(head & 1));
     } else if (type === 8) {
       const id = r.u16(), granted = [];
@@ -113,7 +120,8 @@ export class Hub {
       while (r.i < body.length) {
         const f = r.str();
         r.u8();
-        const ok = f.startsWith(PREFIX) && att.subs.length < MAX_SUBS;
+        // Only '+' wildcards (what the page uses): nobody can listen to everything with '#'.
+        const ok = f.startsWith(PREFIX) && !f.includes('#') && att.subs.length < MAX_SUBS;
         granted.push(ok ? 0 : 0x80);
         if (ok && !att.subs.includes(f)) { att.subs.push(f); added.push(f); }
       }
@@ -140,8 +148,15 @@ export class Hub {
 
   async publish(topic, payload, retain) {
     if (retain) {
-      if (!payload.length) await this.ctx.storage.delete(topic);
-      else if (payload.length <= MAX_RETAINED) await this.ctx.storage.put(topic, dec.decode(payload));
+      const st = this.ctx.storage;
+      if (this.kept < 0) this.kept = (await st.list({limit: MAX_KEPT + 1})).size;
+      if (!payload.length) { if (await st.delete(topic)) this.kept--; }
+      else if (payload.length <= MAX_RETAINED) {
+        // A full mailbox, or too much kept in total, takes nothing new (replacing what is there is fine).
+        const box = topic.match(/^(.*\/mail\/[^/]+\/)/), isNew = (await st.get(topic)) === undefined;
+        const full = isNew && (this.kept >= MAX_KEPT || (box && (await st.list({prefix: box[1], limit: MAX_MAIL})).size >= MAX_MAIL));
+        if (!full) { await st.put(topic, dec.decode(payload)); if (isNew) this.kept++; }
+      }
     }
     const out = publishPacket(topic, payload, false);
     for (const ws of this.ctx.getWebSockets()) {

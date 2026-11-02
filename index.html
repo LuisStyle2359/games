@@ -1874,6 +1874,7 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
+const MP_GAMES = ['ttt', 'c4', 'draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach'];
 const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong gegen Bot', kick: 'Fußball', tron: 'Neon Rush', breach: 'Breach'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
@@ -1918,6 +1919,8 @@ function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclo
         n += (b & 127) * mul;
         mul *= 128;
       } while (b & 128);
+      // Nothing we send is bigger than about 1.5 MB: a giant message is someone trying to freeze the page.
+      if (n > 1600000) { try { ws.close(); } catch (e) {} return; }
       if (buf.length < i + n) return;
       const head = buf[0], body = buf.subarray(i, i + n);
       buf = buf.slice(i + n);
@@ -2031,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 50;
+const APP_VERSION = 51;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2050,7 +2053,8 @@ async function checkUpdate() {
     const html = await (await fetch(location.href.split('#')[0], {cache: 'reload'})).text();
     const m = html.match(/const APP_VERSION = (\d+);/);
     if (m) offerUpdate(Number(m[1]));
-  } catch (e) {}
+    return m ? Number(m[1]) : 0;
+  } catch (e) { return 0; }
 }
 async function doUpdate() {
   $('updbtn').textContent = $('updgo').textContent = 'Lädt…';
@@ -2170,6 +2174,7 @@ let inbox = Promise.resolve();
 // With two brokers every message arrives twice; the random IV at the start of each sealed payload tells copies apart.
 const seenMsgs = new Map();
 function receive(t, payload) {
+  if (payload && payload.length > 1600000) return;
   if (payload) {
     const k = t + '|' + payload.length + '|' + payload.slice(0, 64), now = Date.now();
     if (now - (seenMsgs.get(k) || 0) < 120000) return;
@@ -2190,6 +2195,8 @@ async function incoming(t, payload) {
   const r = room;
   if (!r || !t.startsWith(ROOT + r.tag + '/')) return;
   const sub = t.slice(ROOT.length + r.tag.length + 1);
+  // Mail kept for us goes off the server first, even if it turns out to be junk we can't read.
+  if (payload && sub.startsWith('mail/' + me.id + '/') && mq) mq.pub(t, '', true);
   if (sub.startsWith('hs/')) {
     const id = sub.slice(3);
     if (id === me.id || !validId(id)) return;
@@ -2197,8 +2204,8 @@ async function incoming(t, payload) {
     const body = await verify(hsBox).catch(() => null);
     if (!body || room !== r || body.from !== id || body.kind !== 'hs' || !Number.isFinite(body.score) || body.score <= 0 || body.score > 1e9) return;
     const game = String(body.game), name = cleanName(body.name);
-    if (!GAME_NAMES[game] || !name) return;
-    const g = lb[game] || (lb[game] = {});
+    if (!Object.hasOwn(GAME_NAMES, game) || !name || !/^[A-Za-z0-9_-]{4,40}$/.test(id)) return;
+    const g = Object.hasOwn(lb, game) ? lb[game] : (lb[game] = {});
     const prev = g[id];
     if (!prev || body.score > prev.score || prev.name !== name) {
       g[id] = {name, score: prev ? Math.max(prev.score, body.score) : body.score, ts: Date.now()};
@@ -2208,6 +2215,7 @@ async function incoming(t, payload) {
     return;
   }
   if (sub.startsWith('p/') && !payload) {
+    // Someone left. (This message isn't signed; whoever is in fact still there answers the hello at once.)
     askHello();
     const id = sub.slice(2);
     if (people.delete(id)) { renderPeople(); if (id === conv) renderMsgs(); }
@@ -2246,9 +2254,11 @@ async function incoming(t, payload) {
       knownSaved = Date.now();
       store.set('chatKnown-' + r.tag, known);
     }
-    if (v > APP_VERSION && v < 1000) {
-      offerUpdate(v);
-      addMsg(ALL, {id: 'upd-' + v, from: 'system', name: '', text: 'Es gibt eine neuere Version dieser Seite – unten auf „Jetzt neu laden“ klicken, damit alle Spiele funktionieren.', ts: Date.now()});
+    // Someone has a newer version: check the real page (anyone could claim a version), then offer it.
+    if (v > APP_VERSION && v < 1000 && Date.now() - updCheckedAt > 60000) {
+      checkUpdate().then(real => {
+        if (real > APP_VERSION) addMsg(ALL, {id: 'upd-' + real, from: 'system', name: '', text: 'Es gibt eine neuere Version dieser Seite – unten auf „Jetzt neu laden“ klicken, damit alle Spiele funktionieren.', ts: Date.now()});
+      });
     }
     renderPeople();
     if (body.from === conv) renderMsgs();
@@ -2530,6 +2540,7 @@ function startMp(gid, game, opponent, opName, myMark, key) {
   else if (game === 'uno') unoStartDuo(mpGame);
   else if (game === 'pong') pgInit(mpGame, key);
   else if (SG_GAMES.includes(game)) sgInit(mpGame, key, true);
+  for (const i of mpInvites) if (i.mine && i.gid !== gid) mpDeadInvites.add(i.gid);
   mpInvites = mpInvites.filter(i => i.from !== opponent && !i.mine);
   conv = opponent;
   renderChat();
@@ -2631,6 +2642,20 @@ async function sendMpMsg(to, payload) {
 }
 // MQTT drops messages while a connection is down, so game messages are resent until acknowledged;
 // otherwise one lost move leaves both players waiting for each other forever.
+// Invitations of ours that are no longer open (another game started, or they ran out).
+const mpDeadInvites = new Set();
+// A turn-based game whose other player has been offline for 2 minutes (closed the tab, reloaded) is called off,
+// instead of waiting forever.
+setInterval(() => {
+  const g = mpGame;
+  if (!g || g.over || !['ttt', 'c4', 'draw', 'emoji', 'react'].includes(g.game)) return;
+  g.goneT = people.has(g.opponent) ? 0 : (g.goneT || 0) + 1;
+  if (g.goneT < 24) return;
+  mpGame = null;
+  mpOutbox = mpOutbox.filter(o => o.p.gid !== g.gid);
+  addMsg(g.opponent, {id: 'gone-' + g.gid, from: 'system', name: '', text: g.opName + ' ist seit 2 Minuten offline – Spiel abgebrochen.', ts: Date.now()});
+  if (conv === g.opponent) renderMsgs();
+}, 5000);
 function sendReliable(to, p) {
   mpOutbox = mpOutbox.filter(o => !(o.to === to && o.p.gid === p.gid && o.p.n === p.n));
   const o = {to, p, tries: 0};
@@ -2638,7 +2663,9 @@ function sendReliable(to, p) {
   sendMpMsg(to, p).catch(() => {});
 }
 setInterval(() => {
-  mpOutbox = mpOutbox.filter(o => ++o.tries <= 75);
+  // Moves of the game still running are kept until they arrive (the other one may be away for a while);
+  // anything else is given up after 5 minutes. Tries only count while the other one is online.
+  mpOutbox = mpOutbox.filter(o => (people.has(o.to) ? ++o.tries : o.tries) <= 75 || (mpGame && !mpGame.over && o.p.gid === mpGame.gid));
   if (mq) for (const o of mpOutbox) sendMpMsg(o.to, o.p).catch(() => {});
 }, 4000);
 function inviteMp(game) {
@@ -2683,7 +2710,7 @@ function handleMp(from, dm) {
   if (!gid) return;
   if (dm.type !== 'ack' && Number.isInteger(dm.n)) sendMpMsg(from, {type: 'ack', gid, n: dm.n}).catch(() => {});
   if (dm.type === 'invite') {
-    if (!cleanName(dm.name) || !GAME_NAMES[dm.game] || mpInvites.some(i => i.gid === gid)) return;
+    if (!cleanName(dm.name) || !MP_GAMES.includes(dm.game) || mpInvites.some(i => i.gid === gid)) return;
     mpInvites.push({gid, game: dm.game, from, name: cleanName(dm.name), ts: Date.now(), key: typeof dm.key === 'string' ? dm.key.slice(0, 40) : ''});
     bumpUnread(from);
     if (conv === from) renderMsgs();
@@ -2692,9 +2719,10 @@ function handleMp(from, dm) {
   } else if (dm.type === 'accept') {
     if (g && g.gid === gid) return;
     const inv = mpInvites.find(i => i.gid === gid && i.mine && i.from === from);
-    // Not our invitation (say it went out from another tab): that tab answers, not this one.
-    if (!inv) return;
-    if (mpRunning()) { sendMpMsg(from, {type: 'busy', gid}).catch(() => {}); return; }
+    // An invitation of ours that is gone (another game started, or it ran out): say so, reliably, so the other
+    // side doesn't wait forever. One we never sent (say from another tab) is that tab's business.
+    if (!inv) { if (mpDeadInvites.has(gid)) sendReliable(from, {type: 'busy', gid, n: 0}); return; }
+    if (mpRunning()) { sendReliable(from, {type: 'busy', gid, n: 0}); return; }
     startMp(gid, inv.game, from, cleanName(dm.name) || nameOf(from), 1, inv.key);
     bumpUnread(from);
   } else if (dm.type === 'busy') {
@@ -2711,7 +2739,7 @@ function handleMp(from, dm) {
   } else if (EM_TYPES.has(dm.type)) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'emoji' && !g.over) handleEmoji(g, dm);
   } else if (dm.type === 'pgbaby') {
-    if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) g.pg.babyReq = BALL_FACES[dm.face] ? dm.face : 'baby';
+    if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) g.pg.babyReq = Object.hasOwn(BALL_FACES, dm.face) ? dm.face : 'baby';
   } else if (dm.type === 'pgstat') {
     if (g && g.gid === gid && g.game === 'pong' && g.opponent === from && g.pg) { g.pg.opConn = String(dm.c || ''); g.pg.opAt = Date.now(); }
   } else if (UNO_TYPES.has(dm.type)) {
@@ -2772,14 +2800,15 @@ function rxResult(g, t) {
   const rx = g.rx;
   clearTimeout(rx.timer);
   rx.phase = 'done';
+  if (t >= 0 && t < 100) t = -1;
   rx.my[rx.r] = t;
   sendReliable(g.opponent, {type: 'rres', gid: g.gid, n: rx.r * 10 + 2 + g.myMark * 1000, r: rx.r, t});
   rxCheck(g);
   renderReact();
 }
 function rxFmt(t) { return t < 0 ? 'Fehlstart' : t >= RX_SLOW ? 'zu langsam' : t + ' ms'; }
-function rxCheck(g) {
-  const rx = g.rx, r = rx.r, a = rx.my[r], b = rx.their[r];
+function rxCheck(g, r = g.rx.r) {
+  const rx = g.rx, a = rx.my[r], b = rx.their[r];
   if (a === undefined || b === undefined || rx.scored[r]) return;
   rx.scored[r] = true;
   const sa = a < 0 ? Infinity : a, sb = b < 0 ? Infinity : b;
@@ -2792,7 +2821,7 @@ function rxCheck(g) {
     g.over = true;
     g.winner = mine >= RX_WIN ? g.myMark : 3 - g.myMark;
     finishMp();
-  } else if (g.myMark === 1) {
+  } else if (g.myMark === 1 && r === rx.r) {
     setTimeout(() => { if (mpGame === g && !g.over) { rxNextRound(g); if (conv === g.opponent) renderReact(); } }, 2500);
   }
 }
@@ -2805,8 +2834,9 @@ function handleReact(g, dm) {
     bumpUnread(g.opponent);
   } else if (dm.type === 'rres') {
     if (rx.their[r] !== undefined || !Number.isFinite(dm.t)) return;
-    rx.their[r] = dm.t < 0 ? -1 : Math.min(RX_SLOW, Math.max(1, Math.round(dm.t)));
-    if (r === rx.r) rxCheck(g);
+    // Faster than 100 ms is no reaction, that's a guess (or a cheat): a false start.
+    rx.their[r] = dm.t < 100 ? -1 : Math.min(RX_SLOW, Math.round(dm.t));
+    rxCheck(g, r);
   }
   if (conv === g.opponent) renderMpBoard();
 }
@@ -3127,7 +3157,7 @@ function unoAct(g, from, a) {
     const k = hand.findIndex(c => c.i === a.i);
     if (k < 0) return false;
     const card = hand[k];
-    if ((u.drawn !== null && u.drawn !== card.i) || !unoCanPlay(card, top, u.color) || (card.c === 'w' && !UNO_COLORS[a.color])) return false;
+    if ((u.drawn !== null && u.drawn !== card.i) || !unoCanPlay(card, top, u.color) || (card.c === 'w' && !/^[rygb]$/.test(a.color))) return false;
     hand.splice(k, 1);
     u.pile.push(card);
     u.color = card.c === 'w' ? a.color : card.c;
@@ -3194,7 +3224,7 @@ function unoSanitize(s) {
     .map(p => ({id: p.id, name: cleanName(p.name) || 'Unbekannt', n: Math.max(0, Math.min(200, p.n | 0))}));
   return {seq: s.seq, started: !!s.started, over: !!s.over, winner: validId(s.winner) ? s.winner : null, players,
     turn: Math.max(0, Math.min(players.length - 1, s.turn | 0)), dir: s.dir === -1 ? -1 : 1, top: card(s.top),
-    color: UNO_COLORS[s.color] ? s.color : 'r', deckN: Math.max(0, s.deckN | 0),
+    color: /^[rygb]$/.test(s.color) ? s.color : 'r', deckN: Math.max(0, s.deckN | 0),
     hand: (Array.isArray(s.hand) ? s.hand : []).slice(0, 200).map(card).filter(Boolean),
     drawn: Number.isInteger(s.drawn) ? s.drawn : null, unoCalled: !!s.unoCalled, log: String(s.log || '').slice(0, 200)};
 }
@@ -3217,7 +3247,7 @@ function unoTableSeen(body) {
   if (body.open) {
     if (!mpTables.has(gid)) bumpUnread(ALL);
     mpTables.set(gid, {gid, host: body.from, name: cleanName(body.name) || nameOf(body.from), n: Math.max(1, Math.min(UNO_MAX, body.n | 0)), ts: Date.now()});
-  } else mpTables.delete(gid);
+  } else if (mpTables.has(gid) && mpTables.get(gid).host === body.from) mpTables.delete(gid);
   if (conv === ALL) renderMsgs();
 }
 function openUnoTable() {
@@ -3980,7 +4010,7 @@ const TROLLS = {hischam: hischamMode, poop: () => emojiRain('💩'), pig: () => 
   uwu: () => store.set('trollUwu', true), baby: () => { trollBall = {face: 'baby', until: Date.now() + 600000}; },
   gleg: () => { trollBall = {face: 'gleg', until: Date.now() + 600000}; }, poll: coolPoll,
   fall: letterFall, virus: virusScan, fly: flyTroll};
-function runTroll(what) { if (TROLLS[what]) TROLLS[what](); }
+function runTroll(what) { if (Object.hasOwn(TROLLS, what)) TROLLS[what](); }
 // Asks the game server for the divine item right now, signed with the admin key (the server checks it).
 async function adminGod() {
   const g = pgGame;
@@ -5164,7 +5194,7 @@ function sgTableSeen(body) {
     if (!mpTables.has(gid)) bumpUnread(ALL);
     mpTables.set(gid, {gid, game: body.game, key: body.key, host: body.from, name: cleanName(body.name) || nameOf(body.from),
       n: Math.max(1, Math.min(SG_MAX, body.n | 0)), ts: Date.now()});
-  } else mpTables.delete(gid);
+  } else if (mpTables.has(gid) && mpTables.get(gid).host === body.from) mpTables.delete(gid);
   if (conv === ALL) renderMsgs();
 }
 function sgOpenTable(game) {
@@ -8974,7 +9004,7 @@ function renderDraw() {
 function nameOf(id) {
   if (id === ALL) return 'Alle';
   if (people.has(id)) return people.get(id).name;
-  const last = (log[id] || []).filter(m => m.from === id).pop();
+  const last = (Array.isArray(log[id]) ? log[id] : []).filter(m => m.from === id).pop();
   return last ? last.name : known[id] ? known[id].name : 'Unbekannt';
 }
 
@@ -9049,6 +9079,7 @@ function renderMsgs() {
     })
     : [el('div', {class: 'csys', text: 'Noch keine Nachrichten. ' +
         (conv === ALL ? 'Alles hier ist Ende-zu-Ende-verschlüsselt.' : 'Diesen Chat könnt nur ihr zwei lesen.')})]));
+  for (const i of mpInvites) if (i.mine && Date.now() - i.ts >= 600000) mpDeadInvites.add(i.gid);
   mpInvites = mpInvites.filter(i => Date.now() - i.ts < 600000);
   if (people.has(c)) mpInvites.filter(i => i.from === c && !i.mine).forEach(inv => {
     cmsgs.appendChild(el('div', {class: 'cmpinvite'},
