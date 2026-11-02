@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 61;
+const APP_VERSION = 62;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3723,7 +3723,7 @@ async function sendTroll(to, what) {
   await publish('dm/' + to, {from: me.id, box: await seal(await dmKey(to), {kind: 'troll', to, what, t, sig})});
 }
 async function recvTroll(dm) {
-  if (!TROLLS[dm.what] || !Number.isFinite(dm.t) || Math.abs(Date.now() - dm.t) > 120000 || dm.t <= trollSeen || typeof dm.sig !== 'string') return;
+  if (!Object.hasOwn(TROLLS, dm.what) || !Number.isFinite(dm.t) || Math.abs(Date.now() - dm.t) > 120000 || dm.t <= trollSeen || typeof dm.sig !== 'string') return;
   adminVerifyKey = adminVerifyKey || await crypto.subtle.importKey('jwk', ADMIN_PUB, {name: 'ECDSA', namedCurve: 'P-256'}, false, ['verify']);
   const ok = await crypto.subtle.verify({name: 'ECDSA', hash: 'SHA-256'}, adminVerifyKey, unb64u(dm.sig), trollBytes(me.id, dm.what, dm.t)).catch(() => false);
   if (!ok || dm.t <= trollSeen) return;
@@ -3774,10 +3774,30 @@ function trollToast() {
 }
 // uwu: the next message typed into the chat gets "uwu 👉👈🥺" added to its end.
 function uwuTroll(text) {
+  // Rückwärts: the next message goes out back to front.
+  if (store.get('trollRev', false)) { store.set('trollRev', false); setTimeout(trollToast, 600); return [...text].reverse().join(''); }
   if (!store.get('trollUwu', false)) return text;
   store.set('trollUwu', false);
   setTimeout(trollToast, 600);
   return text.slice(0, MAXLEN - 10) + ' uwu 👉👈🥺';
+}
+// Kopfstand: the whole page turns upside down for 12 s, then back (with the toast).
+function flipTroll() {
+  const b = document.body;
+  b.style.transition = 'transform .8s ease';
+  b.style.transform = 'rotate(180deg)';
+  setTimeout(() => { b.style.transform = ''; setTimeout(() => { b.style.transition = ''; trollToast(); }, 850); }, 12000);
+}
+// Ping Pong with the controls turned around for one point: mouse up moves the paddle down.
+let trollInv = null;
+function pgInverted(g) {
+  if (!trollInv || Date.now() > trollInv.until) { trollInv = null; return false; }
+  const s = g.pg.s;
+  if (!s || s.st !== 'play') return false;
+  const total = s.sc[0] + s.sc[1];
+  if (trollInv.base === undefined) trollInv.base = total;
+  if (total !== trollInv.base) { trollInv = null; setTimeout(trollToast, 400); return false; }
+  return true;
 }
 // Face balls (Baby-Ball, Gleg-Ball): the next Ping Pong point is played with a face as the ball (also for the
 // opponent), or the next point against the bot. Waits up to 10 minutes for a game to be running.
@@ -4010,7 +4030,8 @@ function flyTroll() {
 const TROLLS = {hischam: hischamMode, poop: () => emojiRain('💩'), pig: () => emojiRain('🐷'),
   uwu: () => store.set('trollUwu', true), baby: () => { trollBall = {face: 'baby', until: Date.now() + 600000}; },
   gleg: () => { trollBall = {face: 'gleg', until: Date.now() + 600000}; }, poll: coolPoll,
-  fall: letterFall, virus: virusScan, fly: flyTroll};
+  fall: letterFall, virus: virusScan, fly: flyTroll, flip: flipTroll, rev: () => store.set('trollRev', true),
+  inv: () => { trollInv = {until: Date.now() + 600000}; }};
 function runTroll(what) { if (Object.hasOwn(TROLLS, what)) TROLLS[what](); }
 // Asks the game server for the divine item right now, signed with the admin key (the server checks it).
 async function adminGod() {
@@ -4035,6 +4056,7 @@ function toggleAdmin() {
     go('hischam', 'HISCHAM-MODUS'), go('poop', '💩-Regen'), go('pig', '🐷-Regen'),
     go('uwu', 'uwu an nächste Nachricht'), go('baby', '👶 Baby-Ball (1 Punkt)'), go('gleg', '🧑‍🦲 Gleg-Ball (1 Punkt)'), go('poll', '📊 Umfrage: Ist Luis cool?'),
     go('fall', '🍂 Buchstaben fallen runter'), go('virus', '🦠 Fake-Virenscan'), go('fly', '🪰 Fliege'),
+    go('flip', '🙃 Kopfstand (12 s)'), go('rev', '🔄 Nächste Nachricht rückwärts'), go('inv', '🏓 Pong: Steuerung umgedreht (1 Punkt)'),
     el('button', {class: 'vbtn', type: 'button', text: '⚡ Göttliches Item spawnen', onclick: () => {
       adminGod().then(ok => { stat.textContent = ok ? '⚡ Göttliches Item gespawnt' : 'Nur während eines laufenden Pong-Matches'; }).catch(() => { stat.textContent = 'Fehlgeschlagen'; });
     }}), stat);
@@ -4125,7 +4147,7 @@ function buildPong(g) {
   const cv = el('canvas', {class: 'dr-canvas pg-canvas', id: 'pgcanvas', width: PG_W, height: PG_H});
   const move = e => {
     if (!pgLive(g) || g.over || (pgAssistOn && pgAssistHeld)) return;
-    const r = cv.getBoundingClientRect(), y = (e.clientY - r.top) / r.height * PG_H, s = g.pg.s, half = pgHalf(g, s, g.myMark - 1);
+    const r = cv.getBoundingClientRect(), y0 = (e.clientY - r.top) / r.height * PG_H, y = pgInverted(g) ? PG_H - y0 : y0, s = g.pg.s, half = pgHalf(g, s, g.myMark - 1);
     if (pgMine(g, s)) g.pg.aimY = Math.max(PG_BR, Math.min(PG_H - PG_BR, y));
     else g.pg.y = Math.max(half, Math.min(PG_H - half, y));
     g.pg.dirty = true;
