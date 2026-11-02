@@ -590,7 +590,7 @@ export class Arena {
   }
 }
 
-// Bolzplatz and Neon Rush: game rooms for two to four players, run on the server like Ping Pong. Players join
+// Fußball and Neon Rush: game rooms for two to four players, run on the server like Ping Pong. Players join
 // with the room's key and their chat id; the first one in hosts. From a direct invitation (auto=2) the match
 // starts as soon as both are there; at a table in the group chat the host starts it. Whoever drops out has
 // 15 s to come back. When every player has the game out of sight, a running match pauses.
@@ -697,7 +697,7 @@ class Room {
   extra() { return {}; }
 }
 
-// ⚽ Bolzplatz: top-down football like Haxball. Round players, a ball and two goals; arrow keys or WASD to run,
+// ⚽ Fußball: top-down football like Haxball. Round players, a ball and two goals; arrow keys or WASD to run,
 // Space or X to kick. Physics run 60 times a second in pixels per tick, with the classic Haxball constants:
 // players accelerate by 0.1 (0.07 while holding kick), everything slows by a fixed factor each tick, and a kick
 // adds 5 to the ball's speed. First to 3 goals or the lead after 3 minutes; a draw goes to a golden goal.
