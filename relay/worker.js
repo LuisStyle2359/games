@@ -616,6 +616,9 @@ class Room {
     this.coin = false;
     this.pausedBy = null;
     this.pauseEnd = 0;
+    // Solo: the page runs this room itself against bots (no pause limit; only the human counts as away).
+    this.solo = false;
+    this.think = null;
   }
 
   async fetch(req) {
@@ -665,11 +668,11 @@ class Room {
     else if (m.t === 'vote' && this.st === 'vote' && typeof m.v === 'boolean') {
       this.votes[p.pid] = m.v;
       if (this.players.filter(q => q.ws).every(q => q.pid in this.votes)) this.decide(now);
-    } else if (m.t === 'pause' && this.st === 'play' && p.pauses > 0) {
-      p.pauses--;
+    } else if (m.t === 'pause' && this.st === 'play' && (p.pauses > 0 || this.solo)) {
+      if (!this.solo) p.pauses--;
       this.st = 'pause';
       this.pausedBy = p.pid;
-      this.pauseEnd = now + 60000;
+      this.pauseEnd = now + (this.solo ? 864e5 : 60000);
       this.event('pause', {pid: p.pid});
     } else if (m.t === 'resume' && this.st === 'pause' && this.pausedBy) this.resume(now);
     else if (m.t === 'quit') { if (this.st === 'lobby') { try { p.ws.close(1000, 'bye'); } catch (e) {} this.remove(p); } else this.drop(p); }
@@ -705,7 +708,7 @@ class Room {
       if (!this.players.some(p => p.ws) && now - Math.max(0, ...this.players.map(p => p.left)) > 60000) { clearInterval(this.timer); this.timer = 0; }
     } else {
       for (const p of [...this.players]) if (!p.ws && now - p.left > 15000) this.drop(p);
-      const on = this.players.filter(p => p.ws);
+      const on = this.players.filter(p => p.ws && !p.bot);
       if (this.st === 'vote') { if (now >= this.until) this.decide(now); }
       else if (this.st === 'pause') {
         // A pause someone pressed ends with "Weiter" or after a minute; one because nobody looks, when all are back.
@@ -816,7 +819,7 @@ export class Kick extends Room {
     this.spin = 0;
     this.hold = null;
     this.item = null;
-    this.nextItem = 360 + Math.floor(Math.random() * 240);
+    this.nextItem = Math.max(this.nextItem, 120);
   }
   drop(p) {
     this.remove(p);
@@ -873,6 +876,7 @@ export class Kick extends Room {
   }
   step() {
     this.tick++;
+    if (this.think) this.think();
     const b = this.b, cy = KH / 2, ps = this.players;
     // Every input from a page is one movement step, exactly as that page already showed it, used one per tick
     // (two while catching up) so others see the player move evenly. When inputs come late, the player runs on
@@ -1184,6 +1188,7 @@ export class Tron extends Room {
     if (this.st !== 'play') return;
     this.tk++;
     for (const p of this.players) for (const k in p.fx) if (k !== 'shield' && p.fx[k] > 0) p.fx[k]--;
+    if (this.think) this.think();
     // Each bike moves 0, 1 or 2 cells this tick; moves happen in two rounds so bikes move at the same time.
     const steps = this.players.map(p => {
       if (!p.alive) return 0;
