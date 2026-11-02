@@ -590,10 +590,14 @@ export class Arena {
   }
 }
 
+
 // Fußball and Neon Rush: game rooms for two to four players, run on the server like Ping Pong. Players join
 // with the room's key and their chat id; the first one in hosts. From a direct invitation (auto=2) the match
-// starts as soon as both are there; at a table in the group chat the host starts it. Whoever drops out has
-// 15 s to come back. When every player has the game out of sight, a running match pauses.
+// starts as soon as both are there; at a table in the group chat the host starts it. First everyone votes for
+// or against power-ups (the majority wins, a tie is a coin toss). Whoever drops out has 15 s to come back.
+// A match pauses when a player presses pause (twice per player, at most a minute each) or when every player
+// has the game out of sight; it goes on after a 3 s countdown. All game timers count game ticks, so a pause
+// takes nothing off them.
 class Room {
   constructor(ctx, max, tickMs) {
     this.ctx = ctx;
@@ -607,7 +611,11 @@ class Room {
     this.timer = 0;
     this.ev = {n: 0};
     this.w = null;
-    this.pausedAt = 0;
+    this.votes = {};
+    this.pu = false;
+    this.coin = false;
+    this.pausedBy = null;
+    this.pauseEnd = 0;
   }
 
   async fetch(req) {
@@ -619,7 +627,7 @@ class Room {
     this.key = key;
     const [client, server] = Object.values(new WebSocketPair());
     server.accept();
-    if (!p) { p = {pid, ws: null, left: 0, away: false}; this.players.push(p); this.joined(p); }
+    if (!p) { p = {pid, ws: null, left: 0, away: false, pauses: 2}; this.players.push(p); this.joined(p); }
     if (p.ws) try { p.ws.close(1000, 'replaced'); } catch (e) {}
     p.ws = server;
     p.name = (u.searchParams.get('name') || '').slice(0, 24) || 'Spieler';
@@ -650,11 +658,40 @@ class Room {
   onMessage(p, data) {
     let m;
     try { m = JSON.parse(data); } catch (e) { return; }
+    const now = Date.now();
     if (m.t === 'ping' && Number.isFinite(m.c)) { try { p.ws.send(JSON.stringify({t: 'pong', c: m.c})); } catch (e) {} }
     else if (m.t === 'away' && typeof m.v === 'boolean') p.away = m.v;
-    else if (m.t === 'start' && this.st === 'lobby' && this.players[0] === p && this.players.length >= 2) this.begin(Date.now());
+    else if (m.t === 'start' && this.st === 'lobby' && this.players[0] === p && this.players.length >= 2) this.vote(now);
+    else if (m.t === 'vote' && this.st === 'vote' && typeof m.v === 'boolean') {
+      this.votes[p.pid] = m.v;
+      if (this.players.filter(q => q.ws).every(q => q.pid in this.votes)) this.decide(now);
+    } else if (m.t === 'pause' && this.st === 'play' && p.pauses > 0) {
+      p.pauses--;
+      this.st = 'pause';
+      this.pausedBy = p.pid;
+      this.pauseEnd = now + 60000;
+      this.event('pause', {pid: p.pid});
+    } else if (m.t === 'resume' && this.st === 'pause' && this.pausedBy) this.resume(now);
     else if (m.t === 'quit') { if (this.st === 'lobby') { try { p.ws.close(1000, 'bye'); } catch (e) {} this.remove(p); } else this.drop(p); }
     else this.input(p, m);
+  }
+
+  vote(now) {
+    this.st = 'vote';
+    this.until = now + 15000;
+    this.votes = {};
+  }
+  decide(now) {
+    const v = Object.values(this.votes), yes = v.filter(x => x).length, no = v.length - yes;
+    this.coin = yes === no && yes > 0;
+    this.pu = yes > no || (this.coin && Math.random() < 0.5);
+    this.event('vote', {pu: this.pu, coin: this.coin});
+    this.begin(now);
+  }
+  resume(now) {
+    this.st = 'resume';
+    this.until = now + 3000;
+    this.pausedBy = null;
   }
 
   event(k, extra) { this.ev = {n: this.ev.n + 1, k, ...extra}; }
@@ -664,36 +701,47 @@ class Room {
     if (this.st === 'over') {
       if (now > this.until || !this.players.some(p => p.ws)) { clearInterval(this.timer); this.timer = 0; }
     } else if (this.st === 'lobby') {
-      if (this.auto && this.players.length >= this.auto && this.players.every(p => p.ws)) this.begin(now);
+      if (this.auto && this.players.length >= this.auto && this.players.every(p => p.ws)) this.vote(now);
       if (!this.players.some(p => p.ws) && now - Math.max(0, ...this.players.map(p => p.left)) > 60000) { clearInterval(this.timer); this.timer = 0; }
     } else {
       for (const p of [...this.players]) if (!p.ws && now - p.left > 15000) this.drop(p);
       const on = this.players.filter(p => p.ws);
-      if (this.st === 'pause') {
-        if (on.length && on.every(p => !p.away)) { this.st = 'resume'; this.until = now + 3000; this.pauseLen = now - this.pausedAt + 3000; }
+      if (this.st === 'vote') { if (now >= this.until) this.decide(now); }
+      else if (this.st === 'pause') {
+        // A pause someone pressed ends with "Weiter" or after a minute; one because nobody looks, when all are back.
+        if (this.pausedBy ? now >= this.pauseEnd : on.length && on.every(p => !p.away)) this.resume(now);
       } else if (this.st === 'play' && on.length && on.every(p => p.away)) {
         this.st = 'pause';
-        this.pausedAt = now;
-      } else if (this.st === 'resume' && now >= this.until) {
-        this.st = 'play';
-        this.resumed(this.pauseLen);
-      }
+        this.pausedBy = null;
+      } else if (this.st === 'resume' && now >= this.until) this.st = 'play';
     }
     this.advance(now);
     this.last = now;
     this.send(now);
   }
 
-  // Everyone's own copy of the state, plus the full picture once on joining.
+  // What every update carries besides the game itself.
+  base(now) {
+    return {t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, host: this.players[0] && this.players[0].pid, ev: this.ev,
+      vt: this.st === 'vote' ? this.votes : null, pu: this.pu, coin: this.coin, pb: this.st === 'pause' ? this.pausedBy : null,
+      pz: this.st === 'pause' && this.pausedBy ? Math.max(0, this.pauseEnd - now) : 0};
+  }
   broadcast(obj) {
     const s = JSON.stringify(obj);
     for (const p of this.players) if (p.ws) try { p.ws.send(s); } catch (e) {}
   }
-  roster() { return this.players.map(p => ({pid: p.pid, name: p.name, on: !!p.ws, aw: p.away, ...this.extra(p)})); }
+  roster() { return this.players.map(p => ({pid: p.pid, name: p.name, on: !!p.ws, aw: p.away, ps: p.pauses, ...this.extra(p)})); }
+  // Power-ups that haven't come for a while are more likely, as in Ping Pong: weight (items since + 1)².
+  pickItem(kinds) {
+    const since = this.since || (this.since = kinds.map(() => 0)), w = since.map(s => (s + 1) ** 2);
+    let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0;
+    while (i < w.length - 1 && r >= w[i]) r -= w[i++];
+    this.since = since.map((s, j) => j === i ? 0 : s + 1);
+    return kinds[i];
+  }
   joined() {}
   removed() {}
   full() {}
-  resumed() {}
   extra() { return {}; }
 }
 
@@ -702,7 +750,10 @@ class Room {
 // players accelerate by 0.1 (0.07 while holding kick), everything slows by a fixed factor each tick, and a kick
 // adds 5 to the ball's speed. First to 3 goals or the lead after 3 minutes; a draw goes to a golden goal.
 const KW = 760, KH = 380, KM = 32, GOAL_H = 124, GOAL_D = 38, POST_R = 6, KPR = 15, KBR = 9, KCC = 70,
-  K_ACC = 0.1, K_ACC_KICK = 0.07, K_DAMP = 0.96, B_DAMP = 0.99, K_KICK = 5, K_REACH = 4, K_LIMIT = 3, K_TIME = 180000;
+  K_ACC = 0.1, K_ACC_KICK = 0.07, K_DAMP = 0.96, B_DAMP = 0.99, K_KICK = 5, K_REACH = 4, K_LIMIT = 3, K_TIME = 180000,
+  K_ITEM_R = 14, K_ITEMS = ['turbo', 'hammer', 'sticky', 'wall', 'giant', 'dwarf', 'ice', 'curve'], K_GOD = 0.025, K_WALL_X = 22;
+// Power-up durations in ticks (60 a second).
+const K_FX = {turbo: 480, giant: 480, dwarf: 480, ice: 360, curve: 600, god: 480, wall: 360, sticky: 900};
 export class Kick extends Room {
   constructor(ctx) {
     super(ctx, 4, 1000 / 60);
@@ -714,10 +765,15 @@ export class Kick extends Room {
     this.touch = null;
     this.acc = 0;
     this.tick = 0;
+    this.item = null;
+    this.nextItem = 540;
+    this.wall = [0, 0];
+    this.spin = 0;
+    this.hold = null;
   }
   joined(p) {
     const n = [0, 1].map(t => this.players.filter(x => x !== p && x.team === t).length);
-    Object.assign(p, {team: n[0] <= n[1] ? 0 : 1, x: 0, y: 0, vx: 0, vy: 0, k: 0, q: [], ack: 0, armed: true, owed: 0, started: false});
+    Object.assign(p, {team: n[0] <= n[1] ? 0 : 1, x: 0, y: 0, vx: 0, vy: 0, k: 0, q: [], ack: 0, armed: true, owed: 0, started: false, fx: kickFx(), fdx: 1, fdy: 0});
   }
   extra(p) { return {team: p.team}; }
   input(p, m) {
@@ -745,20 +801,27 @@ export class Kick extends Room {
     this.st = 'count';
     this.until = now + 3000;
   }
-  // Positions for a kickoff: each team in its own half, the ball on the spot.
+  // Positions for a kickoff: each team in its own half, the ball on the spot. Power-ups end with a goal.
   kickoff(team) {
     Object.assign(this.b, {x: KW / 2, y: KH / 2, vx: 0, vy: 0});
     for (const t of [0, 1]) {
       const mates = this.players.filter(p => p.team === t);
-      mates.forEach((p, i) => Object.assign(p, {owed: 0,
+      mates.forEach((p, i) => Object.assign(p, {owed: 0, fx: kickFx(),
         x: t === 0 ? KW / 2 - 150 : KW / 2 + 150,
         y: mates.length === 1 ? KH / 2 : KH / 2 + (i ? 70 : -70), vx: 0, vy: 0}));
     }
     this.ko = team;
     this.touch = null;
+    this.wall = [0, 0];
+    this.spin = 0;
+    this.hold = null;
+    this.item = null;
+    this.nextItem = 360 + Math.floor(Math.random() * 240);
   }
   drop(p) {
     this.remove(p);
+    if (this.hold && this.hold.pid === p.pid) this.hold = null;
+    if (this.st === 'vote') { if (this.players.length < 2) this.st = 'lobby'; return; }
     if (this.st === 'over' || this.st === 'lobby') return;
     for (const t of [0, 1]) if (!this.players.some(x => x.team === t)) return this.finish(1 - t);
   }
@@ -792,14 +855,31 @@ export class Kick extends Room {
       }
     }
   }
+  // A kick from player p, with the power-ups that change it.
+  kick(p, dx, dy) {
+    const b = this.b, f = (p.fx.god || p.fx.hammer > 0 ? 2 : 1);
+    if (!p.fx.god && p.fx.hammer > 0) p.fx.hammer--;
+    b.vx += dx * K_KICK * f;
+    b.vy += dy * K_KICK * f;
+    // Curveball: the shot bends to the side the kicker is moving, or to a random side from standing.
+    this.spin = 0;
+    if (p.fx.curve) {
+      const side = p.vx * -dy + p.vy * dx;
+      this.spin = (Math.abs(side) > 0.3 ? Math.sign(side) : Math.random() < 0.5 ? -1 : 1) * 0.016;
+    }
+    p.armed = false;
+    this.touch = p.pid;
+    this.event('kick', {pid: p.pid, hard: f > 1, curve: !!this.spin});
+  }
   step() {
     this.tick++;
-    const b = this.b, cy = KH / 2;
+    const b = this.b, cy = KH / 2, ps = this.players;
     // Every input from a page is one movement step, exactly as that page already showed it, used one per tick
     // (two while catching up) so others see the player move evenly. When inputs come late, the player runs on
     // with the last one for up to 8 ticks, and that many late inputs are then skipped, so each input still
     // counts exactly once.
-    for (const p of this.players) {
+    for (const p of ps) {
+      for (const k in p.fx) if (k !== 'hammer' && p.fx[k] > 0) p.fx[k]--;
       if (!p.q.length) {
         if (p.started && p.owed < 8) { p.owed++; kickMove(p, p.k); kickBounds(p, this.ko); }
         continue;
@@ -813,72 +893,162 @@ export class Kick extends Room {
         p.ack = i;
         kickMove(p, k);
         kickBounds(p, this.ko);
+        const dx = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0), dy = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0);
+        if (dx || dy) { const l = Math.hypot(dx, dy); p.fdx = dx / l; p.fdy = dy / l; }
         if (!(k & 16)) p.armed = true;
-        else if (p.armed && Math.hypot(b.x - p.x, b.y - p.y) < KPR + KBR + K_REACH && this.st === 'play') {
-          const d = Math.hypot(b.x - p.x, b.y - p.y) || 1;
-          b.vx += (b.x - p.x) / d * K_KICK;
-          b.vy += (b.y - p.y) / d * K_KICK;
-          p.armed = false;
-          this.touch = p.pid;
-          this.event('kick', {pid: p.pid});
+        else if (p.armed && this.st === 'play') {
+          if (this.hold && this.hold.pid === p.pid) {
+            // A held ball leaves in the direction the player is running, a little harder than a normal kick.
+            this.hold = null;
+            p.fx.sticky = 0;
+            b.vx = p.vx + p.fdx * 1.6;
+            b.vy = p.vy + p.fdy * 1.6;
+            this.kick(p, p.fdx, p.fdy);
+          } else if (Math.hypot(b.x - p.x, b.y - p.y) < kickR(p) + KBR + K_REACH) {
+            const d = Math.hypot(b.x - p.x, b.y - p.y) || 1;
+            this.kick(p, (b.x - p.x) / d, (b.y - p.y) / d);
+          }
         }
       }
     }
-    b.x += b.vx; b.y += b.vy;
-    b.vx *= B_DAMP; b.vy *= B_DAMP;
-    // Collisions: players with each other, players with the ball (players weigh twice as much).
-    const ps = this.players;
+    for (const t of [0, 1]) if (this.wall[t] > 0) this.wall[t]--;
+    if (this.hold) {
+      const h = ps.find(p => p.pid === this.hold.pid);
+      if (!h || --this.hold.t <= 0) { if (h) h.fx.sticky = 0; this.hold = null; }
+      else {
+        const r = kickR(h) + KBR + 0.5;
+        Object.assign(b, {x: h.x + h.fdx * r, y: h.y + h.fdy * r, vx: h.vx, vy: h.vy});
+      }
+    }
+    if (!this.hold) {
+      b.x += b.vx; b.y += b.vy;
+      b.vx *= B_DAMP; b.vy *= B_DAMP;
+      if (this.spin) {
+        const a = this.spin, c = Math.cos(a), s = Math.sin(a), vx = b.vx;
+        b.vx = vx * c - b.vy * s;
+        b.vy = vx * s + b.vy * c;
+        this.spin *= 0.985;
+        if (Math.abs(this.spin) < 0.002) this.spin = 0;
+      }
+    }
+    // Collisions: players with each other, players with the ball (players weigh twice as much, a giant more).
     for (let i = 0; i < ps.length; i++) {
-      for (let j = i + 1; j < ps.length; j++) discHit(ps[i], ps[j], KPR, KPR, 0.5, 0.5, 0.25);
-      if (discHit(ps[i], b, KPR, KBR, 0.5, 1, 0.25)) this.touch = ps[i].pid;
+      for (let j = i + 1; j < ps.length; j++) discHit(ps[i], ps[j], kickR(ps[i]), kickR(ps[j]), kickW(ps[i]), kickW(ps[j]), 0.25);
+      if (this.hold && this.hold.pid === ps[i].pid) continue;
+      if (discHit(ps[i], b, kickR(ps[i]), KBR, kickW(ps[i]), 1, 0.25)) {
+        this.touch = ps[i].pid;
+        this.spin = 0;
+        if (this.hold) { const h = ps.find(p => p.pid === this.hold.pid); if (h) h.fx.sticky = 0; this.hold = null; this.event('steal', {pid: ps[i].pid}); }
+        // Sticky foot: the ball stays at the foot for up to 2 s.
+        else if (ps[i].fx.sticky && this.st === 'play') { this.hold = {pid: ps[i].pid, t: 120}; this.event('stick', {pid: ps[i].pid}); }
+      }
     }
     for (const p of ps) {
       kickBounds(p, this.ko);
-      for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(p, gx, cy + s * GOAL_H / 2, KPR);
+      for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(p, gx, cy + s * GOAL_H / 2, kickR(p));
     }
     for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(b, gx, cy + s * GOAL_H / 2, KBR);
+    // The wall power-up: a barrier in front of the goal that only the ball bounces off.
+    for (const t of [0, 1]) if (this.wall[t] > 0 && wallHit(b, t === 0 ? K_WALL_X : KW - K_WALL_X)) { this.spin = 0; this.event('wallhit', {team: t}); }
     ballBounds(b);
     if (this.ko >= 0 && Math.hypot(b.vx, b.vy) > 0.01) this.ko = -1;
+    this.items();
     if (this.st === 'play' && (b.x < -KBR || b.x > KW + KBR)) {
       const team = b.x < 0 ? 1 : 0, scorer = ps.find(p => p.pid === this.touch);
       this.sc[team]++;
       this.lastGoal = team;
       this.face = null;
+      this.hold = null;
+      this.spin = 0;
       this.st = 'goal';
       this.until = Date.now() + 2500;
       this.event('goal', {team, by: scorer ? scorer.name : '', own: !!scorer && scorer.team !== team});
     }
   }
+  // Items appear one at a time on the pitch; a player runs over one, or the ball carries it to whoever last
+  // touched the ball. One left alone goes away after 12 s.
+  items() {
+    if (!this.pu || this.st !== 'play') return;
+    const b = this.b;
+    if (!this.item) {
+      if (--this.nextItem > 0 || this.ko >= 0) return;
+      let x, y, tries = 0;
+      do { x = 110 + Math.random() * (KW - 220); y = 40 + Math.random() * (KH - 80); }
+      while (++tries < 20 && (Math.hypot(x - b.x, y - b.y) < 80 || Math.hypot(x - KW / 2, y - KH / 2) < KCC));
+      this.item = {k: Math.random() < K_GOD ? 'god' : this.pickItem(K_ITEMS), x, y, life: 720};
+      this.event('spawn', {kind: this.item.k});
+      return;
+    }
+    const it = this.item;
+    let taker = this.players.find(p => Math.hypot(p.x - it.x, p.y - it.y) < kickR(p) + K_ITEM_R);
+    if (!taker && this.touch && Math.hypot(b.x - it.x, b.y - it.y) < KBR + K_ITEM_R) taker = this.players.find(p => p.pid === this.touch);
+    if (taker) {
+      this.give(taker, it.k);
+      this.item = null;
+      this.nextItem = 420 + Math.floor(Math.random() * 300);
+    } else if (--it.life <= 0) {
+      this.event('gone', {kind: it.k});
+      this.item = null;
+      this.nextItem = 120 + Math.floor(Math.random() * 120);
+    }
+  }
+  give(p, k) {
+    const foes = this.players.filter(q => q.team !== p.team);
+    if (k === 'turbo') p.fx.turbo = K_FX.turbo;
+    else if (k === 'hammer') p.fx.hammer = 3;
+    else if (k === 'sticky') p.fx.sticky = K_FX.sticky;
+    else if (k === 'wall') this.wall[p.team] = K_FX.wall;
+    else if (k === 'giant') { p.fx.giant = K_FX.giant; p.fx.dwarf = 0; }
+    else if (k === 'dwarf') for (const q of foes) { q.fx.dwarf = K_FX.dwarf; q.fx.giant = 0; }
+    else if (k === 'ice') for (const q of foes) q.fx.ice = K_FX.ice;
+    else if (k === 'curve') p.fx.curve = K_FX.curve;
+    else if (k === 'god') { p.fx.god = K_FX.god; this.wall[p.team] = Math.max(this.wall[p.team], K_FX.god); }
+    this.event('get', {pid: p.pid, kind: k, team: p.team});
+  }
   full(p) { p.ws.send(JSON.stringify(this.state(Date.now()))); }
   state(now) {
     const r = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
-    return {t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), tl: Math.round(this.tl), ot: this.ot, sc: this.sc, w: this.w, ko: this.ko,
-      host: this.players[0] && this.players[0].pid, tk: this.tick, ev: this.ev, lim: K_LIMIT, face: this.face || null,
-      b: [r(this.b.x), r(this.b.y), r(this.b.vx), r(this.b.vy)],
-      pl: this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r2(p.x), y: r2(p.y), vx: r2(p.vx), vy: r2(p.vy), k: p.k, a: p.ack}; })};
+    return {...this.base(now), tl: Math.round(this.tl), ot: this.ot, sc: this.sc, ko: this.ko, tk: this.tick, lim: K_LIMIT, face: this.face || null,
+      b: [r(this.b.x), r(this.b.y), r(this.b.vx), r(this.b.vy)], it: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: this.item.life},
+      wall: this.wall, spin: r2(this.spin * 100), hold: this.hold && this.hold.pid,
+      pl: this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r2(p.x), y: r2(p.y), vx: r2(p.vx), vy: r2(p.vy), k: p.k, a: p.ack, fx: p.fx, r: kickR(p)}; })};
   }
   send(now) { this.broadcast(this.state(now)); }
 }
+function kickFx() { return {turbo: 0, hammer: 0, sticky: 0, giant: 0, dwarf: 0, ice: 0, curve: 0, god: 0}; }
+function kickR(p) { return p.fx.giant ? 30 : p.fx.dwarf ? 8 : KPR; }
+function kickW(p) { return p.fx.giant ? 0.2 : p.fx.dwarf ? 0.9 : 0.5; }
 // One player's movement for one tick (the page runs the same for its own player, to show it without delay).
+// Turbo makes a player 1.5 times as fast; on ice they get going slowly and slide on.
 function kickMove(p, k) {
   let dx = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0), dy = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0);
   if (dx && dy) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }
-  const a = (k & 16) ? K_ACC_KICK : K_ACC;
+  const fx = p.fx, a = ((k & 16) ? K_ACC_KICK : K_ACC) * (fx.turbo || fx.god ? 1.5 : 1) * (fx.ice ? 0.5 : 1), damp = fx.ice ? 0.985 : K_DAMP;
   p.vx += dx * a; p.vy += dy * a;
   p.x += p.vx; p.y += p.vy;
-  p.vx *= K_DAMP; p.vy *= K_DAMP;
+  p.vx *= damp; p.vy *= damp;
 }
 function kickBounds(p, ko) {
-  p.x = Math.max(-KM + KPR, Math.min(KW + KM - KPR, p.x));
-  p.y = Math.max(-KM + KPR, Math.min(KH + KM - KPR, p.y));
+  const r = kickR(p);
+  p.x = Math.max(-KM + r, Math.min(KW + KM - r, p.x));
+  p.y = Math.max(-KM + r, Math.min(KH + KM - r, p.y));
   if (ko < 0) return;
   // Kickoff: everyone stays in their own half, and the team without the kickoff out of the centre circle.
-  if (p.team === 0 && p.x > KW / 2 - KPR) { p.x = KW / 2 - KPR; p.vx = Math.min(0, p.vx); }
-  if (p.team === 1 && p.x < KW / 2 + KPR) { p.x = KW / 2 + KPR; p.vx = Math.max(0, p.vx); }
+  if (p.team === 0 && p.x > KW / 2 - r) { p.x = KW / 2 - r; p.vx = Math.min(0, p.vx); }
+  if (p.team === 1 && p.x < KW / 2 + r) { p.x = KW / 2 + r; p.vx = Math.max(0, p.vx); }
   if (p.team !== ko) {
     const dx = p.x - KW / 2, dy = p.y - KH / 2, d = Math.hypot(dx, dy) || 1;
-    if (d < KCC + KPR) { p.x = KW / 2 + dx / d * (KCC + KPR); p.y = KH / 2 + dy / d * (KCC + KPR); }
+    if (d < KCC + r) { p.x = KW / 2 + dx / d * (KCC + r); p.y = KH / 2 + dy / d * (KCC + r); }
   }
+}
+// The wall: a vertical bar at x, a little longer than the goal is high.
+function wallHit(b, x) {
+  const top = KH / 2 - GOAL_H / 2 - 26, bot = KH / 2 + GOAL_H / 2 + 26;
+  if (b.y < top - KBR || b.y > bot + KBR || Math.abs(b.x - x) >= KBR + 3) return false;
+  const s = b.x < x ? -1 : 1;
+  b.x = x + s * (KBR + 3);
+  if (b.vx * s < 0) b.vx = -b.vx * 0.8;
+  return true;
 }
 // The ball stays on the pitch except through the goal mouths; inside a goal the net stops it softly.
 function ballBounds(b) {
@@ -928,6 +1098,9 @@ function postHit(o, px, py, r) {
 const TW = 80, TH = 50, T_HZ = 24, T_SPEED = 12, T_FUEL = 2000, T_WIN = 3;
 // Start lanes are offset, so nobody rides head-on into anybody else.
 const T_SPAWN = [[6, 15, 1], [73, 34, 3], [60, 4, 2], [19, 45, 0]], T_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+const T_ITEMS = ['nitro', 'ghost', 'bomb', 'gap', 'brake', 'confuse', 'shield'], T_GOD = 0.025;
+// Power-up durations in ticks (24 a second).
+const T_FX = {ghost: 72, gap: 72, brake: 96, confuse: 96, god: 120};
 export class Tron extends Room {
   constructor(ctx) {
     super(ctx, 4, 1000 / T_HZ);
@@ -935,10 +1108,13 @@ export class Tron extends Room {
     this.rd = 0;
     this.tk = 0;
     this.mv = [];
+    this.er = [];
     this.ghosts = [];
+    this.items = [];
+    this.nextItem = 0;
   }
-  joined(p) { Object.assign(p, {sc: 0, alive: false, x: 0, y: 0, d: 1, q: [], fuel: T_FUEL, boost: false, acc: 0, trail: []}); }
-  extra(p) { return {sc: p.sc, al: p.alive, x: p.x, y: p.y, d: p.d, f: Math.round(p.fuel), bo: p.boost, fc: p.face || null}; }
+  joined(p) { Object.assign(p, {sc: 0, alive: false, x: 0, y: 0, d: 1, q: [], fuel: T_FUEL, boost: false, acc: 0, trail: [], fx: tronFx()}); }
+  extra(p) { return {sc: p.sc, al: p.alive, x: p.x, y: p.y, d: p.d, f: Math.round(p.fuel), bo: p.boost, fc: p.face || null, fx: p.fx, sp: tronSpeed(p)}; }
   input(p, m) {
     // A turn can name the move it is meant for (the page has already shown it there); it waits for that move.
     if (m.t === 'turn' && Number.isInteger(m.d) && m.d >= 0 && m.d < 4 && p.q.length < 3) p.q.push({d: m.d, n: Number.isInteger(m.n) ? m.n : 0});
@@ -951,9 +1127,11 @@ export class Tron extends Room {
     this.rd++;
     this.grid.fill(0);
     this.ghosts = [];
+    this.items = [];
+    this.nextItem = 96 + Math.floor(Math.random() * 72);
     this.players.forEach((p, i) => {
       const [x, y, d] = T_SPAWN[i];
-      Object.assign(p, {alive: true, x, y, d, q: [], fuel: T_FUEL, acc: 0, trail: [[x, y]], face: null, mc: 0});
+      Object.assign(p, {alive: true, x, y, d, q: [], fuel: T_FUEL, acc: 0, trail: [[x, y, 1]], face: null, mc: 0, fx: tronFx()});
       this.grid[y * TW + x] = i + 1;
     });
     this.st = 'count';
@@ -972,6 +1150,7 @@ export class Tron extends Room {
         else if (v > i + 1 && v !== 255) this.grid[c] = v - 1;
       }
     }
+    if (this.st === 'vote') { if (this.players.length < 2) this.st = 'lobby'; return; }
     if (this.st === 'lobby' || this.st === 'over') return;
     if (this.players.length < 2) return this.finish(this.players[0] || null);
     this.checkRound(Date.now());
@@ -994,23 +1173,27 @@ export class Tron extends Room {
     this.st = 'roundover';
     this.until = now + 2500;
   }
+  free(x, y) { return x >= 0 && y >= 0 && x < TW && y < TH && !this.grid[y * TW + x]; }
+  // Whether a bike can move into cell (x, y): a ghost or a divine bike rides through trails, never off the grid.
+  open(p, x, y) { return x >= 0 && y >= 0 && x < TW && y < TH && (!this.grid[y * TW + x] || p.fx.ghost > 0 || p.fx.god > 0); }
   advance(now) {
     this.mv = [];
+    this.er = [];
     if (this.st === 'count' && now >= this.until) this.st = 'play';
     if (this.st === 'roundover' && now >= this.until) this.round(now);
     if (this.st !== 'play') return;
     this.tk++;
+    for (const p of this.players) for (const k in p.fx) if (k !== 'shield' && p.fx[k] > 0) p.fx[k]--;
     // Each bike moves 0, 1 or 2 cells this tick; moves happen in two rounds so bikes move at the same time.
     const steps = this.players.map(p => {
       if (!p.alive) return 0;
-      const fast = p.boost && p.fuel > 0;
-      if (fast) p.fuel = Math.max(0, p.fuel - 1000 / T_HZ);
-      p.acc += (fast ? 2 : 1) * T_SPEED / T_HZ;
-      const n = Math.floor(p.acc);
+      if (p.boost && p.fuel > 0) p.fuel = Math.max(0, p.fuel - 1000 / T_HZ);
+      p.acc += tronSpeed(p) / T_HZ;
+      const n = Math.min(3, Math.floor(p.acc));
       p.acc -= n;
       return n;
     });
-    for (let r = 0; r < 2; r++) {
+    for (let r = 0; r < 3; r++) {
       const target = new Map();
       this.players.forEach((p, i) => {
         if (!p.alive || steps[i] <= r) return;
@@ -1018,22 +1201,83 @@ export class Tron extends Room {
           const d = p.q.shift().d;
           if (d !== p.d && d !== (p.d + 2) % 4) { p.d = d; break; }
         }
-        const nx = p.x + T_DIR[p.d][0], ny = p.y + T_DIR[p.d][1];
-        if (nx < 0 || ny < 0 || nx >= TW || ny >= TH || this.grid[ny * TW + nx]) { this.crash(p, i); return; }
-        const c = ny * TW + nx;
-        if (target.has(c)) { this.crash(p, i); const o = target.get(c); if (o.p.alive) this.crash(o.p, o.i); return; }
-        target.set(c, {p, i, nx, ny});
+        let nx = p.x + T_DIR[p.d][0], ny = p.y + T_DIR[p.d][1];
+        if (!this.open(p, nx, ny) || target.has(ny * TW + nx)) {
+          // A shield (or the divine power) steers away from the crash once: to the side with more room.
+          if (!((p.fx.shield || p.fx.god) && this.dodge(p, target))) {
+            this.crash(p, i);
+            const o = target.get(ny * TW + nx);
+            if (o && o.p.alive && this.open(p, nx, ny)) this.crash(o.p, o.i);
+            return;
+          }
+          if (!p.fx.god) { p.fx.shield = 0; this.event('shield', {pid: p.pid}); }
+          nx = p.x + T_DIR[p.d][0]; ny = p.y + T_DIR[p.d][1];
+        }
+        target.set(ny * TW + nx, {p, i, nx, ny});
       });
       for (const [c, {p, i, nx, ny}] of target) {
         if (!p.alive) continue;
         p.x = nx; p.y = ny;
         p.mc++;
-        p.trail.push([nx, ny]);
-        this.grid[c] = i + 1;
-        this.mv.push([i, nx, ny]);
+        // A gap leaves no wall; a ghost going through someone's trail leaves that trail as it is.
+        const wall = !(p.fx.gap > 0) && !this.grid[c];
+        if (wall) this.grid[c] = i + 1;
+        p.trail.push([nx, ny, wall ? 1 : 0]);
+        this.mv.push([i, nx, ny, wall ? 1 : 0]);
+        this.pickup(p, i, nx, ny);
       }
     }
+    this.spawn();
     this.checkRound(now);
+  }
+  dodge(p, target) {
+    const opts = [(p.d + 1) % 4, (p.d + 3) % 4].map(d => {
+      let n = 0, x = p.x, y = p.y;
+      while (n < 12) { x += T_DIR[d][0]; y += T_DIR[d][1]; if (!this.free(x, y) || target.has(y * TW + x)) break; n++; }
+      return {d, n};
+    }).sort((a, b) => b.n - a.n);
+    if (!opts[0].n) return false;
+    p.d = opts[0].d;
+    return true;
+  }
+  // Items: up to two on the grid at a time, gone after 12 s; a bike takes one by riding over it.
+  spawn() {
+    this.items = this.items.filter(it => --it.life > 0 || (this.event('gone', {kind: it.k}), false));
+    if (!this.pu || this.items.length >= 2 || --this.nextItem > 0) return;
+    for (let tries = 0; tries < 40; tries++) {
+      const x = 4 + Math.floor(Math.random() * (TW - 8)), y = 4 + Math.floor(Math.random() * (TH - 8));
+      if (!this.free(x, y) || this.players.some(p => p.alive && Math.abs(p.x - x) + Math.abs(p.y - y) < 8) || this.items.some(it => it.x === x && it.y === y)) continue;
+      this.items.push({k: Math.random() < T_GOD ? 'god' : this.pickItem(T_ITEMS), x, y, life: 288});
+      this.event('spawn', {kind: this.items[this.items.length - 1].k});
+      break;
+    }
+    this.nextItem = 120 + Math.floor(Math.random() * 96);
+  }
+  pickup(p, i, x, y) {
+    const k = this.items.findIndex(it => it.x === x && it.y === y);
+    if (k < 0) return;
+    const kind = this.items[k].k, foes = this.players.filter(q => q !== p && q.alive);
+    this.items.splice(k, 1);
+    if (kind === 'nitro') p.fuel = T_FUEL;
+    else if (kind === 'ghost') p.fx.ghost = T_FX.ghost;
+    else if (kind === 'gap') p.fx.gap = T_FX.gap;
+    else if (kind === 'shield') p.fx.shield = 1;
+    else if (kind === 'god') p.fx.god = T_FX.god;
+    else if (kind === 'brake') for (const q of foes) q.fx.brake = T_FX.brake;
+    else if (kind === 'confuse') for (const q of foes) q.fx.confuse = T_FX.confuse;
+    else if (kind === 'bomb') {
+      // Clears every trail cell within 6 cells, and the walls in them are gone for everyone.
+      for (let yy = y - 6; yy <= y + 6; yy++) for (let xx = x - 6; xx <= x + 6; xx++) {
+        if (xx < 0 || yy < 0 || xx >= TW || yy >= TH || (xx - x) ** 2 + (yy - y) ** 2 > 36 || (xx === x && yy === y) || !this.grid[yy * TW + xx]) continue;
+        this.grid[yy * TW + xx] = 0;
+        this.er.push([xx, yy]);
+      }
+      if (this.er.length) {
+        const gone = new Set(this.er.map(([a, b]) => a + ',' + b));
+        for (const t of [...this.players.map(q => q.trail), ...this.ghosts]) for (const c of t) if (c[2] && gone.has(c[0] + ',' + c[1])) c[2] = 0;
+      }
+    }
+    this.event('get', {pid: p.pid, kind, x, y});
   }
   crash(p, i) {
     p.alive = false;
@@ -1041,7 +1285,10 @@ export class Tron extends Room {
   }
   full(p) { if (p.ws) try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, trails: this.players.map(q => q.trail), ghosts: this.ghosts})); } catch (e) {} }
   send(now) {
-    this.broadcast({t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), tk: this.tk, rd: this.rd, win: T_WIN, w: this.w,
-      host: this.players[0] && this.players[0].pid, ev: this.ev, pl: this.roster(), mv: this.mv});
+    this.broadcast({...this.base(now), tk: this.tk, rd: this.rd, win: T_WIN, pl: this.roster(), mv: this.mv, er: this.er,
+      its: this.items.map(it => [it.k, it.x, it.y, it.life])});
   }
 }
+function tronFx() { return {ghost: 0, gap: 0, brake: 0, confuse: 0, shield: 0, god: 0}; }
+// Cells per second: boost and the divine power double it, the brake halves it.
+function tronSpeed(p) { return T_SPEED * ((p.boost && p.fuel > 0) || p.fx.god > 0 ? 2 : 1) * (p.fx.brake > 0 ? 0.5 : 1); }
