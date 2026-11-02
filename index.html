@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -4425,6 +4425,37 @@ function pgEvent(g, ev) {
   }
 }
 function pgQuit(g) { pgSend(g, {t: 'quit'}); }
+// End screen: a black panel in the pixel font with both players' numbers (the better one bright), a title each,
+// and a graph of the lead point by point.
+function pgStats(g, ctx, fin, me1, op1) {
+  const st = fin.st, log = fin.log || [], name = String(g.opName).slice(0, 8).toUpperCase();
+  const best = i => { let b = 0, n = 0, prev = -1; for (const w of log) { n = w === prev ? n + 1 : 1; prev = w; if (w === i) b = Math.max(b, n); } return b; };
+  const rows = [['BALLWECHSEL', i => st[i].ret], ['TOP-TEMPO', i => st[i].top], ['ITEMS', i => st[i].items], ['MAGNETSCHÜSSE', i => st[i].fire], ['GEHALTEN', i => st[i].saves], ['BESTE SERIE', best]];
+  const titles = [['DIE MAUER', i => st[i].saves], ['KANONIER', i => st[i].top], ['SAMMLER', i => st[i].items], ['DAUERLÄUFER', i => st[i].ret]];
+  const title = i => { for (const [t, f] of titles) if (f(i) > f(1 - i)) return t; return 'KÄMPFER'; };
+  const x0 = PGX(PG_W / 2 - 230), y0 = 40, w = 460, h = 280;
+  ctx.fillStyle = '#000000'; ctx.fillRect(x0, y0, w, h);
+  ctx.fillStyle = '#ffd23f'; ctx.fillRect(x0, y0, w, 4); ctx.fillRect(x0, y0 + h - 4, w, 4);
+  const cL = PG_W / 2 - 110, cA = PG_W / 2 + 80, cB = PG_W / 2 + 170;
+  pgText(ctx, [['DU', PG_COL.me]], cA, y0 + 14, 2); pgText(ctx, [[name, PG_COL.op]], cB, y0 + 14, 2);
+  pgText(ctx, [[title(me1), PG_COL.me]], cA, y0 + 34, 1); pgText(ctx, [[title(op1), PG_COL.op]], cB, y0 + 34, 1);
+  rows.forEach(([label, f], r) => {
+    const y = y0 + 56 + r * 22, a = f(me1), b = f(op1);
+    pgText(ctx, [[label, '#6b7079']], cL, y, 2);
+    pgText(ctx, [[String(a), a >= b ? '#ffffff' : '#3a3f47']], cA, y, 2);
+    pgText(ctx, [[String(b), b >= a ? '#ffffff' : '#3a3f47']], cB, y, 2);
+  });
+  pgText(ctx, [['LÄNGSTE RALLY ' + Math.max(st[0].rally, st[1].rally), '#ffd23f']], PG_W / 2, y0 + 56 + rows.length * 22 + 2, 2);
+  // The lead after each point: up is you ahead, down your opponent.
+  const gy = y0 + h - 34, step = Math.min(24, Math.floor((w - 40) / Math.max(1, log.length)));
+  ctx.fillStyle = '#2c313a'; ctx.fillRect(x0 + 20, gy, w - 40, 2);
+  let lead = 0;
+  log.forEach((wn, k) => {
+    lead += wn === me1 ? 1 : -1;
+    ctx.fillStyle = lead > 0 ? PG_COL.me : lead < 0 ? PG_COL.op : '#ffffff';
+    ctx.fillRect(x0 + 20 + k * step, gy - lead * 5 - 2, Math.max(4, step - 2), 4);
+  });
+}
 
 // Game coordinates (640x360) onto a canvas at screen resolution: every rectangle's edges are rounded to whole
 // screen pixels, so the pixel art stays sharp while moving things go exactly where they are, not to a grid.
@@ -5108,6 +5139,8 @@ function pgFrame(g, ts) {
   }
   ctx.pgOx = ctx.pgOy = 0;
 
+  // The end of a match: both players' numbers, a title each, and how the lead went.
+  if (g.over && s && s.fin && Array.isArray(s.fin.st)) { if (!pg.finAt) pg.finAt = now; if (now - pg.finAt > 1500) pgStats(g, ctx, s.fin, me1, op1); }
   const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis ' + pgTarget(s.sc) + ')' : 'Du 0 : 0 ' + g.opName) + (pg.rtt && !g.offline ? '   ·   Ping ' + Math.round(pg.rtt) + (pgAssistOn ? 'ms' : ' ms') : '');
   if ($('pgscore').textContent !== score) $('pgscore').textContent = score;
   const voting = !g.over && s && s.st === 'vote';
@@ -5120,7 +5153,8 @@ function pgFrame(g, ts) {
   }
   const over = $('pgover');
   let text = '';
-  if (g.over) text = g.winner === g.myMark ? '🏆 Gewonnen!' : g.opName + ' gewinnt';
+  if (g.over && pg.finAt && performance.now() - pg.finAt > 1500) text = '';
+  else if (g.over) text = g.winner === g.myMark ? '🏆 Gewonnen!' : g.opName + ' gewinnt';
   else if (!g.offline && !OWN_BROKER.url) text = 'Kein eigener Spielserver eingerichtet';
   else if (pg.conn !== 'open') text = pg.conn === 'lost' ? 'Spielserver nicht erreichbar – neuer Versuch…' : 'Verbinde mit dem Spielserver…';
   else if (!s || s.st === 'wait') {
@@ -6361,6 +6395,9 @@ class Arena {
     // Rally: returns in the current point. Rescue: the one-time wall for whoever falls 3 behind. Ghost: the ball
     // fades in the middle of the table after the taker's returns.
     this.rally = 0;
+    // The match in numbers, per seat, for the end screen; log: who won each point, in order.
+    this.stats = [0, 1].map(() => ({ret: 0, top: 0, items: 0, fire: 0, saves: 0, rally: 0}));
+    this.log = [];
     this.rescued = [false, false];
     this.ghost = [0, 0];
     this.hide = false;
@@ -6548,6 +6585,7 @@ class Arena {
       if (it.k === 'god') { this.god[i] = now + GOD_MS; this.ph[i] = GOD_PH; this.miniUntil[i] = 0; }
       if (it.k === 'shield') this.shield[i] = true;
       if (it.k === 'magnet') this.magnet[i] = true;
+      this.stats[i].items++;
       this.event('get', i, it.k);
       this.item = null;
       this.nextItem = now + 7000 + Math.random() * 5000;
@@ -6575,6 +6613,10 @@ class Arena {
     Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
     this.last = i;
     this.rally++;
+    const stt = this.stats[i];
+    stt.ret++;
+    stt.top = Math.max(stt.top, Math.round(Math.hypot(this.b.vx, this.b.vy)));
+    stt.rally = Math.max(stt.rally, this.rally);
     this.hide = this.ghost[i] > Date.now();
     this.turbo = false;
     this.spin = 0;
@@ -6629,6 +6671,7 @@ class Arena {
     this.turbo = true;
     this.spin = 0;
     this.last = i;
+    this.stats[i].fire++;
     this.event('fire', i);
   }
 
@@ -6711,6 +6754,7 @@ class Arena {
           this.turbo = true;
           this.spin = 0;
           this.last = i;
+          this.stats[i].saves++;
           this.event('godwall', i);
           continue;
         }
@@ -6724,6 +6768,7 @@ class Arena {
           // A fireball bounced off a shield goes back as a normal ball: overall speed capped, direction kept.
           const sp = Math.hypot(b.vx, b.vy);
           if (sp > VMAX) { b.vx *= VMAX / sp; b.vy *= VMAX / sp; }
+          this.stats[i].saves++;
           this.event('shield', i);
           continue;
         }
@@ -6741,6 +6786,8 @@ class Arena {
     const a = this.sc[scorer], o = this.sc[1 - scorer];
     // How long the rally was (for records on the pages).
     this.event('point', scorer, this.rally);
+    this.log.push(scorer);
+    for (const st of this.stats) st.rally = Math.max(st.rally, this.rally);
     if (a >= CAP || (a >= WIN && a - o >= 2)) return this.finish(scorer + 1);
     // Aufholjagd: the first time someone is 3 behind, they get a free shield wall (once per match).
     const j = 1 - scorer;
@@ -6758,7 +6805,8 @@ class Arena {
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
       sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)],
       aw: this.away, cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
-      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq, rl: this.rally, gb: this.hide && this.stuck < 0});
+      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq, rl: this.rally, gb: this.hide && this.stuck < 0,
+      fin: this.st === 'over' ? {st: this.stats, log: this.log} : undefined});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }
 }

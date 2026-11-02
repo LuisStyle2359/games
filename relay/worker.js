@@ -240,6 +240,9 @@ export class Arena {
     // Rally: returns in the current point. Rescue: the one-time wall for whoever falls 3 behind. Ghost: the ball
     // fades in the middle of the table after the taker's returns.
     this.rally = 0;
+    // The match in numbers, per seat, for the end screen; log: who won each point, in order.
+    this.stats = [0, 1].map(() => ({ret: 0, top: 0, items: 0, fire: 0, saves: 0, rally: 0}));
+    this.log = [];
     this.rescued = [false, false];
     this.ghost = [0, 0];
     this.hide = false;
@@ -427,6 +430,7 @@ export class Arena {
       if (it.k === 'god') { this.god[i] = now + GOD_MS; this.ph[i] = GOD_PH; this.miniUntil[i] = 0; }
       if (it.k === 'shield') this.shield[i] = true;
       if (it.k === 'magnet') this.magnet[i] = true;
+      this.stats[i].items++;
       this.event('get', i, it.k);
       this.item = null;
       this.nextItem = now + 7000 + Math.random() * 5000;
@@ -454,6 +458,10 @@ export class Arena {
     Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
     this.last = i;
     this.rally++;
+    const stt = this.stats[i];
+    stt.ret++;
+    stt.top = Math.max(stt.top, Math.round(Math.hypot(this.b.vx, this.b.vy)));
+    stt.rally = Math.max(stt.rally, this.rally);
     this.hide = this.ghost[i] > Date.now();
     this.turbo = false;
     this.spin = 0;
@@ -508,6 +516,7 @@ export class Arena {
     this.turbo = true;
     this.spin = 0;
     this.last = i;
+    this.stats[i].fire++;
     this.event('fire', i);
   }
 
@@ -590,6 +599,7 @@ export class Arena {
           this.turbo = true;
           this.spin = 0;
           this.last = i;
+          this.stats[i].saves++;
           this.event('godwall', i);
           continue;
         }
@@ -603,6 +613,7 @@ export class Arena {
           // A fireball bounced off a shield goes back as a normal ball: overall speed capped, direction kept.
           const sp = Math.hypot(b.vx, b.vy);
           if (sp > VMAX) { b.vx *= VMAX / sp; b.vy *= VMAX / sp; }
+          this.stats[i].saves++;
           this.event('shield', i);
           continue;
         }
@@ -620,6 +631,8 @@ export class Arena {
     const a = this.sc[scorer], o = this.sc[1 - scorer];
     // How long the rally was (for records on the pages).
     this.event('point', scorer, this.rally);
+    this.log.push(scorer);
+    for (const st of this.stats) st.rally = Math.max(st.rally, this.rally);
     if (a >= CAP || (a >= WIN && a - o >= 2)) return this.finish(scorer + 1);
     // Aufholjagd: the first time someone is 3 behind, they get a free shield wall (once per match).
     const j = 1 - scorer;
@@ -637,7 +650,8 @@ export class Arena {
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
       sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)],
       aw: this.away, cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
-      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq, rl: this.rally, gb: this.hide && this.stuck < 0});
+      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq, rl: this.rally, gb: this.hide && this.stuck < 0,
+      fin: this.st === 'over' ? {st: this.stats, log: this.log} : undefined});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }
 }
