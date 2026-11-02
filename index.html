@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 55;
+const APP_VERSION = 56;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5607,12 +5607,20 @@ function bzEvent(g, ev, s) {
   const sg = g.sg;
   if (ev.k === 'goal') {
     const gx = ev.team === 0 ? BZ_W + BZ_GD / 2 : -BZ_GD / 2;
-    sgBanner(g, 'TOR!', ev.by ? ev.by + (ev.own ? ' (Eigentor)' : '') : '', BZ_TEAM[ev.team]);
+    sgBanner(g, 'TOR!', (ev.by ? ev.by + (ev.own ? ' (Eigentor)' : '') : '') + (ev.kmh > 0 && !ev.own ? (ev.by ? ' · ' : '') + ev.kmh + ' km/h' : ''), BZ_TEAM[ev.team]);
     sgBurst(g, gx, BZ_H / 2, 90, [BZ_TEAM[ev.team], '#ffffff', '#ffd23f'], 560, {life: 1.4, size: 7, grav: 260});
     sg.rings.push({x: gx, y: BZ_H / 2, r0: 10, r1: 160, life: 0, max: 0.6, c: '#ffffff', w: 6});
     sg.shake = 1;
     sg.netAt = performance.now();
     sg.netSide = ev.team === 0 ? 1 : 0;
+  } else if (ev.k === 'post') {
+    sgBanner(g, 'PFOSTEN!', 'Knapp vorbei', '#ffffff');
+    sgBurst(g, ev.x, ev.y, 26, ['#ffffff', '#ffd23f'], 320, {life: 0.6, size: 4});
+    sg.rings.push({x: ev.x, y: ev.y, r0: 6, r1: 70, life: 0, max: 0.4, c: '#ffffff', w: 5});
+    sg.shake = Math.max(sg.shake, 0.5);
+  } else if (ev.k === 'save') {
+    sgBanner(g, 'PARADE!', (ev.pid === me.id ? 'Du' : ev.name || 'Jemand') + ' hält den Ball', '#7bd88f');
+    sg.shake = Math.max(sg.shake, 0.4);
   } else if (ev.k === 'kick') {
     const b = s.b;
     sg.rings.push({x: b[0], y: b[1], r0: BZ_BR, r1: BZ_BR + 26, life: 0, max: 0.28, c: '#ffffff', w: 4});
@@ -5974,7 +5982,14 @@ function nrEvent(g, ev, s) {
     sg.rings.push({x, y, r0: 4, r1: 80, life: 0, max: 0.45, c, w: 6});
     sg.rings.push({x, y, r0: 2, r1: 34, life: 0, max: 0.2, c: '#ffffff', w: 10});
     sg.shake = ev.pid === me.id ? 1.2 : 0.5;
-    if (ev.pid === me.id && s.pl.filter(p => p.al).length > 1) sgBanner(g, 'DU BIST RAUS', 'Warte auf die nächste Runde', c);
+    // How it happened, for everyone: who cut whom off, own trail, the edge, head-on.
+    const nm = id => id === me.id ? 'Du' : ((s.pl.find(p => p.pid === id) || {}).name || 'Jemand'), who = nm(ev.pid), by = ev.by ? nm(ev.by) : '';
+    const how = ev.why === 'cut' ? '✂ ' + by + (by === 'Du' ? ' hast ' : ' hat ') + (ev.pid === me.id ? 'dich' : who) + ' abgeschnitten'
+      : ev.why === 'self' ? '🌀 ' + who + (who === 'Du' ? ' bist' : ' ist') + ' in die eigene Spur gefahren'
+      : ev.why === 'wall' ? '🧱 ' + who + (who === 'Du' ? ' bist' : ' ist') + ' gegen die Wand gefahren'
+      : ev.why === 'head' ? '💥 Frontal: ' + who + (by ? ' und ' + by : '') : '';
+    if (how) sgFloat(g, x, y - 18, how, c);
+    if (ev.pid === me.id && s.pl.filter(p => p.al).length > 1) sgBanner(g, 'DU BIST RAUS', how || 'Warte auf die nächste Runde', c);
   } else if (ev.k === 'get') {
     const i = s.pl.findIndex(p => p.pid === ev.pid), [icon, col, name, tip] = NR_PU[ev.kind] || ['?', '#fff', '', ''];
     const x = (ev.x + 0.5) * NR_CELL, y = (ev.y + 0.5) * NR_CELL;
@@ -6921,6 +6936,7 @@ class Kick extends Room {
     }
     p.armed = false;
     this.touch = p.pid;
+    this.shotV = Math.hypot(b.vx, b.vy);
     this.event('kick', {pid: p.pid, hard: f > 1, curve: !!this.spin});
   }
   step() {
@@ -6993,7 +7009,10 @@ class Kick extends Room {
     for (let i = 0; i < ps.length; i++) {
       for (let j = i + 1; j < ps.length; j++) discHit(ps[i], ps[j], kickR(ps[i]), kickR(ps[j]), kickW(ps[i]), kickW(ps[j]), 0.25);
       if (this.hold && this.hold.pid === ps[i].pid) continue;
+      const threat = goalThreat(b), fast = Math.hypot(b.vx, b.vy) > 3;
       if (discHit(ps[i], b, kickR(ps[i]), KBR, kickW(ps[i]), 1, 0.25)) {
+        // A save: the ball was on its way into this player's own goal (team 0 defends the left one) and isn't now.
+        if (fast && threat === ps[i].team && goalThreat(b) !== threat && this.tick - (this.saveT || 0) > 30) { this.saveT = this.tick; this.event('save', {pid: ps[i].pid, name: ps[i].name}); }
         this.touch = ps[i].pid;
         this.spin = 0;
         if (this.hold) { const h = ps.find(p => p.pid === this.hold.pid); if (h) h.fx.sticky = 0; this.hold = null; this.event('steal', {pid: ps[i].pid}); }
@@ -7005,7 +7024,12 @@ class Kick extends Room {
       kickBounds(p, this.ko);
       for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(p, gx, cy + s * GOAL_H / 2, kickR(p));
     }
-    for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(b, gx, cy + s * GOAL_H / 2, KBR);
+    // A hard shot off the post: everyone should see that one.
+    const spd = Math.hypot(b.vx, b.vy);
+    for (const s of [-1, 1]) for (const gx of [0, KW]) if (postHit(b, gx, cy + s * GOAL_H / 2, KBR) && spd > 2.5 && this.tick - (this.postT || 0) > 30) {
+      this.postT = this.tick;
+      this.event('post', {x: gx, y: cy + s * GOAL_H / 2});
+    }
     // The wall power-up: a barrier in front of the goal that only the ball bounces off.
     for (const t of [0, 1]) if (this.wall[t] > 0 && wallHit(b, t === 0 ? K_WALL_X : KW - K_WALL_X)) { this.spin = 0; this.event('wallhit', {team: t}); }
     ballBounds(b);
@@ -7021,7 +7045,8 @@ class Kick extends Room {
       this.spin = 0;
       this.st = 'goal';
       this.until = Date.now() + 2500;
-      this.event('goal', {team, by: scorer ? scorer.name : '', own: !!scorer && scorer.team !== team});
+      // About 19 px are a metre; the speed of the last shot, in km/h.
+      this.event('goal', {team, by: scorer ? scorer.name : '', own: !!scorer && scorer.team !== team, kmh: Math.round((this.shotV || 0) * 60 / 19 * 3.6)});
     }
   }
   // Items appear one at a time on the pitch; a player runs over one, or the ball carries it to whoever last
@@ -7150,11 +7175,18 @@ function discHit(a, b, ra, rb, ia, ib, bc) {
 }
 function postHit(o, px, py, r) {
   const dx = o.x - px, dy = o.y - py, d = Math.hypot(dx, dy);
-  if (d >= r + POST_R || d === 0) return;
+  if (d >= r + POST_R || d === 0) return false;
   const nx = dx / d, ny = dy / d;
   o.x = px + nx * (r + POST_R); o.y = py + ny * (r + POST_R);
   const rv = o.vx * nx + o.vy * ny;
   if (rv < 0) { o.vx -= 1.5 * rv * nx; o.vy -= 1.5 * rv * ny; }
+  return true;
+}
+// Where a ball moving like this crosses an end line within 40 ticks: 0 (left goal), 1 (right goal) or -1.
+function goalThreat(b) {
+  if (Math.abs(b.vx) < 0.5) return -1;
+  const line = b.vx < 0 ? 0 : KW, t = (line - b.x) / b.vx, y = b.y + b.vy * t, cy = KH / 2;
+  return t > 0 && t < 40 && Math.abs(y - cy) < GOAL_H / 2 ? (b.vx < 0 ? 0 : 1) : -1;
 }
 
 // 🏍️ Neon Rush: light bikes on a grid. Every bike leaves a wall behind it; whoever drives into a wall, a trail
@@ -7279,10 +7311,12 @@ class Tron extends Room {
         if (!this.open(p, nx, ny) || target.has(ny * TW + nx)) {
           // A shield (or the divine power) steers away from the crash once: to the side with more room.
           if (!((p.fx.shield || p.fx.god) && this.dodge(p, target))) {
-            this.crash(p, i);
-            const o = target.get(ny * TW + nx);
+            // What it was: the edge, the own trail, someone's trail (they cut you off), or head-on.
+            const out = nx < 0 || ny < 0 || nx >= TW || ny >= TH, v = out ? 0 : this.grid[ny * TW + nx], o = target.get(ny * TW + nx);
+            const by = !out && v && v !== 255 && v !== i + 1 && this.players[v - 1] ? this.players[v - 1].pid : null;
+            this.crash(p, i, out ? 'wall' : o && !v ? 'head' : v === i + 1 ? 'self' : by ? 'cut' : 'trail', by || (o && o.p.pid) || null);
             if (o && o.p.alive && this.open(p, nx, ny) && !o.p.fx.god) {
-              if (o.p.fx.shield) { o.p.fx.shield = 0; this.event('shield', {pid: o.p.pid}); } else this.crash(o.p, o.i);
+              if (o.p.fx.shield) { o.p.fx.shield = 0; this.event('shield', {pid: o.p.pid}); } else this.crash(o.p, o.i, 'head', p.pid);
             }
             return;
           }
@@ -7361,9 +7395,9 @@ class Tron extends Room {
     }
     this.event('get', {pid: p.pid, kind, x, y});
   }
-  crash(p, i) {
+  crash(p, i, why = '', by = null) {
     p.alive = false;
-    this.event('crash', {pid: p.pid, x: p.x, y: p.y});
+    this.event('crash', {pid: p.pid, x: p.x, y: p.y, why, by});
   }
   full(p) { if (p.ws) try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, trails: this.players.map(q => q.trail), ghosts: this.ghosts})); } catch (e) {} }
   send(now) {
