@@ -1178,7 +1178,7 @@ export class Tron extends Room {
     this.nextItem = 0;
   }
   joined(p) { Object.assign(p, {sc: 0, alive: false, x: 0, y: 0, d: 1, q: [], fuel: T_FUEL, boost: false, acc: 0, trail: [], fx: tronFx()}); }
-  extra(p) { return {sc: p.sc, al: p.alive, x: p.x, y: p.y, d: p.d, f: Math.round(p.fuel), bo: p.boost, fc: p.face || null, fx: p.fx, sp: tronSpeed(p)}; }
+  extra(p) { return {sc: p.sc, al: p.alive, x: p.x, y: p.y, d: p.d, f: Math.round(p.fuel), bo: p.boost, fc: p.face || null, fx: p.fx, sp: tronSpeed(p), gr: this.tk - p.gr < 4}; }
   input(p, m) {
     // A turn can name the move it is meant for (the page has already shown it there); it waits for that move.
     // A turn can't wait for a move far ahead (a stale one from the last round would block all others).
@@ -1196,9 +1196,10 @@ export class Tron extends Room {
     this.nextItem = 96 + Math.floor(Math.random() * 72);
     this.players.forEach((p, i) => {
       const [x, y, d] = T_SPAWN[i];
-      Object.assign(p, {alive: true, x, y, d, q: [], fuel: T_FUEL, acc: 0, trail: [[x, y, 1]], face: null, mc: 0, fx: tronFx()});
+      Object.assign(p, {alive: true, x, y, d, q: [], fuel: T_FUEL, acc: 0, trail: [[x, y, 1]], face: null, mc: 0, fx: tronFx(), od: 1, gr: -99});
       this.grid[y * TW + x] = i + 1;
     });
+    this.t0 = this.tk;
     this.st = 'count';
     this.until = now + 3000;
     for (const p of this.players) this.full(p);
@@ -1248,6 +1249,10 @@ export class Tron extends Room {
     if (this.st === 'roundover' && now >= this.until) this.round(now);
     if (this.st !== 'play') return;
     this.tk++;
+    // Overdrive: after 30 s of a round every bike gets faster, up to +50 % over the next minute.
+    const od = 1 + Math.min(0.5, Math.max(0, (this.tk - this.t0 - 30 * T_HZ) / (60 * T_HZ)));
+    if (this.tk - this.t0 === 30 * T_HZ) this.event('overdrive', {});
+    for (const p of this.players) p.od = od;
     for (const p of this.players) for (const k in p.fx) if (k !== 'shield' && p.fx[k] > 0) p.fx[k]--;
     if (this.think) this.think();
     // Each bike moves 0, 1 or 2 cells this tick; moves happen in two rounds so bikes move at the same time.
@@ -1294,6 +1299,12 @@ export class Tron extends Room {
         if (wall) this.grid[c] = i + 1;
         p.trail.push([nx, ny, wall ? 1 : 0]);
         this.mv.push([i, nx, ny, wall ? 1 : 0]);
+        // Grinding: riding right next to someone else's trail fills the boost back up.
+        const [sx, sy] = T_DIR[(p.d + 1) % 4];
+        for (const s of [1, -1]) {
+          const gx = nx + sx * s, gy = ny + sy * s, v = gx >= 0 && gy >= 0 && gx < TW && gy < TH ? this.grid[gy * TW + gx] : 0;
+          if (v && v !== i + 1) { p.fuel = Math.min(T_FUEL, p.fuel + 25); p.gr = this.tk; break; }
+        }
         this.pickup(p, i, nx, ny);
       }
     }
@@ -1361,7 +1372,7 @@ export class Tron extends Room {
 }
 function tronFx() { return {ghost: 0, gap: 0, brake: 0, confuse: 0, shield: 0, god: 0}; }
 // Cells per second: boost and the divine power double it, the brake halves it.
-function tronSpeed(p) { return T_SPEED * ((p.boost && p.fuel > 0) || p.fx.god > 0 ? 2 : 1) * (p.fx.brake > 0 ? 0.5 : 1); }
+function tronSpeed(p) { return T_SPEED * ((p.boost && p.fuel > 0) || p.fx.god > 0 ? 2 : 1) * (p.fx.brake > 0 ? 0.5 : 1) * (p.od || 1); }
 
 // ⚔️ Breach: a 1 v 1 tactical shooter in first person (drawn by the page with ray casting, like the old 3D
 // shooters). An attacker and a defender, one life each per round; the attacker wins the round by taking the
@@ -1496,12 +1507,13 @@ export class Breach extends Room {
     this.changed = [];
     this.charges = [];
     this.defuse = 0;
+    this.dfOn = false;
     this.rl = BR_ROUND;
     for (const p of this.players) {
       const spots = p.side === 'atk' ? def.a : def.d, [x, y] = spots[Math.floor(Math.random() * spots.length)];
       const gun = BR_GUN[p.side];
       Object.assign(p, {x, y, a: Math.atan2(def.bomb[1] - y, def.bomb[0] - x), vx: 0, vy: 0, hp: 100, alive: true, q: [], owed: 0, started: false,
-        mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, rf: p.side === 'def' ? BR_REINF : 0, hist: [], face: null});
+        mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 + (p.lost || 0) : 0, rf: p.side === 'def' ? BR_REINF + (p.lost || 0) : 0, hist: [], face: null});
       // While preparing, the attacker scouts with a small drone instead of walking.
       p.drone = p.side === 'atk' ? {x, y, a: p.a, vx: 0, vy: 0} : null;
     }
@@ -1524,6 +1536,8 @@ export class Breach extends Room {
   endRound(winner, why) {
     if (this.st !== 'play') return;
     winner.sc++;
+    // Whoever lost gets a little more next round: one more charge (attack) or steel wall (defence).
+    for (const q of this.players) q.lost = q !== winner ? 1 : 0;
     this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
     if (winner.sc >= BR_WIN) return this.finish(winner);
     this.st = 'roundover';
@@ -1593,10 +1607,16 @@ export class Breach extends Room {
     this.charges = this.charges.filter(c => c.t > 0);
     // Defusing: the attacker stands at the bomb holding E and doesn't move.
     if (atk && atk.alive && (atk.k & 128) && Math.hypot(atk.x - this.def.bomb[0], atk.y - this.def.bomb[1]) < 1.3 && !(atk.k & (15 | 32))) {
-      if (!this.defuse) this.event('defusing', {pid: atk.pid});
+      if (!this.dfOn) this.event('defusing', {pid: atk.pid, from: Math.round(this.defuse)});
+      this.dfOn = true;
       this.defuse += 1000 / 60;
       if (this.defuse >= BR_DEFUSE) return this.endRound(atk, 'defuse');
-    } else this.defuse = 0;
+    } else {
+      // Interrupted: past halfway, half of it stays done.
+      if (this.dfOn && this.defuse < BR_DEFUSE / 2) this.defuse = 0;
+      if (this.dfOn && this.defuse >= BR_DEFUSE / 2) this.defuse = BR_DEFUSE / 2;
+      this.dfOn = false;
+    }
     this.rl -= 1000 / 60;
     if (this.rl <= 0 && def) return this.endRound(def, 'time');
   }
@@ -1724,7 +1744,7 @@ export class Breach extends Room {
   send(now) {
     const r = v => Math.round(v * 1000) / 1000, open = this.st !== 'play' && this.st !== 'prep';
     const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null, dr: p.drone ? [r(p.drone.x), r(p.drone.y), r(p.drone.a)] : null}; });
-    const msg = {...this.base(now), tk: this.tick, rd: this.rd, mp: this.mapIx, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
+    const msg = {...this.base(now), tk: this.tick, rd: this.rd, mp: this.mapIx, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse), dfa: !!this.dfOn,
       ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0)};
     for (const p of this.players) {
       if (!p.ws) continue;
