@@ -1330,18 +1330,42 @@ const BR_MAP = [
   '#ooooooooooooooooooooooooooooaa#',
   '#aooooooooooooooooooooooooooooo#',
   '################################'];
+// The warehouse: a big hall with shelves, the bomb in an office in the north-east corner.
+const BR_MAP2 = [
+  '################################',
+  '#aooooooooooooooooooooooooooooa#',
+  '#oooooooooooooooooooooooooooooo#',
+  '#oo####====##..#===##########oo#',
+  '#oo#...........#....#.......#oo#',
+  '#oo#...........#....=....B..#oo#',
+  '#oo=..#####....#....=.d.....#oo#',
+  '#oo=................#.......#oo#',
+  '#oo#................###==#.##oo#',
+  '#oo#........................=oo#',
+  '#oo...#####..#####..........=oo#',
+  '#oo#.............d......#...#oo#',
+  '#oo#....................#....oo#',
+  '#oo###===#####..###===#######oo#',
+  '#oooooooooooooooooooooooooooooo#',
+  '#oooooooooooooooooooooooooooooo#',
+  '#aooooooooooooooooooooooooooooa#',
+  '################################'];
+// Both maps with what a room needs to know about them: the rows, the bomb, where each side starts.
+const BR_MAPS = [{name: 'Haus', rows: BR_MAP}, {name: 'Lagerhalle', rows: BR_MAP2}].map(m => {
+  const spots = ch => m.rows.flatMap((row, y) => [...row].map((c, x) => c === ch ? [x + 0.5, y + 0.5] : null)).filter(Boolean);
+  return {...m, bomb: spots('B')[0], a: spots('a'), d: spots('d')};
+});
 const BR_W = 32, BR_H = 18, BR_R = 0.25, BR_RUN = 3, BR_WALK = 1.4, BR_WIN = 4, BR_ROUND = 120000, BR_DEFUSE = 7000, BR_PREP = 15000, BR_REINF = 2;
 // Weapons: damage close up and far away (falls off over 4..16 units), shots per second, magazine, reload ms, spread.
 const BR_GUN = {atk: {name: 'Sturmgewehr', dmg: 34, far: 22, rate: 9, mag: 30, reload: 2200, spread: 0.012},
   def: {name: 'MP', dmg: 26, far: 14, rate: 13, mag: 32, reload: 1900, spread: 0.02}};
 // Map cells: 0 floor, 1 concrete, 2 brick (with hit points), 3 reinforced brick (steel behind it: bullets and charges do nothing).
-function brGrid() {
+function brGrid(rows = BR_MAP) {
   const g = new Uint8Array(BR_W * BR_H), hp = new Uint8Array(BR_W * BR_H);
-  BR_MAP.forEach((row, y) => [...row].forEach((c, x) => { g[y * BR_W + x] = c === '#' ? 1 : c === '=' ? 2 : 0; hp[y * BR_W + x] = c === '=' ? 100 : 0; }));
+  rows.forEach((row, y) => [...row].forEach((c, x) => { g[y * BR_W + x] = c === '#' ? 1 : c === '=' ? 2 : 0; hp[y * BR_W + x] = c === '=' ? 100 : 0; }));
   return {g, hp};
 }
-const brSpots = ch => BR_MAP.flatMap((row, y) => [...row].map((c, x) => c === ch ? [x + 0.5, y + 0.5] : null)).filter(Boolean);
-const BR_BOMB = brSpots('B')[0];
+const BR_BOMB = BR_MAPS[0].bomb;
 function brSolid(g, x, y) { const cx = Math.floor(x), cy = Math.floor(y); return cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H || g[cy * BR_W + cx] > 0; }
 // One movement step (1/60 s) from keys k (1 W, 2 S, 4 A, 8 D, 16 walk) and view angle a; slides along walls.
 function brMove(p, k, a, g) {
@@ -1373,7 +1397,9 @@ export class Breach extends Room {
   constructor(ctx) {
     super(ctx, 2, 1000 / 60);
     this.rd = 0;
-    this.map = brGrid();
+    // The map is drawn by lot for each match (offline the page may pick one before the start).
+    this.mapIx = Math.floor(Math.random() * BR_MAPS.length);
+    this.map = brGrid(BR_MAPS[this.mapIx].rows);
     this.changed = [];
     this.charges = [];
     this.acc = 0;
@@ -1406,15 +1432,16 @@ export class Breach extends Room {
   }
   round(now) {
     this.rd++;
-    this.map = brGrid();
+    const def = this.def = BR_MAPS[this.mapIx] || BR_MAPS[0];
+    this.map = brGrid(def.rows);
     this.changed = [];
     this.charges = [];
     this.defuse = 0;
     this.rl = BR_ROUND;
     for (const p of this.players) {
-      const spots = brSpots(p.side === 'atk' ? 'a' : 'd'), [x, y] = spots[Math.floor(Math.random() * spots.length)];
+      const spots = p.side === 'atk' ? def.a : def.d, [x, y] = spots[Math.floor(Math.random() * spots.length)];
       const gun = BR_GUN[p.side];
-      Object.assign(p, {x, y, a: Math.atan2(BR_BOMB[1] - y, BR_BOMB[0] - x), vx: 0, vy: 0, hp: 100, alive: true, q: [], owed: 0, started: false,
+      Object.assign(p, {x, y, a: Math.atan2(def.bomb[1] - y, def.bomb[0] - x), vx: 0, vy: 0, hp: 100, alive: true, q: [], owed: 0, started: false,
         mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, rf: p.side === 'def' ? BR_REINF : 0, hist: [], face: null});
     }
     this.st = 'count';
@@ -1500,7 +1527,7 @@ export class Breach extends Room {
     for (const c of this.charges) if ((c.t -= 1000 / 60) <= 0) this.blow(c);
     this.charges = this.charges.filter(c => c.t > 0);
     // Defusing: the attacker stands at the bomb holding E and doesn't move.
-    if (atk && atk.alive && (atk.k & 128) && Math.hypot(atk.x - BR_BOMB[0], atk.y - BR_BOMB[1]) < 1.3 && !(atk.k & (15 | 32))) {
+    if (atk && atk.alive && (atk.k & 128) && Math.hypot(atk.x - this.def.bomb[0], atk.y - this.def.bomb[1]) < 1.3 && !(atk.k & (15 | 32))) {
       if (!this.defuse) this.event('defusing', {pid: atk.pid});
       this.defuse += 1000 / 60;
       if (this.defuse >= BR_DEFUSE) return this.endRound(atk, 'defuse');
@@ -1603,7 +1630,7 @@ export class Breach extends Room {
   full(p) {
     if (!p.ws) return;
     const g = [...this.map.g].map(v => v === 2 ? 2 : v);
-    try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, g: g.join('')})); } catch (e) {}
+    try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, mp: this.mapIx, g: g.join('')})); } catch (e) {}
   }
   // Can p see o right now: a clear line between them (a little slack for the body's width).
   sees(p, o) {
@@ -1615,7 +1642,7 @@ export class Breach extends Room {
   send(now) {
     const r = v => Math.round(v * 1000) / 1000, open = this.st !== 'play' && this.st !== 'prep';
     const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null}; });
-    const msg = {...this.base(now), tk: this.tick, rd: this.rd, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
+    const msg = {...this.base(now), tk: this.tick, rd: this.rd, mp: this.mapIx, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
       ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0)};
     for (const p of this.players) {
       if (!p.ws) continue;
