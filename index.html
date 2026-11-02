@@ -355,6 +355,9 @@ tbody tr.sel td { background: var(--select); }
 .sg-start:hover:not(:disabled) { background: #26864a; }
 .sg-start:disabled { background: #a9c7b2; border-color: #a9c7b2; }
 .sg-free { color: var(--muted); font-style: italic; }
+.sg-vote { display: flex; gap: 8px; }
+.sg-vote .vbtn { flex: 1; height: 34px; font-size: 14px; }
+.sg-vote .vbtn.on { outline: 3px solid #ffd23f; }
 .sg-chipfree { background: transparent; box-shadow: inset 0 0 0 1px var(--muted); }
 .sg-lobbybox .sg-keys { color: var(--ink); font-size: 11.5px; }
 .pg-over { background: rgba(16,22,31,.55); color: #fff; font-size: 28px; font-weight: 700; white-space: pre-line; line-height: 1.4; }
@@ -2002,7 +2005,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5010,7 +5013,7 @@ function sgConnect(g) {
     if (mpGame === g && !g.over && sg.tries++ < 30) setTimeout(() => sgConnect(g), 1000);
   };
 }
-const sgRosterKey = s => s.st + '|' + s.host + '|' + s.pl.map(p => p.pid + ':' + p.name + ':' + p.team + ':' + p.on).join(',');
+const sgRosterKey = s => s.st + '|' + s.host + '|' + s.pb + '|' + JSON.stringify(s.vt || '') + '|' + s.pl.map(p => p.pid + ':' + p.name + ':' + p.team + ':' + p.on + ':' + p.ps).join(',');
 function sgMessage(g, m) {
   const sg = g.sg;
   if (m.t === 'pong' && Number.isFinite(m.c)) { const r = performance.now() - m.c; sg.rtt = sg.rtt ? sg.rtt * 0.7 + r * 0.3 : r; return; }
@@ -5096,6 +5099,7 @@ function sgFinish(g, s) {
   if (conv === mpConv(g)) renderMpBoard();
 }
 function sgEvent(g, ev, s) {
+  if (ev.k === 'vote') { sgBanner(g, ev.pu ? '⚡ POWER-UPS AN' : 'OHNE POWER-UPS', ev.coin ? 'Unentschieden – die Münze hat entschieden' : '', ev.pu ? '#ffd23f' : '#ffffff'); return; }
   if (g.game === 'kick') bzEvent(g, ev, s);
   else nrEvent(g, ev, s);
 }
@@ -5127,11 +5131,18 @@ function sgActive() {
 }
 document.addEventListener('keydown', e => {
   if (!sgActive() || e.ctrlKey || e.metaKey || e.altKey || (e.target.matches && e.target.matches('input, textarea'))) return;
+  const g = mpGame;
+  if (e.key.toLowerCase() === 'p' && !e.repeat && g.sg.s) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (g.sg.s.st === 'pause' && g.sg.s.pb) sgSend(g, {t: 'resume'});
+    else if (g.sg.s.st === 'play') sgSend(g, {t: 'pause'});
+    return;
+  }
   const bit = SG_KEYS[e.key.toLowerCase()];
   if (!bit) return;
   e.preventDefault();
   e.stopPropagation();
-  const g = mpGame;
   if (g.game === 'kick') g.sg.keys |= bit;
   else if (!e.repeat) { if (bit === 16) sgSend(g, {t: 'boost', v: true}); else nrTurn(g, {1: 0, 8: 1, 2: 2, 4: 3}[bit]); }
 }, true);
@@ -5186,9 +5197,28 @@ function renderSgChrome(g) {
   $('cmpstatus').textContent = SG_TITLE[g.game] + (g.over ? '' : ' — ' + SG_HINT[g.game]);
   const res = $('cmpresult');
   res.hidden = false;
-  res.replaceChildren(g.over
-    ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
-    : el('button', {class: 'vbtn', text: 'Verlassen', onclick: () => sgLeave(g)}));
+  const mine = s && s.pl.find(p => p.pid === me.id), left = mine ? mine.ps : 0;
+  res.replaceChildren(...(g.over
+    ? [el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})]
+    : [s && s.st === 'pause' && s.pb ? el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Weiter', onclick: () => sgSend(g, {t: 'resume'})})
+      : el('button', {class: 'vbtn', type: 'button', text: 'Pause (' + left + ')', title: 'Taste P · jeder hat 2 Pausen pro Spiel',
+        disabled: !s || s.st !== 'play' || !left, onclick: () => sgSend(g, {t: 'pause'})}),
+      el('button', {class: 'vbtn', text: 'Verlassen', onclick: () => sgLeave(g)})]));
+  // Before the start everyone votes for or against power-ups.
+  if (s && s.st === 'vote' && !g.over) {
+    const vt = s.vt || {}, mineV = vt[me.id];
+    lobby.hidden = false;
+    lobby.replaceChildren(el('div', {class: 'sg-lobbybox'},
+      el('div', {class: 'upddlg-head', text: SG_TITLE[g.game] + ' · Mit Power-ups?'}),
+      el('div', {class: 'sg-vote'},
+        el('button', {class: 'vbtn sg-start' + (mineV === true ? ' on' : ''), type: 'button', text: '⚡ Mit Power-ups', disabled: mineV !== undefined, onclick: () => sgSend(g, {t: 'vote', v: true})}),
+        el('button', {class: 'vbtn' + (mineV === false ? ' on' : ''), type: 'button', text: 'Ohne', disabled: mineV !== undefined, onclick: () => sgSend(g, {t: 'vote', v: false})})),
+      el('div', {class: 'sg-riders'}, ...s.pl.map(p => el('div', {class: 'sg-pl'}, (p.pid in vt ? '✓ ' : '… ') + p.name + (p.pid === me.id ? ' (du)' : '') + (p.pid in vt ? ' hat abgestimmt' : '')))),
+      el('p', {id: 'sgvotet', text: ''}),
+      el('p', {class: 'sg-keys', text: (g.game === 'kick' ? '⚡ Turbo · 💥 Hammerschuss · 🧲 Klebefuß · 🧱 Mauer · 🎈 Riese · 🐜 Zwerge · ❄️ Eis · 🌀 Kurvenball · ✨ Göttlich'
+        : '🔥 Nitro · 👻 Geist · 💣 Bombe · ✂️ Lücke · 🐢 Bremse · 🔄 Verwirrung · 🛡️ Schild · ✨ Göttlich')})));
+    return;
+  }
   lobby.hidden = !(s && s.st === 'lobby') || g.over;
   if (lobby.hidden) return;
   const host = s.pl[0], iHost = host && host.pid === me.id;
@@ -5240,14 +5270,34 @@ function sgFrame(g, ts) {
   else if (g.over) text = '';
   else if (sg.conn === 'lost') text = 'Verbindung weg – neuer Versuch…';
   else if (s.st === 'count') text = (g.game === 'kick' ? 'Anstoß in\n' : 'Runde ' + s.rd + '\n') + Math.max(1, Math.ceil(s.c / 1000));
+  else if (s.st === 'pause' && s.pb) text = (s.pb === me.id ? 'Du hast' : ((s.pl.find(p => p.pid === s.pb) || {}).name || 'Jemand') + ' hat') + ' pausiert\nspätestens in ' + Math.ceil(s.pz / 1000) + ' s geht\'s weiter';
   else if (s.st === 'pause') text = 'Pausiert\n' + (s.pl.some(p => p.aw && p.pid !== me.id) ? 'Warte auf ' + s.pl.filter(p => p.aw && p.pid !== me.id).map(p => p.name).join(', ') + '…' : 'Gleich geht\'s weiter…');
   else if (s.st === 'resume') text = 'Weiter in\n' + Math.max(1, Math.ceil(s.c / 1000));
+  if (s && s.st === 'vote' && $('sgvotet')) { const t = 'Noch ' + Math.ceil(s.c / 1000) + ' s – wer nicht abstimmt, zählt nicht mit.'; if ($('sgvotet').textContent !== t) $('sgvotet').textContent = t; }
   const over = $('sgover');
   if (over.textContent !== text) over.textContent = text;
   over.hidden = !text;
   sg.raf = requestAnimationFrame(t => sgFrame(g, t));
 }
 function sgBanner(g, text, sub, color) { g.sg.banner = {text, sub, color, at: performance.now()}; }
+// Short texts that rise and fade where something happened (a pickup, a stolen ball).
+function sgFloat(g, x, y, text, color) { (g.sg.floats || (g.sg.floats = [])).push({x, y, text, color, at: performance.now()}); }
+function sgDrawFloats(g, ctx, now) {
+  const sg = g.sg;
+  sg.floats = (sg.floats || []).filter(f => now - f.at < 1300);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const f of sg.floats) {
+    const q = (now - f.at) / 1300;
+    ctx.globalAlpha = q < 0.75 ? 1 : 1 - (q - 0.75) / 0.25;
+    ctx.font = '900 ' + (q < 0.12 ? 12 + q / 0.12 * 8 : 20) + 'px "Segoe UI", system-ui, sans-serif';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    ctx.strokeText(f.text, f.x, f.y - q * 34);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y - q * 34);
+  }
+  ctx.globalAlpha = 1;
+}
 // Drawn on top of either game: a big title that pops in and fades, plus sparks and rings.
 function sgDrawFx(g, ctx, dt, now) {
   const sg = g.sg;
@@ -5316,25 +5366,34 @@ function sgDrawBanner(g, ctx, vw, vh, now) {
 const BZ_W = 760, BZ_H = 380, BZ_M = 32, BZ_GH = 124, BZ_GD = 38, BZ_POST = 6, BZ_PR = 15, BZ_BR = 9, BZ_CC = 70,
   BZ_ACC = 0.1, BZ_ACC_KICK = 0.07, BZ_DAMP = 0.96, BZ_TICK = 1000 / 60, BZ_PAD = 46;
 const BZ_TEAM = ['#e5484d', '#3e7bfa'], BZ_TEAM_DARK = ['#8f1d22', '#173e8c'];
+const BZ_TIP = {turbo: '8 s schneller laufen', hammer: 'Die nächsten 3 Schüsse doppelt so hart', sticky: 'Der Ball klebt kurz am Fuß – Leertaste schießt',
+  wall: '6 s eine Mauer vor dem eigenen Tor', giant: '8 s doppelt so groß', dwarf: 'Die Gegner sind 8 s halb so groß', ice: 'Die Gegner rutschen 6 s auf Glatteis',
+  curve: '10 s lang drehen deine Schüsse ab', god: '8 s Turbo, Hammerschuss und Mauer'};
+// Turbo (and the divine power) make a player 1.5 times as fast; on ice they get going slowly and slide on.
 function bzMove(p, k) {
   let dx = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0), dy = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0);
   if (dx && dy) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }
-  const a = (k & 16) ? BZ_ACC_KICK : BZ_ACC;
+  const fx = p.fx || {}, a = ((k & 16) ? BZ_ACC_KICK : BZ_ACC) * (fx.turbo || fx.god ? 1.5 : 1) * (fx.ice ? 0.5 : 1), damp = fx.ice ? 0.985 : BZ_DAMP;
   p.vx += dx * a; p.vy += dy * a;
   p.x += p.vx; p.y += p.vy;
-  p.vx *= BZ_DAMP; p.vy *= BZ_DAMP;
+  p.vx *= damp; p.vy *= damp;
 }
 function bzBounds(p, ko) {
-  p.x = Math.max(-BZ_M + BZ_PR, Math.min(BZ_W + BZ_M - BZ_PR, p.x));
-  p.y = Math.max(-BZ_M + BZ_PR, Math.min(BZ_H + BZ_M - BZ_PR, p.y));
+  const r = p.r || BZ_PR;
+  p.x = Math.max(-BZ_M + r, Math.min(BZ_W + BZ_M - r, p.x));
+  p.y = Math.max(-BZ_M + r, Math.min(BZ_H + BZ_M - r, p.y));
   if (ko < 0) return;
-  if (p.team === 0 && p.x > BZ_W / 2 - BZ_PR) { p.x = BZ_W / 2 - BZ_PR; p.vx = Math.min(0, p.vx); }
-  if (p.team === 1 && p.x < BZ_W / 2 + BZ_PR) { p.x = BZ_W / 2 + BZ_PR; p.vx = Math.max(0, p.vx); }
+  if (p.team === 0 && p.x > BZ_W / 2 - r) { p.x = BZ_W / 2 - r; p.vx = Math.min(0, p.vx); }
+  if (p.team === 1 && p.x < BZ_W / 2 + r) { p.x = BZ_W / 2 + r; p.vx = Math.max(0, p.vx); }
   if (p.team !== ko) {
     const dx = p.x - BZ_W / 2, dy = p.y - BZ_H / 2, d = Math.hypot(dx, dy) || 1;
-    if (d < BZ_CC + BZ_PR) { p.x = BZ_W / 2 + dx / d * (BZ_CC + BZ_PR); p.y = BZ_H / 2 + dy / d * (BZ_CC + BZ_PR); }
+    if (d < BZ_CC + r) { p.x = BZ_W / 2 + dx / d * (BZ_CC + r); p.y = BZ_H / 2 + dy / d * (BZ_CC + r); }
   }
 }
+// The power-ups: icon, colour, name and what the pickup says.
+const BZ_PU = {turbo: ['⚡', '#ffb020', 'TURBO'], hammer: ['💥', '#ff5a36', 'HAMMERSCHUSS'], sticky: ['🧲', '#d946ef', 'KLEBEFUSS'],
+  wall: ['🧱', '#c2702d', 'MAUER'], giant: ['🎈', '#22c55e', 'RIESE'], dwarf: ['🐜', '#84cc16', 'ZWERGE'], ice: ['❄️', '#38bdf8', 'EIS'],
+  curve: ['🌀', '#ec4899', 'KURVENBALL'], god: ['✨', '#ffd23f', 'GÖTTLICH']};
 function bzTicks(g, now) {
   const sg = g.sg, s = sg.s;
   if (!s || (s.st !== 'play' && s.st !== 'goal')) { sg.simAt = now; return; }
@@ -5353,7 +5412,7 @@ function bzTicks(g, now) {
 function bzSnapshot(g, m) {
   const sg = g.sg, mine = m.pl.find(p => p.pid === me.id);
   if (!mine) { sg.me = null; return; }
-  const p = {x: mine.x, y: mine.y, vx: mine.vx, vy: mine.vy, team: mine.team};
+  const p = {x: mine.x, y: mine.y, vx: mine.vx, vy: mine.vy, team: mine.team, fx: mine.fx || {}, r: mine.r || BZ_PR};
   if ((m.st !== 'play' && m.st !== 'goal') || !sg.me) { sg.me = p; sg.hist = []; sg.vis.x = sg.vis.y = 0; return; }
   // Start from the server's answer and replay the inputs it hasn't seen yet.
   sg.hist = sg.hist.filter(h => h[0] > mine.a);
@@ -5376,8 +5435,26 @@ function bzEvent(g, ev, s) {
   } else if (ev.k === 'kick') {
     const b = s.b;
     sg.rings.push({x: b[0], y: b[1], r0: BZ_BR, r1: BZ_BR + 26, life: 0, max: 0.28, c: '#ffffff', w: 4});
-    sgBurst(g, b[0], b[1], 8, ['#ffffff', '#fff3b0'], 260, {life: 0.35, size: 4});
+    sgBurst(g, b[0], b[1], ev.hard ? 22 : 8, ev.hard ? ['#ff5a36', '#ffd23f', '#ffffff'] : ['#ffffff', '#fff3b0'], ev.hard ? 420 : 260, {life: ev.hard ? 0.5 : 0.35, size: ev.hard ? 5 : 4});
+    if (ev.hard) { sg.shake = Math.max(sg.shake, 0.45); sg.rings.push({x: b[0], y: b[1], r0: BZ_BR, r1: BZ_BR + 44, life: 0, max: 0.35, c: '#ff5a36', w: 6}); }
     sg.kickFx = performance.now();
+  } else if (ev.k === 'get') {
+    const [icon, col, name] = BZ_PU[ev.kind] || ['?', '#fff', ''], pl = s.pl.find(p => p.pid === ev.pid), mineGot = ev.pid === me.id;
+    const x = pl ? pl.x : BZ_W / 2, y = pl ? pl.y : BZ_H / 2;
+    sgFloat(g, x, y - 30, icon + ' ' + name, col);
+    sgBurst(g, x, y, 24, [col, '#ffffff'], 300, {life: 0.6, size: 4});
+    sg.rings.push({x, y, r0: 10, r1: 60, life: 0, max: 0.4, c: col, w: 4});
+    if (ev.kind === 'god') { sgBanner(g, '✨ GÖTTLICH ✨', (pl ? pl.name : '') + ' – 8 Sekunden unaufhaltsam', '#ffd23f'); sg.shake = 0.8; }
+    else if (mineGot || ['dwarf', 'ice'].includes(ev.kind) && sg.team !== ev.team) sgBanner(g, icon + ' ' + name, mineGot ? BZ_TIP[ev.kind] : (pl ? pl.name : '') + ': ' + BZ_TIP[ev.kind], col);
+  } else if (ev.k === 'gone' && s.it === null) {
+    // nothing to show: the item just fades
+  } else if (ev.k === 'wallhit') {
+    sg.wallFlash = [performance.now(), ev.team];
+    sgBurst(g, ev.team === 0 ? 22 : BZ_W - 22, s.b[1], 14, ['#ffcf8a', '#ffffff'], 260, {life: 0.4, size: 4});
+  } else if (ev.k === 'stick' || ev.k === 'steal') {
+    const b = s.b;
+    sg.rings.push({x: b[0], y: b[1], r0: BZ_BR, r1: BZ_BR + 22, life: 0, max: 0.3, c: ev.k === 'stick' ? '#d946ef' : '#ffffff', w: 4});
+    if (ev.k === 'steal') sgFloat(g, b[0], b[1] - 24, 'GEKLAUT!', '#ffffff');
   } else if (ev.k === 'ot') sgBanner(g, 'VERLÄNGERUNG', 'Das nächste Tor gewinnt', '#ffd23f');
   else if (ev.k === 'over') sgBanner(g, s.w === sg.team ? 'SIEG!' : 'ABPFIFF', (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt ' + s.sc[s.w] + ':' + s.sc[1 - s.w], BZ_TEAM[s.w]);
 }
@@ -5436,6 +5513,36 @@ function bzDraw(g, cv, now, dt) {
       ctx.strokeStyle = '#1b1b1b'; ctx.lineWidth = 2; ctx.stroke();
     }
   }
+  // The wall power-up: glowing bricks in front of a goal, flickering in its last second and a half.
+  if (s) for (const t of [0, 1]) {
+    const left = (s.wall || [0, 0])[t];
+    if (!left || (left < 90 && Math.floor(now / 90) % 2)) continue;
+    const x = t === 0 ? 22 : BZ_W - 22, top = BZ_H / 2 - BZ_GH / 2 - 26, h = BZ_GH + 52, hit = sg.wallFlash && sg.wallFlash[1] === t ? Math.max(0, 1 - (now - sg.wallFlash[0]) / 250) : 0;
+    ctx.fillStyle = 'rgba(255,190,110,' + (0.25 + 0.5 * hit) + ')';
+    ctx.fillRect(x - 9, top - 3, 18, h + 6);
+    for (let y = top, row = 0; y < top + h; y += 12, row++) {
+      ctx.fillStyle = row % 2 ? '#b8612a' : '#cf7436';
+      ctx.fillRect(x - 5, y, 10, 11);
+      ctx.fillStyle = 'rgba(255,255,255,.25)';
+      ctx.fillRect(x - 5, y, 10, 2);
+    }
+    ctx.strokeStyle = BZ_TEAM[t]; ctx.lineWidth = 2; ctx.strokeRect(x - 6, top, 12, h);
+  }
+  // An item: a pulsing coin with its icon, blinking in its last 3 seconds.
+  if (s && s.it && !(s.it.l < 180 && Math.floor(now / 120) % 2)) {
+    const [icon, col] = BZ_PU[s.it.k] || ['?', '#fff'], pr = 19 + Math.sin(now / 180) * 2;
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.ellipse(s.it.x + 3, s.it.y + 5, pr, pr * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(s.it.x, s.it.y, pr, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.globalAlpha = 0.35 + 0.25 * Math.sin(now / 150);
+    ctx.beginPath(); ctx.arc(s.it.x, s.it.y, pr + 6, 0, Math.PI * 2); ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.font = '22px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(icon, s.it.x, s.it.y + 1);
+  }
   const smp = s && sgSample(g);
   if (smp) {
     const {a, b, k: f, ex} = smp, lerp = (x, y) => x + (y - x) * f;
@@ -5447,44 +5554,75 @@ function bzDraw(g, cv, now, dt) {
     for (const pb of b.pl) {
       const pa = a.pl.find(p => p.pid === pb.pid) || pb, mine = pb.pid === me.id && sg.me && (s.st === 'play' || s.st === 'goal');
       const x = mine ? sg.me.x + sg.vis.x : lerp(pa.x, pb.x) + ahead(pb.vx, BZ_DAMP), y = mine ? sg.me.y + sg.vis.y : lerp(pa.y, pb.y) + ahead(pb.vy, BZ_DAMP);
-      const kicking = mine ? (sg.keys & 16) : (pb.k & 16);
+      const kicking = mine ? (sg.keys & 16) : (pb.k & 16), R = pb.r || BZ_PR, fx = pb.fx || {};
+      (sg.drawn || (sg.drawn = {}))[pb.pid] = [x, y];
+      // Turbo: speed lines behind; divine: a golden halo.
+      const sp = Math.hypot(pb.vx, pb.vy);
+      if ((fx.turbo || fx.god) && sp > 0.8) {
+        ctx.strokeStyle = fx.god ? 'rgba(255,215,90,.7)' : 'rgba(255,176,32,.75)';
+        ctx.lineWidth = 2.5;
+        for (const o of [-0.5, 0, 0.5]) {
+          const nx = -pb.vx / sp, ny = -pb.vy / sp, ox = -ny * R * o, oy = nx * R * o;
+          ctx.beginPath(); ctx.moveTo(x + nx * (R + 3) + ox, y + ny * (R + 3) + oy); ctx.lineTo(x + nx * (R + 16 + sp * 3) + ox, y + ny * (R + 16 + sp * 3) + oy); ctx.stroke();
+        }
+      }
+      if (fx.god) {
+        const gl = ctx.createRadialGradient(x, y, R * 0.6, x, y, R * 2.2);
+        gl.addColorStop(0, 'rgba(255,225,120,.55)'); gl.addColorStop(1, 'rgba(255,225,120,0)');
+        ctx.fillStyle = gl;
+        ctx.beginPath(); ctx.arc(x, y, R * 2.2, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.fillStyle = 'rgba(0,0,0,.22)';
-      ctx.beginPath(); ctx.ellipse(x + 3, y + 5, BZ_PR, BZ_PR * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x + 3, y + 5, R, R * 0.8, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = BZ_TEAM[pb.team];
-      ctx.beginPath(); ctx.arc(x, y, BZ_PR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+      if (fx.ice) { ctx.fillStyle = 'rgba(190,235,255,.55)'; ctx.fill(); }
       ctx.lineWidth = kicking ? 3.5 : 2;
-      ctx.strokeStyle = kicking ? '#ffffff' : BZ_TEAM_DARK[pb.team];
+      ctx.strokeStyle = kicking ? '#ffffff' : fx.god ? '#ffd23f' : BZ_TEAM_DARK[pb.team];
       ctx.stroke();
+      // Rings for power-ups that wait for the next kick or touch.
+      if (fx.hammer > 0 || fx.god) { ctx.strokeStyle = '#ff5a36'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(x, y, R + 3.5, now / 300, now / 300 + Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      if (fx.sticky) { ctx.strokeStyle = '#d946ef'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 3.5 + Math.sin(now / 120), 0, Math.PI * 2); ctx.stroke(); }
+      if (fx.curve) { ctx.strokeStyle = '#ec4899'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 3.5, now / 140, now / 140 + Math.PI * 1.2); ctx.stroke(); }
+      const tags = [fx.ice && '❄️', fx.hammer > 0 && '💥' + fx.hammer].filter(Boolean);
+      if (tags.length) {
+        ctx.font = '12px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(tags.join(' '), x + R + 10, y - R - 2);
+      }
       if (pb.pid === me.id) {
         // You: a pulsing light ring, and right after a kickoff a marker above your head.
         ctx.strokeStyle = 'rgba(255,236,140,' + (0.6 + 0.4 * Math.sin(now / 160)) + ')';
         ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(x, y, BZ_PR + 6 + Math.sin(now / 160) * 1.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, R + 6 + Math.sin(now / 160) * 1.5, 0, Math.PI * 2); ctx.stroke();
         if (now - (sg.koAt || 0) < 3000) {
           const bob = Math.sin(now / 120) * 3;
           ctx.fillStyle = '#ffec8c';
-          ctx.beginPath(); ctx.moveTo(x - 8, y - BZ_PR - 22 + bob); ctx.lineTo(x + 8, y - BZ_PR - 22 + bob); ctx.lineTo(x, y - BZ_PR - 11 + bob); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x - 8, y - R - 22 + bob); ctx.lineTo(x + 8, y - R - 22 + bob); ctx.lineTo(x, y - R - 11 + bob); ctx.fill();
           ctx.font = '800 14px "Segoe UI", system-ui, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'alphabetic';
           ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)';
-          ctx.strokeText('DU', x, y - BZ_PR - 26 + bob);
-          ctx.fillText('DU', x, y - BZ_PR - 26 + bob);
+          ctx.strokeText('DU', x, y - R - 26 + bob);
+          ctx.fillText('DU', x, y - R - 26 + bob);
         }
       }
       ctx.fillStyle = '#ffffff';
-      ctx.font = '800 17px "Segoe UI", system-ui, sans-serif';
+      ctx.font = '800 ' + Math.round(R * 1.13) + 'px "Segoe UI", system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText((pb.name || '?').charAt(0).toUpperCase(), x, y + 1);
       ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
       ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,0,.55)';
-      ctx.strokeText(pb.name + (pb.on ? '' : ' …'), x, y + BZ_PR + 13);
+      ctx.strokeText(pb.name + (pb.on ? '' : ' …'), x, y + R + 13);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(pb.name + (pb.on ? '' : ' …'), x, y + BZ_PR + 13);
+      ctx.fillText(pb.name + (pb.on ? '' : ' …'), x, y + R + 13);
     }
     // Ball with its shadow.
-    const bx = lerp(a.b[0], b.b[0]) + ahead(b.b[2], 0.99), by = lerp(a.b[1], b.b[1]) + ahead(b.b[3], 0.99);
+    let bx = lerp(a.b[0], b.b[0]) + ahead(b.b[2], 0.99), by = lerp(a.b[1], b.b[1]) + ahead(b.b[3], 0.99);
+    // A ball stuck to a foot is drawn at that foot as it is drawn (for yourself that is ahead of the updates).
+    const holder = b.hold && b.pl.find(p => p.pid === b.hold), hd = holder && sg.drawn[holder.pid];
+    if (hd) { bx = hd[0] + b.b[0] - holder.x; by = hd[1] + b.b[1] - holder.y; ctx.strokeStyle = 'rgba(217,70,239,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hd[0], hd[1]); ctx.lineTo(bx, by); ctx.stroke(); }
     // A fading streak behind a fast ball, and a flash right after a kick.
     sg.btrail = [[bx, by], ...(sg.btrail || [])].slice(0, 8);
     if (Math.hypot(b.b[2], b.b[3]) > 2.5) sg.btrail.forEach(([tx, ty], i) => {
@@ -5498,6 +5636,10 @@ function bzDraw(g, cv, now, dt) {
     if (flash) { ctx.fillStyle = 'rgba(255,255,255,' + (0.55 * flash) + ')'; ctx.beginPath(); ctx.arc(bx, by, BZ_BR + 10 * flash, 0, Math.PI * 2); ctx.fill(); }
     ctx.fillStyle = 'rgba(0,0,0,.25)';
     ctx.beginPath(); ctx.ellipse(bx + 3, by + 4, BZ_BR, BZ_BR * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+    if (b.spin) {
+      ctx.strokeStyle = 'rgba(236,72,153,.85)'; ctx.lineWidth = 2.5;
+      for (let j = 0; j < 2; j++) { ctx.beginPath(); ctx.arc(bx, by, BZ_BR + 5, now / 70 * Math.sign(b.spin) + j * Math.PI, now / 70 * Math.sign(b.spin) + j * Math.PI + 1.6); ctx.stroke(); }
+    }
     if (b.face) babyBall(ctx, bx, by, BZ_BR * 2.6, b.face);
     else {
       ctx.fillStyle = '#ffffff';
@@ -5508,7 +5650,27 @@ function bzDraw(g, cv, now, dt) {
     }
   }
   sgDrawFx(g, ctx, dt, now);
+  sgDrawFloats(g, ctx, now);
   ctx.setTransform(k, 0, 0, k, 0, 0);
+  // Your running power-ups, bottom left: icon and seconds left (or shots left).
+  const mineNow = s && s.pl.find(p => p.pid === me.id);
+  if (mineNow && mineNow.fx) {
+    const chips = [];
+    for (const [key, v] of Object.entries(mineNow.fx)) if (v > 0) chips.push([BZ_PU[key][0], key === 'hammer' ? v + '×' : key === 'sticky' ? '' : Math.ceil(v / 60) + 's', BZ_PU[key][1]]);
+    if (s.wall && s.wall[mineNow.team] > 0 && !mineNow.fx.god) chips.push([BZ_PU.wall[0], Math.ceil(s.wall[mineNow.team] / 60) + 's', BZ_PU.wall[1]]);
+    let cx = 10;
+    for (const [icon, t, col] of chips) {
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.beginPath(); ctx.roundRect(cx, vh - 34, 62, 26, 13); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+      ctx.font = '15px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(icon, cx + 7, vh - 20);
+      ctx.font = '700 13px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#ffffff';
+      ctx.fillText(t, cx + 30, vh - 20);
+      cx += 68;
+    }
+  }
   if (s && s.st !== 'lobby') {
     // Score and clock on the pitch, top centre; the clock turns red in the last 30 s.
     const cx = vw / 2;
@@ -5534,16 +5696,22 @@ function bzDraw(g, cv, now, dt) {
    the trails and draws each bike gliding along them a moment behind, by about as much as updates arrive late,
    so it moves evenly even when the network delivers in bursts. */
 const NR_W = 80, NR_H = 50, NR_CELL = 10, NR_COL = ['#22e5ff', '#ff3df0', '#ffe14d', '#7dff4d'], NR_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+// Trail cells are [x, y, time, wall]: wall is 0 where the bike left a gap or a bomb blew the trail away.
 function nrFull(g, m) {
-  const sg = g.sg;
-  sg.trails = (m.trails || []).map(t => (Array.isArray(t) ? t : []).map(c => [c[0] | 0, c[1] | 0]));
-  sg.ghosts = (m.ghosts || []).map(t => (Array.isArray(t) ? t : []).map(c => [c[0] | 0, c[1] | 0]));
+  const sg = g.sg, cells = t => (Array.isArray(t) ? t : []).map(c => [c[0] | 0, c[1] | 0, 0, c[2] === 0 ? 0 : 1]);
+  sg.trails = (m.trails || []).map(cells);
+  sg.ghosts = (m.ghosts || []).map(cells);
   sg.rd = m.rd;
   sg.fullAsked = 0;
   sg.pend = [];
   sg.grid = new Uint8Array(NR_W * NR_H);
-  for (const t of [...sg.trails, ...sg.ghosts]) for (const [x, y] of t) if (x >= 0 && y >= 0 && x < NR_W && y < NR_H) sg.grid[y * NR_W + x] = 1;
+  for (const t of [...sg.trails, ...sg.ghosts]) for (const [x, y, , w] of t) if (w && x >= 0 && y >= 0 && x < NR_W && y < NR_H) sg.grid[y * NR_W + x] = 1;
 }
+// The power-ups: icon, colour, name and what the pickup says.
+const NR_PU = {nitro: ['🔥', '#ff7a1a', 'NITRO', 'Boost-Leiste wieder voll'], ghost: ['👻', '#c4b5fd', 'GEIST', '3 s durch Spuren fahren'],
+  bomb: ['💣', '#ff4d4d', 'BOMBE', 'Alle Spuren um dich herum gesprengt'], gap: ['✂️', '#94a3b8', 'LÜCKE', '3 s keine Spur'],
+  brake: ['🐢', '#4ade80', 'BREMSE', 'Die anderen 4 s halb so schnell'], confuse: ['🔄', '#f472b6', 'VERWIRRUNG', 'Bei den anderen 4 s alle Richtungen vertauscht'],
+  shield: ['🛡️', '#60a5fa', 'SCHILD', 'Einmal einen Crash überleben'], god: ['✨', '#ffd23f', 'GÖTTLICH', '5 s unverwundbar und doppelt so schnell']};
 // When a key pressed now will have reached the server, on the clock the trail cells are stamped with: half the
 // round trip plus a margin for how much the network wobbles, so a turn practically never arrives too late.
 function nrLead(sg, now) { return now + (sg.rtt || 60) * 0.5 + 10 + Math.min(60, sg.jit); }
@@ -5554,9 +5722,11 @@ function nrTurn(g, d) {
   const sg = g.sg, s = sg.s, mi = s ? s.pl.findIndex(p => p.pid === me.id) : -1, mine = s && s.pl[mi], t = sg.trails[mi];
   if (!mine || !t || !t.length) return;
   sg.pend = sg.pend || [];
+  // Confused: every direction is the opposite one.
+  if (mine.fx && mine.fx.confuse > 0) d = (d + 2) % 4;
   const cur = sg.pend.length ? sg.pend[sg.pend.length - 1].d : mine.d;
   if (d === cur || d === (cur + 2) % 4 || sg.pend.length >= 3) return;
-  const last = t[t.length - 1], cellMs = 1000 / ((mine.bo && mine.f > 0) ? 24 : 12), arrive = nrLead(sg, performance.now());
+  const last = t[t.length - 1], cellMs = 1000 / (mine.sp || 12), arrive = nrLead(sg, performance.now());
   // The move the drawn bike is already halfway into is finished first; the turn goes on the one after it.
   let n = t.length;
   if (last[2]) while (last[2] + (n - t.length + 1) * cellMs < arrive) n++;
@@ -5569,7 +5739,7 @@ function nrTurn(g, d) {
 // ride on cell by cell at its speed, taking each pending turn at the first cell after it arrives, and stop in
 // front of anything in the way. Returns the cells ahead and how far into the next one the bike is.
 function nrPredict(g, t, p, now) {
-  const sg = g.sg, last = t[t.length - 1], cellMs = 1000 / ((p.bo && p.f > 0) ? 24 : 12);
+  const sg = g.sg, last = t[t.length - 1], cellMs = 1000 / (p.sp || 12), fx = p.fx || {}, through = fx.ghost > 0 || fx.god > 0;
   if (!last || !last[2]) return null;
   // Turns for moves the server has made already are in the confirmed trail.
   sg.pend = (sg.pend || []).filter(q => q.n > t.length - 1);
@@ -5581,7 +5751,7 @@ function nrPredict(g, t, p, now) {
     let dn = d, pj = pi;
     while (pj < sg.pend.length && sg.pend[pj].n <= n) { const q = sg.pend[pj++].d; if (q !== d && q !== (d + 2) % 4) { dn = q; break; } }
     const nx = x + NR_DIR[dn][0], ny = y + NR_DIR[dn][1];
-    const blocked = nx < 0 || ny < 0 || nx >= NR_W || ny >= NR_H || (sg.grid && sg.grid[ny * NR_W + nx]);
+    const blocked = nx < 0 || ny < 0 || nx >= NR_W || ny >= NR_H || (!through && sg.grid && sg.grid[ny * NR_W + nx]);
     if (at + cellMs > T || cells.length >= 4 || blocked) return {cells, f: blocked ? 0 : Math.max(0, Math.min(1, (T - at) / cellMs)), d: dn, x, y};
     pi = pj;
     d = dn;
@@ -5596,9 +5766,15 @@ function nrSnapshot(g, m) {
     return;
   }
   const at = m.ts + sg.off - performance.timeOrigin;
-  for (const [i, x, y] of m.mv || []) {
-    (sg.trails[i] || (sg.trails[i] = [])).push([x, y, at]);
-    if (sg.grid && x >= 0 && y >= 0 && x < NR_W && y < NR_H) sg.grid[y * NR_W + x] = 1;
+  for (const [i, x, y, w] of m.mv || []) {
+    (sg.trails[i] || (sg.trails[i] = [])).push([x, y, at, w === 0 ? 0 : 1]);
+    if (w !== 0 && sg.grid && x >= 0 && y >= 0 && x < NR_W && y < NR_H) sg.grid[y * NR_W + x] = 1;
+  }
+  // A bomb went off: those cells are free again for everyone.
+  if (m.er && m.er.length) {
+    const gone = new Set(m.er.map(([x, y]) => x + ',' + y));
+    for (const [x, y] of m.er) if (sg.grid) sg.grid[y * NR_W + x] = 0;
+    for (const t of [...sg.trails, ...sg.ghosts]) for (const c of t) if (c[3] && gone.has(c[0] + ',' + c[1])) c[3] = 0;
   }
 }
 function nrEvent(g, ev, s) {
@@ -5611,6 +5787,24 @@ function nrEvent(g, ev, s) {
     sg.rings.push({x, y, r0: 2, r1: 34, life: 0, max: 0.2, c: '#ffffff', w: 10});
     sg.shake = ev.pid === me.id ? 1.2 : 0.5;
     if (ev.pid === me.id && s.pl.filter(p => p.al).length > 1) sgBanner(g, 'DU BIST RAUS', 'Warte auf die nächste Runde', c);
+  } else if (ev.k === 'get') {
+    const i = s.pl.findIndex(p => p.pid === ev.pid), [icon, col, name, tip] = NR_PU[ev.kind] || ['?', '#fff', '', ''];
+    const x = (ev.x + 0.5) * NR_CELL, y = (ev.y + 0.5) * NR_CELL;
+    sgFloat(g, x, y - 18, icon + ' ' + name, col);
+    sgBurst(g, x, y, 24, [col, '#ffffff'], 300, {life: 0.6, size: 4});
+    if (ev.kind === 'bomb') {
+      sgBurst(g, x, y, 90, ['#ff4d4d', '#ffb020', '#ffffff'], 520, {life: 1, size: 6});
+      sg.rings.push({x, y, r0: 10, r1: 6.5 * NR_CELL, life: 0, max: 0.5, c: '#ffb020', w: 10});
+      sg.rings.push({x, y, r0: 4, r1: 40, life: 0, max: 0.25, c: '#ffffff', w: 14});
+      sg.shake = 1.2;
+    }
+    const others = ['brake', 'confuse'].includes(ev.kind);
+    if (ev.kind === 'god') sgBanner(g, '✨ GÖTTLICH ✨', (s.pl[i] ? s.pl[i].name : '') + ' – 5 Sekunden unaufhaltsam', '#ffd23f');
+    else if (ev.pid === me.id) sgBanner(g, icon + ' ' + name, tip, col);
+    else if (others && s.pl.some(p => p.pid === me.id && p.al)) sgBanner(g, icon + ' ' + name, (s.pl[i] ? s.pl[i].name : 'Jemand') + ': ' + tip, col);
+  } else if (ev.k === 'shield') {
+    const i = s.pl.findIndex(p => p.pid === ev.pid), h = sg.heads && sg.heads[i];
+    if (h) { sg.rings.push({x: h[0], y: h[1], r0: 6, r1: 40, life: 0, max: 0.4, c: '#60a5fa', w: 6}); sgFloat(g, h[0], h[1] - 18, '🛡️ GERETTET', '#60a5fa'); }
   } else if (ev.k === 'round') {
     const i = s.pl.findIndex(p => p.pid === ev.pid);
     sgBanner(g, ev.pid ? (ev.pid === me.id ? 'RUNDE GEWONNEN' : s.pl[i].name.toUpperCase() + ' GEWINNT') : 'UNENTSCHIEDEN', 'Runde ' + s.rd + ' · Stand ' + s.pl.map(p => p.sc).join(':'), ev.pid ? NR_COL[i] : '#ffffff');
@@ -5637,13 +5831,30 @@ function nrDraw(g, cv, now, dt) {
   ctx.strokeRect(1, 1, vw - 2, vh - 2);
   ctx.lineCap = 'square';
   ctx.lineJoin = 'miter';
-  const path = (t, head, upto = t.length, ahead = null) => {
+  // A trail is drawn only between cells that are walls, so gaps and blown-up parts stay open.
+  const path = (t, head, upto = t.length, ahead = null, gap = false) => {
     ctx.beginPath();
-    ctx.moveTo((t[0][0] + 0.5) * C, (t[0][1] + 0.5) * C);
-    for (let i = 1; i < upto; i++) ctx.lineTo((t[i][0] + 0.5) * C, (t[i][1] + 0.5) * C);
-    if (ahead) for (const c of ahead) ctx.lineTo((c[0] + 0.5) * C, (c[1] + 0.5) * C);
-    if (head) ctx.lineTo(head[0], head[1]);
+    let pen = false;
+    const pt = (x, y, w) => { if (w && pen) ctx.lineTo(x, y); else ctx.moveTo(x, y); pen = !!w; };
+    for (let i = 0; i < upto; i++) pt((t[i][0] + 0.5) * C, (t[i][1] + 0.5) * C, t[i][3] !== 0);
+    if (ahead) for (const c of ahead) pt((c[0] + 0.5) * C, (c[1] + 0.5) * C, !gap);
+    if (head && pen && !gap) ctx.lineTo(head[0], head[1]);
   };
+  // Items: glowing diamonds with their icon, blinking in their last 3 seconds.
+  for (const [kind, ix, iy, life] of (s && s.its) || []) {
+    if (life < 72 && Math.floor(now / 120) % 2) continue;
+    const [icon, col] = NR_PU[kind] || ['?', '#fff'], x = (ix + 0.5) * C, y = (iy + 0.5) * C, r = C * (1.1 + 0.12 * Math.sin(now / 160));
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.shadowColor = col; ctx.shadowBlur = 16;
+    ctx.fillStyle = 'rgba(10,14,30,.85)'; ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -r * 1.25); ctx.lineTo(r * 1.25, 0); ctx.lineTo(0, r * 1.25); ctx.lineTo(-r * 1.25, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.font = Math.round(C * 1.25) + 'px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(icon, 0, 1);
+    ctx.restore();
+  }
   for (const t of sg.ghosts) {
     if (t.length < 2) continue;
     path(t); ctx.strokeStyle = 'rgba(160,170,190,.35)'; ctx.lineWidth = C * 0.35; ctx.stroke();
@@ -5655,7 +5866,7 @@ function nrDraw(g, cv, now, dt) {
     const col = NR_COL[i] || '#fff', alive = p.al && s.st !== 'lobby';
     // Where the bike was at the drawing time: between the last cell it had reached and the next one.
     let head, upto = t.length, ahead = null;
-    const pr = alive && s.st === 'play' && p.pid === me.id ? nrPredict(g, t, p, now) : null;
+    const pr = alive && s.st === 'play' && p.pid === me.id ? nrPredict(g, t, p, now) : null, fx = p.fx || {};
     if (pr) {
       // Own bike: confirmed trail, then the predicted cells, then part of the way into the next one.
       ahead = pr.cells;
@@ -5664,7 +5875,7 @@ function nrDraw(g, cv, now, dt) {
       p = {...p, d: pr.d};
     } else if (alive && s.st === 'play' && t.length > 1) {
       // One cell's time behind (cells only come every 83 ms, 42 with boost) plus how late updates arrive.
-      const T = now - 1000 / ((p.bo && p.f > 0) ? 24 : 12) - Math.max(8, Math.min(110, sg.jit));
+      const T = now - 1000 / (p.sp || 12) - Math.max(8, Math.min(110, sg.jit));
       let j = t.length - 1;
       while (j > 0 && (t[j][2] || 0) > T) j--;
       const a = t[j], b = t[j + 1];
@@ -5675,22 +5886,38 @@ function nrDraw(g, cv, now, dt) {
     (sg.heads || (sg.heads = []))[i] = head;
     ctx.globalAlpha = alive ? 1 : 0.35;
     if (t.length > 1 || ahead) {
-      path(t, head, upto, ahead);
-      const hot = alive && p.bo && p.f > 0;
+      path(t, head, upto, ahead, alive && fx.gap > 0);
+      const hot = alive && ((p.bo && p.f > 0) || fx.god > 0);
       ctx.strokeStyle = col; ctx.globalAlpha = alive ? (hot ? 0.38 : 0.26) : 0.08; ctx.lineWidth = C * 1.5; ctx.stroke();
       ctx.globalAlpha = alive ? 1 : 0.35; ctx.lineWidth = C * 0.55; ctx.stroke();
       ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = alive ? (hot ? 0.85 : 0.6) : 0.12; ctx.lineWidth = C * 0.16; ctx.stroke();
     }
     ctx.globalAlpha = 1;
+    if (alive && s.st === 'play') {
+      // Power-ups on the bike: a golden aura, a shield bubble, and icons over bikes that are slowed or confused.
+      if (fx.god > 0) {
+        const gl = ctx.createRadialGradient(head[0], head[1], 2, head[0], head[1], C * 3);
+        gl.addColorStop(0, 'rgba(255,225,120,.75)'); gl.addColorStop(1, 'rgba(255,225,120,0)');
+        ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(head[0], head[1], C * 3, 0, Math.PI * 2); ctx.fill();
+      }
+      if (fx.shield) { ctx.strokeStyle = 'rgba(96,165,250,' + (0.6 + 0.3 * Math.sin(now / 150)) + ')'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(head[0], head[1], C * 1.4, 0, Math.PI * 2); ctx.stroke(); }
+      const tags = [fx.brake > 0 && '🐢', fx.confuse > 0 && '🔄', fx.ghost > 0 && '👻', fx.gap > 0 && '✂️'].filter(Boolean);
+      if (tags.length) {
+        ctx.font = Math.round(C * 1.3) + 'px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(tags.join(''), head[0] + C * 1.8, head[1] - C * 1.6);
+      }
+      if (fx.ghost > 0) ctx.globalAlpha = 0.35 + 0.3 * Math.abs(Math.sin(now / 90));
+    }
     if (alive && p.fc) babyBall(ctx, head[0], head[1], C * 1.6, p.fc);
     else if (alive || s.st === 'count') {
       const d = NR_DIR[p.d || 0], ang = Math.atan2(d[1], d[0]);
       ctx.save();
       ctx.translate(head[0], head[1]);
       ctx.rotate(ang);
-      ctx.shadowColor = col;
+      ctx.shadowColor = fx.god > 0 ? '#ffd23f' : col;
       ctx.shadowBlur = 14;
-      ctx.fillStyle = col;
+      ctx.fillStyle = fx.god > 0 ? '#fff3b0' : col;
       ctx.beginPath(); ctx.moveTo(C * 0.9, 0); ctx.lineTo(-C * 0.5, -C * 0.55); ctx.lineTo(-C * 0.2, 0); ctx.lineTo(-C * 0.5, C * 0.55); ctx.closePath(); ctx.fill();
       ctx.shadowBlur = 0;
       ctx.fillStyle = '#ffffff';
@@ -5709,9 +5936,11 @@ function nrDraw(g, cv, now, dt) {
         ctx.fillText(p.pid === me.id ? 'DU' : p.name || '', head[0], head[1] - C * 1.5);
       }
     }
+    ctx.globalAlpha = 1;
   });
   if (s && s.st === 'count') sg.rdAt = now;
   sgDrawFx(g, ctx, dt, now);
+  sgDrawFloats(g, ctx, now);
   // Own boost bar at the bottom.
   const mine = pl.find(p => p.pid === me.id), mi = pl.indexOf(mine);
   if (mine && (s.st === 'play' || s.st === 'count')) {
@@ -5720,6 +5949,19 @@ function nrDraw(g, cv, now, dt) {
     ctx.fillStyle = NR_COL[mi]; ctx.fillRect(x, y, w * f, 7);
     ctx.font = '600 10px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.7)';
     ctx.fillText('BOOST', x - 6, y + 7);
+    // Your running power-ups next to the boost bar.
+    let cx = x + w + 12;
+    for (const [key, v] of Object.entries(mine.fx || {})) {
+      if (!(v > 0)) continue;
+      const [icon, col] = NR_PU[key];
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(cx, y - 9, 50, 22, 11); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.font = '12px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(icon, cx + 6, y + 2);
+      ctx.font = '700 11px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#fff';
+      ctx.fillText(key === 'shield' ? '1×' : Math.ceil(v / 24) + 's', cx + 26, y + 2);
+      cx += 56;
+    }
   }
   ctx.setTransform(k, 0, 0, k, 0, 0);
   if (s && s.st !== 'lobby') {
