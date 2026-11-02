@@ -237,6 +237,8 @@ export class Arena {
     this.pausedAt = 0;
     this.pausedSt = '';
     this.tok = ['', ''];
+    this.spAt = [0, 0];
+    this.rttN = [0, 0];
     this.evq = [];
   }
 
@@ -277,8 +279,11 @@ export class Arena {
       h.push([now, y]);
       while (h.length && now - h[0][0] > 800) h.shift();
     } else if (msg.t === 'ping' && Number.isFinite(msg.c)) {
-      if (Number.isFinite(msg.rtt)) this.rtt[i] = Math.max(0, Math.min(400, msg.rtt));
       try { this.seats[i].send(JSON.stringify({t: 'pong', c: msg.c})); } catch (e) {}
+    } else if (msg.t === 'spr' && Number.isFinite(msg.c) && msg.c === this.spAt[i]) {
+      // The round trip as the server measures it (a page could claim any ping), smoothed a little.
+      const r = Math.max(0, Math.min(400, Date.now() - msg.c));
+      this.rtt[i] = this.rttN[i]++ ? this.rtt[i] * 0.7 + r * 0.3 : r;
     } else if (msg.t === 'vote' && this.st === 'vote' && typeof msg.v === 'boolean') {
       this.votes[i] = msg.v;
       if (this.votes[0] !== null && this.votes[1] !== null) this.decide();
@@ -353,6 +358,8 @@ export class Arena {
       clearInterval(this.timer);
       this.timer = 0;
     }
+    // Every 2 s the server asks each page for an echo, to know its ping itself.
+    for (let i = 0; i < 2; i++) if (this.seats[i] && now - this.spAt[i] > 2000) { this.spAt[i] = now; try { this.seats[i].send(JSON.stringify({t: 'sp', c: now})); } catch (e) {} }
     this.broadcast(now);
   }
 
