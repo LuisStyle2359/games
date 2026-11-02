@@ -187,7 +187,7 @@ export class Hub {
 // Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
 // their paddle is; the page draws its own paddle right away and the rest from these updates.
 const W = 640, H = 360, PH = 70, BIG = 105, MINI = 44, PW = 10, PX = 24, BR = 7, WIN = 7, CAP = 10, V0 = 330, VFAST = 1150, VMAX = 1900,
-  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini', 'curve'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000,
+  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini', 'curve', 'ghost'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000,
   GOD_CHANCE = 0.025, GOD_MS = 8000, GOD_PH = 140, CURVE_MS = 12000, FACE_GAP = W - 2 * (PX + PW / 2 + BR);
 // The owner's admin key (public half): a signed request from the owner's page can spawn the divine item.
 const ADMIN_PUB = {kty: 'EC', crv: 'P-256', x: '30m7AWoz9Hby1aY-forxylWjKyUcxg5hykvUolJKZVg', y: '-BaBgI413Atu8-Ep57UHLwkFhcZbidMNGSwQ0hR1LpA'};
@@ -237,6 +237,12 @@ export class Arena {
     this.pausedAt = 0;
     this.pausedSt = '';
     this.tok = ['', ''];
+    // Rally: returns in the current point. Rescue: the one-time wall for whoever falls 3 behind. Ghost: the ball
+    // fades in the middle of the table after the taker's returns.
+    this.rally = 0;
+    this.rescued = [false, false];
+    this.ghost = [0, 0];
+    this.hide = false;
     this.spAt = [0, 0];
     this.rttN = [0, 0];
     this.evq = [];
@@ -316,6 +322,8 @@ export class Arena {
     this.turbo = false;
     this.spin = 0;
     this.last = -1;
+    this.rally = 0;
+    this.hide = false;
   }
 
   launch() {
@@ -375,7 +383,7 @@ export class Arena {
   // between points ends in the usual countdown before the serve.
   resume(now) {
     const d = now - this.pausedAt + (this.pausedSt === 'play' ? 3000 : 0), sh = t => t ? t + d : t;
-    for (const k of ['bigUntil', 'miniUntil', 'god', 'curve', 'slow']) this[k] = this[k].map(sh);
+    for (const k of ['bigUntil', 'miniUntil', 'god', 'curve', 'slow', 'ghost']) this[k] = this[k].map(sh);
     if (this.item) this.item.t += d;
     this.nextItem = sh(this.nextItem);
     this.stuckUntil = sh(this.stuckUntil);
@@ -415,6 +423,7 @@ export class Arena {
       // Divine paddle: for 8 s a double-size paddle, every return a fireball, and a goal nothing gets through.
       // Curveball: for 12 s every return of the taker bends on its way across.
       if (it.k === 'curve') this.curve[i] = now + CURVE_MS;
+      if (it.k === 'ghost') this.ghost[i] = now + 10000;
       if (it.k === 'god') { this.god[i] = now + GOD_MS; this.ph[i] = GOD_PH; this.miniUntil[i] = 0; }
       if (it.k === 'shield') this.shield[i] = true;
       if (it.k === 'magnet') this.magnet[i] = true;
@@ -444,6 +453,8 @@ export class Arena {
     const v = Math.min(VMAX, speed * (speed < VFAST ? 1.05 : 1.02));
     Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
     this.last = i;
+    this.rally++;
+    this.hide = this.ghost[i] > Date.now();
     this.turbo = false;
     this.spin = 0;
     if (this.god[i] > Date.now()) { this.b.vx = -s * TURBO * Math.cos(a); this.b.vy = TURBO * Math.sin(a); this.turbo = true; }
@@ -607,7 +618,12 @@ export class Arena {
   point(scorer) {
     this.sc[scorer]++;
     const a = this.sc[scorer], o = this.sc[1 - scorer];
+    // How long the rally was (for records on the pages).
+    this.event('point', scorer, this.rally);
     if (a >= CAP || (a >= WIN && a - o >= 2)) return this.finish(scorer + 1);
+    // Aufholjagd: the first time someone is 3 behind, they get a free shield wall (once per match).
+    const j = 1 - scorer;
+    if (a - o >= 3 && !this.rescued[j]) { this.rescued[j] = true; this.shield[j] = true; this.event('rescue', j); }
     this.dir = scorer === 0 ? 1 : -1;
     this.serve('goal', 1200);
   }
@@ -621,7 +637,7 @@ export class Arena {
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
       sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)],
       aw: this.away, cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
-      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq});
+      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq, rl: this.rally, gb: this.hide && this.stuck < 0});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }
 }

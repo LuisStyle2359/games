@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 62;
+const APP_VERSION = 63;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3446,7 +3446,7 @@ const PG_W = 640, PG_H = 360, PG_PH = 70, PG_PW = 10, PG_PX = 24, PG_BR = 7, PG_
 const PG_ITEMS = {big: {icon: '🟨', name: 'Riesen-Schläger', color: '#b6ff3b', hue: 85}, shield: {icon: '🛡️', name: 'Schutzwand', color: '#b388ff', hue: 265},
   magnet: {icon: '🧲', name: 'Magnet-Schuss', color: '#ff3b5c', hue: 350}, slow: {icon: '⏳', name: 'Zeitlupe', color: '#2ef2d0', hue: 170},
   mini: {icon: '🔻', name: 'Mini-Schläger', color: '#ffd23f', hue: 48}, god: {icon: '⚡', name: 'Göttlicher Schläger', color: '#ffe066', hue: 50},
-  curve: {icon: '🌀', name: 'Kurvenball', color: '#ff6ad5', hue: 315}};
+  curve: {icon: '🌀', name: 'Kurvenball', color: '#ff6ad5', hue: 315}, ghost: {icon: '👻', name: 'Geisterball', color: '#d0d4dc', hue: 220}};
 // First to 7; from 6:6 on a two-point lead is needed, at most up to 10 (at 9:9 the next point wins).
 function pgTarget(sc) { const hi = Math.max(sc[0], sc[1]), lo = Math.min(sc[0], sc[1]); return lo >= 6 ? Math.min(10, hi === lo ? hi + 2 : hi + 1) : 7; }
 let pgGame = null;
@@ -4222,15 +4222,16 @@ const PG_ICONS = {
   slow: ['WWWWWWWWW', '.T.....T.', '..TTTTT..', '...TTT...', '....T....', '...T.T...', '..T.T.T..', '.TTTTTTT.', 'WWWWWWWWW'],
   mini: ['..GGGGG..', '...GGG...', '....G....', '.........', '..WWWWW..', '.........', '....G....', '...GGG...', '..GGGGG..'],
   curve: ['..PPPPP..', '.P.....P.', 'P..PPP..P', 'P.P...P.P', 'P.P.W.P.P', 'P.P..PP.P', 'P..PP...P', '.P......P', '..PPPPPP.'],
+  ghost: ['..SSSSS..', '.SSSSSSS.', 'SSWSSSWSS', 'SSKSSSKSS', 'SSSSSSSSS', 'SSSSSSSSS', 'SSSSSSSSS', 'SS.SS.SSS', 'S...S...S'],
   god: ['.....GGG.', '....GGW..', '...GGW...', '..GGGGGG.', '.GGGGGG..', '....GWG..', '...GWG...', '..GW.....', '.G.......']
 };
 // The divine item's star jewel (O outline, G gold, W light gold, X white core).
 const PG_GOD_STAR = ['....O....', '...OXO...', '..OXWGO..', '.OXWGGGO.', 'OWWGGGGDO', '.OGGGGDO.', '..OGGDO..', '...ODO...', '....O....'];
 // An angel wing (upper one, pointing into the field, root at the bottom left); O gold outline, W white, G light gold.
 const PG_WING = ['..........OO', '........OOWO', '......OOWWWO', '....OOWWWWGO', '..OOWWWWWGO.', '.OWWWWWWGGO.', 'OWWWWWWGGOO.', 'OWWGOWGOWGO.', 'OGO.OGO.OGO.'];
-const PG_ICON_COL = {W: '#ffffff', R: '#ff3b5c', D: '#a3152f', L: '#b6ff3b', V: '#b388ff', T: '#2ef2d0', G: '#ffd23f', P: '#ff6ad5'};
-const PG_DARK = {'#ff3b5c': '#8a1830', '#b388ff': '#4a2d85', '#b6ff3b': '#4f7a14', '#ffffff': '#6b7079', '#2ef2d0': '#12695b', '#ffd23f': '#7a5c10', '#ff6ad5': '#7a2a63'};
-const PG_LABEL = {big: 'RIESEN-SCHLÄGER', shield: 'SCHUTZWAND', magnet: 'MAGNET', slow: 'ZEITLUPE', mini: 'MINI-SCHLÄGER', god: 'GÖTTLICH', curve: 'KURVENBALL'};
+const PG_ICON_COL = {S: '#d0d4dc', K: '#1b1e24', W: '#ffffff', R: '#ff3b5c', D: '#a3152f', L: '#b6ff3b', V: '#b388ff', T: '#2ef2d0', G: '#ffd23f', P: '#ff6ad5'};
+const PG_DARK = {'#ff3b5c': '#8a1830', '#b388ff': '#4a2d85', '#b6ff3b': '#4f7a14', '#ffffff': '#6b7079', '#2ef2d0': '#12695b', '#ffd23f': '#7a5c10', '#ff6ad5': '#7a2a63', '#d0d4dc': '#5a5f69'};
+const PG_LABEL = {big: 'RIESEN-SCHLÄGER', shield: 'SCHUTZWAND', magnet: 'MAGNET', slow: 'ZEITLUPE', mini: 'MINI-SCHLÄGER', god: 'GÖTTLICH', curve: 'KURVENBALL', ghost: 'GEISTERBALL'};
 // 5x7 pixel font for the banner and the score.
 const PG_FONT = {
   A: '.###.#...##...#######...##...##...#', B: '####.#...##...#####.#...##...#####.', C: '.#####....#....#....#....#.....####',
@@ -4378,6 +4379,23 @@ function pgEvent(g, ev) {
     if (curse) fxBanner(pg, mine ? [['MINI FÜR ', it.color], [String(g.opName).slice(0, 8), PG_COL.op]] : [[name, own], [' · MINI FÜR DICH', it.color]], it.color);
     else fxBanner(pg, [[name, own], [' · ' + PG_LABEL[ev.kind], it.color]], it.color);
   }
+  if (ev.k === 'point') {
+    // A long rally gets its moment; a new best (against this opponent, or this bot level) a big one.
+    const n = ev.kind | 0, key = 'pgRally:' + (g.offline ? 'bot-' + g.offline.lvl : g.opName), best = store.get(key, 0);
+    pg.matchBest = Math.max(pg.matchBest || 0, n);
+    if (n > best && n >= 8) {
+      store.set(key, n);
+      fx.hitStop = performance.now() + 200; fx.whiteout = 1;
+      fxBanner(pg, [['✦ NEUER REKORD ' + n + ' ✦', '#ffd23f']], '#ffd23f');
+      fxDebris(pg, PG_W / 2, PG_H / 2, 40, ['#ffd23f', '#ffffff', '#7a5c10'], {speed: 500, life: 0.7, gravity: 200, size: 4});
+    } else if (n >= 12) fxBanner(pg, [['RALLY ' + n + ' · PUNKT FÜR ', '#ffffff'], [name, own]], '#ffd23f');
+    pg.rallyRecord = Math.max(best, n);
+    return;
+  }
+  if (ev.k === 'rescue') {
+    fxBanner(pg, [['AUFHOLJAGD · WAND FÜR ', '#ffffff'], [name, own]], PG_COL.wall);
+    return;
+  }
   if (ev.k === 'catch') {
     fxBanner(pg, mine ? [['ZIELEN & KLICKEN', own]] : [[name, own], [' LÄDT', PG_COL.mag]], PG_COL.mag);
   }
@@ -4508,6 +4526,12 @@ function pgFrame(g, ts) {
     if (pg.baby !== undefined && (total !== pg.baby || s.st === 'over')) pg.baby = undefined;
     if (pg.prevTotal !== undefined && total > pg.prevTotal && s.st !== 'over') {
       const mineScored = s.sc[me1] > pg.prevMine, x = mineScored ? PG_W - 36 : 36, y = pg.lastBall ? pg.lastBall[1] : PG_H / 2;
+      // Streaks: three points in a row and you're on fire; whoever ends a streak gets a moment too.
+      const who = mineScored ? 'me' : 'op', st0 = pg.streak || {who: '', n: 0};
+      if (st0.who === who) st0.n++;
+      else { if (st0.n >= 3) fxBanner(pg, [['SERIE GEBROCHEN!', mineScored ? PG_COL.me : PG_COL.op]], '#ff9f1c'); st0.who = who; st0.n = 1; }
+      pg.streak = st0;
+      if (st0.n === 3) setTimeout(() => fxBanner(pg, [[mineScored ? 'DU BIST' : String(g.opName).slice(0, 8).toUpperCase() + ' IST', mineScored ? PG_COL.me : PG_COL.op], [' HEISS ⚡', '#ff9f1c']], '#ff9f1c'), 700);
       fx.scoreJump[mineScored ? 0 : 1] = 1;
       fx.serveAt = now;
       if (now - (pg.hotAt || 0) < 500) {
@@ -4535,10 +4559,24 @@ function pgFrame(g, ts) {
     const dim = by < 100 || path.some(p => p[1] < 90) || fx.burn.some(b => b.y < 90);
     for (const [k, i, x] of [[0, me1, PG_W / 4], [1, op1, PG_W * 3 / 4]]) {
       const j = fx.scoreJump[k];
-      pgText(ctx, [[String(s.sc[i]), j > 0.1 ? '#ffffff' : dim ? '#181c22' : '#2c313a']], x, 28 - PGX(16 * j), 8);
+      const fire = pg.streak && pg.streak.n >= 3 && (pg.streak.who === 'me') === (i === me1);
+      pgText(ctx, [[String(s.sc[i]), j > 0.1 ? '#ffffff' : fire ? (Math.floor(now / 160) % 2 ? '#ff9f1c' : '#e8401c') : dim ? '#181c22' : '#2c313a']], x, 28 - PGX(16 * j), 8);
       fx.scoreJump[k] *= Math.pow(0.02, dt);
     }
 
+    // The rally: how many returns this point, getting hotter as the ball gets faster; the record below it.
+    const rl = s.rl | 0;
+    if (s.st === 'play' && rl >= 3) {
+      const col = rl >= 26 ? (Math.floor(now / 150) % 2 ? '#ff3b5c' : '#ffffff') : rl >= 20 ? '#ff9f1c' : rl >= 10 ? '#ffd23f' : dim ? '#181c22' : '#2c313a';
+      const txt = String(rl), w = PGX(pgTextWidth(txt, 4) + 12);
+      ctx.fillStyle = '#0e1116'; ctx.fillRect(PGX(PG_W / 2 - w / 2), PG_H - 48, w, 32);
+      pgText(ctx, [[txt, col]], PG_W / 2, PG_H - 44, 4);
+      const rec = pg.rallyRecord || store.get('pgRally:' + (g.offline ? 'bot-' + g.offline.lvl : g.opName), 0);
+      if (rec >= 8) pgText(ctx, [['REKORD ' + rec, rl > rec ? '#ffd23f' : '#3a3f47']], PG_W / 2, PG_H - 14, 2);
+      if (rl !== pg.rlPrev && [10, 20, 30, 40].includes(rl)) fxBanner(pg, [[rl + 'ER RALLY', '#ffd23f']], '#ffd23f');
+      if (rl === 26 && pg.rlPrev !== 26) { fx.shake = Math.max(fx.shake || 0, 0.6); fxBanner(pg, [['MAX TEMPO', '#ff3b5c']], '#ff3b5c'); }
+    }
+    pg.rlPrev = rl;
     // Net kick when the ball crosses the middle.
     if (pg.prevBx !== undefined && Math.sign(bx - PG_W / 2) !== Math.sign(pg.prevBx - PG_W / 2) && s.st === 'play') {
       for (let i = 0, y = 0; y < PG_H; i++, y += 24) {
@@ -4958,8 +4996,10 @@ function pgFrame(g, ts) {
       pg.trail = [];
       // In slow motion the ball drags teal after-images behind it.
       const slowNow = s.sl && s.sl[s.p[2] < 0 ? 0 : 1] > 0;
+      // Geisterball: in the middle third of the table only a faint outline flickers now and then.
+      const ghostHide = s.gb && s.stuck < 0 && bx > 200 && bx < 440;
       // A curveball spins: a pink helix winds along the path it took, and a stripe turns on the ball itself.
-      if (s.sp && s.stuck < 0) {
+      if (s.sp && s.stuck < 0 && !ghostHide) {
         if (dt) { pg.ctrail = [[bx, by], ...(pg.ctrail || [])].slice(0, 16); }
         (pg.ctrail || []).forEach(([cx2, cy2], k) => {
           if (!k) return;
@@ -4974,7 +5014,8 @@ function pgFrame(g, ts) {
       } else pg.ghosts = null;
       // A new serve after a goal blinks in so it never reads as a second ball next to the explosion.
       const since = now - (fx.serveAt || 0);
-      if (pg.baby === undefined && (since > 700 || (since > 300 && Math.floor(since / 80) % 2))) {
+      if (ghostHide) { if (Math.floor(now / 120) % 3 === 0) { ctx.fillStyle = '#5a5f69'; ctx.fillRect(bx - 6, by - 6, 12, 2); ctx.fillRect(bx - 6, by + 4, 12, 2); ctx.fillRect(bx - 6, by - 6, 2, 12); ctx.fillRect(bx + 4, by - 6, 2, 12); } }
+      else if (pg.baby === undefined && (since > 700 || (since > 300 && Math.floor(since / 80) % 2))) {
         const cool = now - (pg.coolAt || 0), heat = s.stuck >= 0 ? (full ? '#e8401c' : charge > 0.55 ? '#ff9f1c' : charge > 0.25 ? '#ffd23f' : null) : cool < 200 ? '#ff6b1a' : cool < 450 ? '#ffd23f' : null;
         if (heat) { ctx.fillStyle = heat; ctx.fillRect(bx - 10, by - 10, 20, 20); }
         ctx.fillStyle = s.stuck < 0 && cool < 200 ? '#fff3b0' : '#ffffff';
@@ -6267,7 +6308,7 @@ const SG_LOCAL = (() => {
 // Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
 // their paddle is; the page draws its own paddle right away and the rest from these updates.
 const W = 640, H = 360, PH = 70, BIG = 105, MINI = 44, PW = 10, PX = 24, BR = 7, WIN = 7, CAP = 10, V0 = 330, VFAST = 1150, VMAX = 1900,
-  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini', 'curve'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000,
+  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini', 'curve', 'ghost'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000,
   GOD_CHANCE = 0.025, GOD_MS = 8000, GOD_PH = 140, CURVE_MS = 12000, FACE_GAP = W - 2 * (PX + PW / 2 + BR);
 // The owner's admin key (public half): a signed request from the owner's page can spawn the divine item.
 const ADMIN_PUB = {kty: 'EC', crv: 'P-256', x: '30m7AWoz9Hby1aY-forxylWjKyUcxg5hykvUolJKZVg', y: '-BaBgI413Atu8-Ep57UHLwkFhcZbidMNGSwQ0hR1LpA'};
@@ -6317,6 +6358,12 @@ class Arena {
     this.pausedAt = 0;
     this.pausedSt = '';
     this.tok = ['', ''];
+    // Rally: returns in the current point. Rescue: the one-time wall for whoever falls 3 behind. Ghost: the ball
+    // fades in the middle of the table after the taker's returns.
+    this.rally = 0;
+    this.rescued = [false, false];
+    this.ghost = [0, 0];
+    this.hide = false;
     this.spAt = [0, 0];
     this.rttN = [0, 0];
     this.evq = [];
@@ -6396,6 +6443,8 @@ class Arena {
     this.turbo = false;
     this.spin = 0;
     this.last = -1;
+    this.rally = 0;
+    this.hide = false;
   }
 
   launch() {
@@ -6455,7 +6504,7 @@ class Arena {
   // between points ends in the usual countdown before the serve.
   resume(now) {
     const d = now - this.pausedAt + (this.pausedSt === 'play' ? 3000 : 0), sh = t => t ? t + d : t;
-    for (const k of ['bigUntil', 'miniUntil', 'god', 'curve', 'slow']) this[k] = this[k].map(sh);
+    for (const k of ['bigUntil', 'miniUntil', 'god', 'curve', 'slow', 'ghost']) this[k] = this[k].map(sh);
     if (this.item) this.item.t += d;
     this.nextItem = sh(this.nextItem);
     this.stuckUntil = sh(this.stuckUntil);
@@ -6495,6 +6544,7 @@ class Arena {
       // Divine paddle: for 8 s a double-size paddle, every return a fireball, and a goal nothing gets through.
       // Curveball: for 12 s every return of the taker bends on its way across.
       if (it.k === 'curve') this.curve[i] = now + CURVE_MS;
+      if (it.k === 'ghost') this.ghost[i] = now + 10000;
       if (it.k === 'god') { this.god[i] = now + GOD_MS; this.ph[i] = GOD_PH; this.miniUntil[i] = 0; }
       if (it.k === 'shield') this.shield[i] = true;
       if (it.k === 'magnet') this.magnet[i] = true;
@@ -6524,6 +6574,8 @@ class Arena {
     const v = Math.min(VMAX, speed * (speed < VFAST ? 1.05 : 1.02));
     Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
     this.last = i;
+    this.rally++;
+    this.hide = this.ghost[i] > Date.now();
     this.turbo = false;
     this.spin = 0;
     if (this.god[i] > Date.now()) { this.b.vx = -s * TURBO * Math.cos(a); this.b.vy = TURBO * Math.sin(a); this.turbo = true; }
@@ -6687,7 +6739,12 @@ class Arena {
   point(scorer) {
     this.sc[scorer]++;
     const a = this.sc[scorer], o = this.sc[1 - scorer];
+    // How long the rally was (for records on the pages).
+    this.event('point', scorer, this.rally);
     if (a >= CAP || (a >= WIN && a - o >= 2)) return this.finish(scorer + 1);
+    // Aufholjagd: the first time someone is 3 behind, they get a free shield wall (once per match).
+    const j = 1 - scorer;
+    if (a - o >= 3 && !this.rescued[j]) { this.rescued[j] = true; this.shield[j] = true; this.event('rescue', j); }
     this.dir = scorer === 0 ? 1 : -1;
     this.serve('goal', 1200);
   }
@@ -6701,7 +6758,7 @@ class Arena {
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
       sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)],
       aw: this.away, cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
-      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq});
+      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq, rl: this.rally, gb: this.hide && this.stuck < 0});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }
 }
@@ -8036,7 +8093,8 @@ function pgBrain(A, lvl) {
         const v = Math.hypot(A.b.vx, A.b.vy);
         off = d > 0 ? (Math.random() * 2 - 1) * L.angle * half + gauss() * (L.e0 + L.ev * v / 1000) : 0;
       }
-      if (now >= reactAt && now >= aimAt) {
+      // A Geisterball can't be seen in the middle of the table: no new look at it there.
+      if (now >= reactAt && now >= aimAt && !(A.hide && A.b.x > 200 && A.b.x < 440)) {
         aimAt = now + L.reaim;
         target = dir > 0 ? predict(L.curve) + off : PG_H / 2 + (A.b.y - PG_H / 2) * 0.3;
       }
@@ -8237,7 +8295,7 @@ function offShow(game) {
     ...(game === 'breach' ? [el('div', {class: 'olabel', text: 'Karte'}),
       el('div', {class: 'orow'}, opt('map', 'rand', '🎲 Zufall'), ...SG_LOCAL.br.MAPS.map((m, i) => opt('map', i, (i ? '🏭 ' : '🏠 ') + m.name)))] : []),
     ...(pong ? [el('p', {text: 'Das Ping Pong aus dem Chat, gegen einen Bot. Wer zuerst 7 Punkte hat, gewinnt (ab 6:6 brauchst du 2 Punkte Vorsprung – bei 9:9 entscheidet der nächste Punkt).'}),
-      el('p', {text: 'Power-ups kriegt, wer sie mit dem Ball trifft: 🟨 Riesen-Schläger · 🔻 Mini-Schläger für den Gegner · ⏳ Zeitlupe: der Ball kommt langsamer auf dich zu · 🛡️ Schutzwand hält einmal · 🌀 Kurvenball: beim Treffen den Schläger bewegen · 🧲 Magnet: der Ball bleibt kleben, zielen und klicken (nach 3 s geht er von allein).'}),
+      el('p', {text: 'Power-ups kriegt, wer sie mit dem Ball trifft: 🟨 Riesen-Schläger · 🔻 Mini-Schläger für den Gegner · ⏳ Zeitlupe: der Ball kommt langsamer auf dich zu · 🛡️ Schutzwand hält einmal · 🌀 Kurvenball: beim Treffen den Schläger bewegen · 🧲 Magnet: der Ball bleibt kleben, zielen und klicken (nach 3 s geht er von allein) · 👻 Geisterball: deine Bälle sind in der Tischmitte fast unsichtbar. Wer 3 Punkte hinten liegt, bekommt einmal eine Schutzwand geschenkt.'}),
       el('div', {class: 'olabel', text: 'Power-ups'}),
       el('div', {class: 'orow'}, opt('pu', true, '⚡ An'), opt('pu', false, 'Aus'))]
     : game === 'breach' ? [
