@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 60;
+const APP_VERSION = 61;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5289,6 +5289,8 @@ document.addEventListener('keydown', e => {
   if (g.game === 'breach') {
     const key = e.key.toLowerCase(), b = BR_KEYS[key];
     if (key === 'f' && !e.repeat) sgSend(g, {t: 'charge'});
+    // The deciding round: 1 or 2 picks the side.
+    else if ((key === '1' || key === '2') && g.sg.decider && g.sg.decider.pid === me.id) sgSend(g, {t: 'side', v: key === '1' ? 'atk' : 'def'});
     else if (key === '+' || key === '-' || key === '=') {
       brSens = Math.max(0.0008, Math.min(0.008, brSens * (key === '-' ? 1 / 1.15 : 1.15)));
       store.set('brSens', brSens);
@@ -7575,6 +7577,7 @@ class Breach extends Room {
       if (p.q.length > 12) p.q.splice(0, p.q.length - 12);
     } else if (m.t === 'charge' && this.st === 'play') this.place(p);
     else if (m.t === 'charge' && this.st === 'prep') this.reinforce(p);
+    else if (m.t === 'side' && this.st === 'roundover' && p.pid === this.picker && (m.v === 'atk' || m.v === 'def')) { this.pick = m.v; this.event('picked', {pid: p.pid, side: m.v}); }
     else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f)) p.face = m.f;
     else if (m.t === 'full') this.full(p);
   }
@@ -7635,13 +7638,27 @@ class Breach extends Room {
     // A killcam needs a little longer before the next round.
     this.until = Date.now() + (this.killcam ? 5200 : 3500);
     this.killcam = false;
+    // 3:3: the deciding round. Whoever lost this one picks the side (a few seconds more to choose).
+    if (this.players.length === 2 && this.players.every(q => q.sc === BR_WIN - 1)) {
+      const loser = this.players.find(q => q !== winner);
+      this.picker = loser.pid;
+      this.pick = null;
+      this.until += 4000;
+      this.event('decider', {pid: loser.pid});
+    }
   }
   advance(now) {
     // After the countdown, 15 s to prepare: the defender moves and reinforces walls, the attacker waits.
     if (this.st === 'count' && now >= this.until) { this.st = 'prep'; this.until = now + BR_PREP; this.event('prep', {}); }
     if (this.st === 'prep' && now >= this.until) { this.st = 'play'; for (const p of this.players) p.drone = null; this.event('go', {}); }
     if (this.st === 'roundover' && now >= this.until) {
-      for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
+      const picker = this.picker && this.players.find(q => q.pid === this.picker);
+      if (picker) {
+        // The pick (or, without one, a coin toss) decides the sides of the last round.
+        const side = this.pick || (Math.random() < 0.5 ? 'atk' : 'def');
+        for (const p of this.players) p.side = p === picker ? side : side === 'atk' ? 'def' : 'atk';
+        this.picker = null;
+      } else for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
       this.round(now);
     }
     // While counting down players may turn but not move.
@@ -8418,6 +8435,11 @@ function brEvent(g, ev, s) {
     (sg.booms || (sg.booms = [])).push({x: ev.x, y: ev.y, at: performance.now()});
     if (ev.to === me.id) { sgBanner(g, 'DROHNE ZERSTÖRT', 'Abgeschossen – zurück zur Ausgangsposition', '#ff6b6b'); sg.shake = 0.6; }
     else if (mine) sgFloat(g, BR_RW / 2, 80, '💥 Drohne abgeschossen', '#9fd3ff');
+  } else if (ev.k === 'decider') {
+    // 3:3: the loser of this round picks the side of the last one.
+    sg.decider = {pid: ev.pid, at: performance.now()};
+  } else if (ev.k === 'picked') {
+    if (sg.decider) sg.decider.side = ev.side;
   } else if (ev.k === 'prep') {
     const mine = s.pl.find(p => p.pid === me.id) || {}, def = mine.side === 'def';
     // Lost the last round: one more charge or steel wall this time.
@@ -8593,6 +8615,17 @@ function brDraw(g, cv, now, dt) {
   sgDrawFloats(g, ctx, now);
   if (!kc) sgDrawBanner(g, ctx, vw, vh, now);
   if (s.st === 'over' && sg.final && now - sg.final.at > 1800 && !kc) brStats(g, ctx, vw, vh);
+  // The deciding round: who picks, and (for the picker) how.
+  const dc = sg.decider;
+  if (dc && s.st === 'roundover' && !kc && now - dc.at > 1200) {
+    const mineP = dc.pid === me.id, nm = (s.pl.find(p => p.pid === dc.pid) || {}).name || '';
+    const lines = [['🔥 ENTSCHEIDUNGSRUNDE', '#ff6b6b', 22], [dc.side ? (mineP ? 'Du' : nm) + ' ' + (mineP ? 'spielst' : 'spielt') + ' ' + (dc.side === 'atk' ? '⚔ Angriff' : '🛡 Verteidigung')
+      : mineP ? 'Du wählst die Seite: 1 = ⚔ Angriff · 2 = 🛡 Verteidigung' : nm + ' wählt die Seite…', '#ffffff', 15]];
+    ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(0, vh / 2 - 46, vw, 92);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    lines.forEach(([txt, col, size], i) => { ctx.font = '900 ' + size + 'px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = col; ctx.fillText(txt, vw / 2, vh / 2 - 16 + i * 34); });
+  }
+  if (dc && s.st !== 'roundover') sg.decider = null;
 }
 // Which frame of the killcam to show now, if any: it starts a moment after the kill and plays 2.5 s in real
 // time (frames are 1/30 s apart), then holds the last frame briefly.

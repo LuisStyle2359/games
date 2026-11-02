@@ -1519,6 +1519,7 @@ export class Breach extends Room {
       if (p.q.length > 12) p.q.splice(0, p.q.length - 12);
     } else if (m.t === 'charge' && this.st === 'play') this.place(p);
     else if (m.t === 'charge' && this.st === 'prep') this.reinforce(p);
+    else if (m.t === 'side' && this.st === 'roundover' && p.pid === this.picker && (m.v === 'atk' || m.v === 'def')) { this.pick = m.v; this.event('picked', {pid: p.pid, side: m.v}); }
     else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f)) p.face = m.f;
     else if (m.t === 'full') this.full(p);
   }
@@ -1579,13 +1580,27 @@ export class Breach extends Room {
     // A killcam needs a little longer before the next round.
     this.until = Date.now() + (this.killcam ? 5200 : 3500);
     this.killcam = false;
+    // 3:3: the deciding round. Whoever lost this one picks the side (a few seconds more to choose).
+    if (this.players.length === 2 && this.players.every(q => q.sc === BR_WIN - 1)) {
+      const loser = this.players.find(q => q !== winner);
+      this.picker = loser.pid;
+      this.pick = null;
+      this.until += 4000;
+      this.event('decider', {pid: loser.pid});
+    }
   }
   advance(now) {
     // After the countdown, 15 s to prepare: the defender moves and reinforces walls, the attacker waits.
     if (this.st === 'count' && now >= this.until) { this.st = 'prep'; this.until = now + BR_PREP; this.event('prep', {}); }
     if (this.st === 'prep' && now >= this.until) { this.st = 'play'; for (const p of this.players) p.drone = null; this.event('go', {}); }
     if (this.st === 'roundover' && now >= this.until) {
-      for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
+      const picker = this.picker && this.players.find(q => q.pid === this.picker);
+      if (picker) {
+        // The pick (or, without one, a coin toss) decides the sides of the last round.
+        const side = this.pick || (Math.random() < 0.5 ? 'atk' : 'def');
+        for (const p of this.players) p.side = p === picker ? side : side === 'atk' ? 'def' : 'atk';
+        this.picker = null;
+      } else for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
       this.round(now);
     }
     // While counting down players may turn but not move.
