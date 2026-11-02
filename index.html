@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 57;
+const APP_VERSION = 58;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5143,6 +5143,7 @@ function sgMessage(g, m) {
   const sg = g.sg;
   if (m.t === 'pong' && Number.isFinite(m.c)) { const r = performance.now() - m.c; sg.rtt = sg.rtt ? sg.rtt * 0.7 + r * 0.3 : r; return; }
   if (m.t === 'full') { if (g.game === 'tron') nrFull(g, m); else if (g.game === 'breach') brFull(g, m); return; }
+  if (m.t === 'replay') { if (g.game === 'breach' && Array.isArray(m.fr)) g.sg.replay = {...m, at: performance.now()}; return; }
   if (m.t !== 's' || !Array.isArray(m.pl)) return;
   const prev = sg.s;
   sg.s = m;
@@ -7546,6 +7547,7 @@ class Breach extends Room {
     this.defuse = 0;
     this.dfOn = false;
     this.rl = BR_ROUND;
+    for (const p of this.players) p.rp = [];
     for (const p of this.players) {
       const spots = p.side === 'atk' ? def.a : def.d, [x, y] = spots[Math.floor(Math.random() * spots.length)];
       const gun = BR_GUN[p.side];
@@ -7583,7 +7585,9 @@ class Breach extends Room {
     this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
     if (winner.sc >= BR_WIN) return this.finish(winner);
     this.st = 'roundover';
-    this.until = Date.now() + 3500;
+    // A killcam needs a little longer before the next round.
+    this.until = Date.now() + (this.killcam ? 5200 : 3500);
+    this.killcam = false;
   }
   advance(now) {
     // After the countdown, 15 s to prepare: the defender moves and reinforces walls, the attacker waits.
@@ -7642,6 +7646,8 @@ class Breach extends Room {
       }
       p.hist.push([this.tick, now, p.x, p.y]);
       if (p.hist.length > 40) p.hist.shift();
+      // The last 2.5 s of everyone, for the killcam.
+      if (!prep) { const rp = p.rp || (p.rp = []); rp.push([Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(p.a * 100) / 100, (p.k & 32) && p.cd > 1000 / BR_GUN[p.side].rate - 20 ? 1 : 0]); if (rp.length > 150) rp.shift(); }
     }
     if (prep) return;
     // Breach charges go off 2 s after they are placed.
@@ -7724,6 +7730,10 @@ class Breach extends Room {
     o.alive = false;
     by.kills++;
     this.event('kill', {pid: by.pid, to: o.pid, x: o.x, y: o.y});
+    // Killcam: the last 2.5 s of both, sent once (every second frame), shown while the round ends.
+    const msg = JSON.stringify({t: 'replay', rd: this.rd, by: by.pid, to: o.pid, fr: this.players.map(q => ({pid: q.pid, side: q.side, f: (q.rp || []).filter((_, i) => i % 2 === 0)}))});
+    for (const q of this.players) if (q.ws) try { q.ws.send(msg); } catch (e) {}
+    this.killcam = true;
     this.endRound(by, 'kill');
   }
   // F: a breach charge on the brick wall right in front of the attacker; it goes off 2 s later.
@@ -8404,10 +8414,12 @@ function brDraw(g, cv, now, dt) {
   sg.vis.x *= fv; sg.vis.y *= fv;
   const mine = s.pl.find(p => p.pid === me.id), moving = Math.hypot(...(sg.me ? [sg.me.vx, sg.me.vy] : [0, 0])) > 0.3;
   sg.bob = (sg.bob || 0) + (moving ? dt * ((sg.keys & 16) ? 7 : 11) : 0);
-  const px = sg.me.x + sg.vis.x, py = sg.me.y + sg.vis.y, ang = sg.ang, ca = Math.cos(ang), sa = Math.sin(ang);
+  // Killcam: after a kill the picture shows the last moments from the killer's eyes.
+  const kc = brKillcam(sg, s, now);
+  const px = kc ? kc.cam[0] : sg.me.x + sg.vis.x, py = kc ? kc.cam[1] : sg.me.y + sg.vis.y, ang = kc ? kc.cam[2] : sg.ang, ca = Math.cos(ang), sa = Math.sin(ang);
   sg.shake = Math.max(0, (sg.shake || 0) - dt * 2.5);
   // The drone looks from just above the floor; a person from half the wall height.
-  const eye = sg.droneMode ? 0.12 : 0.5;
+  const eye = sg.droneMode && !kc ? 0.12 : 0.5;
   const horizon = (BR_RH >> 1) + Math.round(Math.sin(sg.bob * 2) * (moving && !sg.droneMode ? 1.5 : 0) + (sg.shake ? (Math.random() * 2 - 1) * 4 * sg.shake : 0));
   // Floor and ceiling: per row the distance on the floor, per pixel the map cell (inside: planks and panels,
   // outside: grass and sky), darker further away.
@@ -8451,14 +8463,15 @@ function brDraw(g, cv, now, dt) {
   const sprites = [];
   const smp = sgSample(g);
   const other = smp && smp.b.pl.find(p => p.pid !== me.id);
-  if (other && other.al && !other.hid) {
+  if (kc) sprites.push({x: kc.vic[0], y: kc.vic[1], tex: T[kc.side] || T.def, w: 24, h: 40, size: 0.95, pid: kc.to});
+  else if (other && other.al && !other.hid) {
     // Hidden by the server a moment ago (out of sight): start from where they are now.
     const oa0 = smp.a.pl.find(p => p.pid === other.pid), oa = oa0 && !oa0.hid ? oa0 : other, f = smp.k;
     sprites.push({x: oa.x + (other.x - oa.x) * f + other.vx * (smp.ex || 0) / 60, y: oa.y + (other.y - oa.y) * f + other.vy * (smp.ex || 0) / 60, tex: T[other.side], w: 24, h: 40, size: 0.95, pid: other.pid});
   }
   // A player who was taken out lies where they fell until the next round.
   const fallen = s.pl.find(p => p.pid !== me.id && !p.al && Number.isFinite(p.x));
-  if (fallen && (s.st === 'roundover' || s.st === 'play')) sprites.push({x: fallen.x, y: fallen.y, tex: T[fallen.side + 'Down'], w: 40, h: 24, size: 0.32, pid: fallen.pid, down: true});
+  if (fallen && !kc && (s.st === 'roundover' || s.st === 'play')) sprites.push({x: fallen.x, y: fallen.y, tex: T[fallen.side + 'Down'], w: 40, h: 24, size: 0.32, pid: fallen.pid, down: true});
   sprites.push({x: bomb[0], y: bomb[1], draw: 'bomb', size: 0.45});
   for (const p of s.pl) if (p.pid !== me.id && Array.isArray(p.dr) && s.st === 'prep') sprites.push({x: p.dr[0], y: p.dr[1], draw: 'drone', size: 0.16});
   for (const [cx, cy, t] of s.ch || []) sprites.push({x: cx, y: cy, draw: 'charge', size: 0.25, blink: Math.floor(t / 150) % 2});
@@ -8514,12 +8527,37 @@ function brDraw(g, cv, now, dt) {
     ctx.font = '700 12px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
     const nm = (s.pl.find(p => p.pid === os.pid) || {}).name || '';
-    ctx.strokeText(nm, os.screen[0] * R, os.screen[1] * R - 6); ctx.fillStyle = BR_COL[other.side]; ctx.fillText(nm, os.screen[0] * R, os.screen[1] * R - 6);
+    ctx.strokeText(nm, os.screen[0] * R, os.screen[1] * R - 6); ctx.fillStyle = BR_COL[(s.pl.find(p => p.pid === os.pid) || {}).side] || '#ffffff'; ctx.fillText(nm, os.screen[0] * R, os.screen[1] * R - 6);
   }
-  brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving);
+  if (kc) {
+    // Killcam: a red frame, who it was, and the muzzle flash of their shots.
+    ctx.strokeStyle = 'rgba(255,77,77,.8)'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, vw - 4, vh - 4);
+    if (kc.cam[3]) { ctx.fillStyle = 'rgba(255,240,170,.9)'; ctx.beginPath(); ctx.arc(vw * 0.66, vh - 60, 16, 0, Math.PI * 2); ctx.fill(); }
+    const nm = (s.pl.find(p => p.pid === kc.by) || {}).name || '';
+    ctx.font = '800 14px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const label = '▶ KILLCAM · ' + (kc.by === me.id ? 'du' : nm);
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.roundRect(12, 12, ctx.measureText(label).width + 24, 28, 14); ctx.fill();
+    ctx.fillStyle = '#ff6b6b'; ctx.fillText(label, 24, 26);
+    const cx = vw / 2, cy = vh / 2;
+    ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(cx + dx * 5, cy + dy * 5); ctx.lineTo(cx + dx * 12, cy + dy * 12); }
+    ctx.stroke();
+  } else brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving);
   sgDrawFloats(g, ctx, now);
-  sgDrawBanner(g, ctx, vw, vh, now);
-  if (s.st === 'over' && sg.final && now - sg.final.at > 1800) brStats(g, ctx, vw, vh);
+  if (!kc) sgDrawBanner(g, ctx, vw, vh, now);
+  if (s.st === 'over' && sg.final && now - sg.final.at > 1800 && !kc) brStats(g, ctx, vw, vh);
+}
+// Which frame of the killcam to show now, if any: it starts a moment after the kill and plays 2.5 s in real
+// time (frames are 1/30 s apart), then holds the last frame briefly.
+function brKillcam(sg, s, now) {
+  const rp = sg.replay;
+  if (!rp || rp.rd !== s.rd || (s.st !== 'roundover' && s.st !== 'over')) return null;
+  const t = now - rp.at - 900, fk = rp.fr.find(f => f.pid === rp.by), fv = rp.fr.find(f => f.pid === rp.to);
+  if (t < 0 || !fk || !fv || !fk.f.length || !fv.f.length) return null;
+  const n = fk.f.length, i = Math.floor(t / (1000 / 30));
+  if (i >= n + 18) return null;
+  const j = Math.min(n - 1, i);
+  return {cam: fk.f[j], vic: fv.f[Math.min(fv.f.length - 1, j)], by: rp.by, to: rp.to, side: fv.side};
 }
 // The end of a match: both players side by side, the better number marked, and a title for each.
 function brStats(g, ctx, vw, vh) {

@@ -1528,6 +1528,7 @@ export class Breach extends Room {
     this.defuse = 0;
     this.dfOn = false;
     this.rl = BR_ROUND;
+    for (const p of this.players) p.rp = [];
     for (const p of this.players) {
       const spots = p.side === 'atk' ? def.a : def.d, [x, y] = spots[Math.floor(Math.random() * spots.length)];
       const gun = BR_GUN[p.side];
@@ -1565,7 +1566,9 @@ export class Breach extends Room {
     this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
     if (winner.sc >= BR_WIN) return this.finish(winner);
     this.st = 'roundover';
-    this.until = Date.now() + 3500;
+    // A killcam needs a little longer before the next round.
+    this.until = Date.now() + (this.killcam ? 5200 : 3500);
+    this.killcam = false;
   }
   advance(now) {
     // After the countdown, 15 s to prepare: the defender moves and reinforces walls, the attacker waits.
@@ -1624,6 +1627,8 @@ export class Breach extends Room {
       }
       p.hist.push([this.tick, now, p.x, p.y]);
       if (p.hist.length > 40) p.hist.shift();
+      // The last 2.5 s of everyone, for the killcam.
+      if (!prep) { const rp = p.rp || (p.rp = []); rp.push([Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(p.a * 100) / 100, (p.k & 32) && p.cd > 1000 / BR_GUN[p.side].rate - 20 ? 1 : 0]); if (rp.length > 150) rp.shift(); }
     }
     if (prep) return;
     // Breach charges go off 2 s after they are placed.
@@ -1706,6 +1711,10 @@ export class Breach extends Room {
     o.alive = false;
     by.kills++;
     this.event('kill', {pid: by.pid, to: o.pid, x: o.x, y: o.y});
+    // Killcam: the last 2.5 s of both, sent once (every second frame), shown while the round ends.
+    const msg = JSON.stringify({t: 'replay', rd: this.rd, by: by.pid, to: o.pid, fr: this.players.map(q => ({pid: q.pid, side: q.side, f: (q.rp || []).filter((_, i) => i % 2 === 0)}))});
+    for (const q of this.players) if (q.ws) try { q.ws.send(msg); } catch (e) {}
+    this.killcam = true;
     this.endRound(by, 'kill');
   }
   // F: a breach charge on the brick wall right in front of the attacker; it goes off 2 s later.
