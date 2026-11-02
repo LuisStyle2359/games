@@ -1502,6 +1502,8 @@ export class Breach extends Room {
       const gun = BR_GUN[p.side];
       Object.assign(p, {x, y, a: Math.atan2(def.bomb[1] - y, def.bomb[0] - x), vx: 0, vy: 0, hp: 100, alive: true, q: [], owed: 0, started: false,
         mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, rf: p.side === 'def' ? BR_REINF : 0, hist: [], face: null});
+      // While preparing, the attacker scouts with a small drone instead of walking.
+      p.drone = p.side === 'atk' ? {x, y, a: p.a, vx: 0, vy: 0} : null;
     }
     this.st = 'count';
     this.until = now + 4000;
@@ -1530,7 +1532,7 @@ export class Breach extends Room {
   advance(now) {
     // After the countdown, 15 s to prepare: the defender moves and reinforces walls, the attacker waits.
     if (this.st === 'count' && now >= this.until) { this.st = 'prep'; this.until = now + BR_PREP; this.event('prep', {}); }
-    if (this.st === 'prep' && now >= this.until) { this.st = 'play'; this.event('go', {}); }
+    if (this.st === 'prep' && now >= this.until) { this.st = 'play'; for (const p of this.players) p.drone = null; this.event('go', {}); }
     if (this.st === 'roundover' && now >= this.until) {
       for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
       this.round(now);
@@ -1557,8 +1559,9 @@ export class Breach extends Room {
       if (p.cd > 0) p.cd -= 1000 / 60;
       // Inputs as in Fußball: one per tick, two to catch up, and a late player runs on with the last input.
       const run = (k, a, rt) => {
-        // Preparing: nobody shoots, and the attacker stays at the spawn (looking around is fine).
-        if (prep) k = p.side === 'atk' ? 0 : k & ~(32 | 128);
+        // Preparing: nobody shoots; the attacker stays at the spawn and steers the drone.
+        if (prep && p.side === 'atk') { p.k = 0; if (p.drone && p.alive) { p.drone.a = a; brMove(p.drone, k & 31, a, this.map.g); } return; }
+        if (prep) k &= ~(32 | 128);
         p.k = k; p.a = a;
         if (!p.alive) return;
         brMove(p, k, a, this.map.g);
@@ -1694,15 +1697,16 @@ export class Breach extends Room {
     try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, mp: this.mapIx, g: g.join('')})); } catch (e) {}
   }
   // Can p see o right now: a clear line between them (a little slack for the body's width).
-  sees(p, o) {
-    const d = Math.hypot(o.x - p.x, o.y - p.y);
-    return d < 0.6 || brRay(this.map.g, p.x, p.y, Math.atan2(o.y - p.y, o.x - p.x), d + 0.5).d >= d - BR_R - 0.15;
+  sees(p, o) { return this.clear(p, o) || (this.st === 'prep' && !!p.drone && this.clear(p.drone, o)); }
+  clear(a, o) {
+    const d = Math.hypot(o.x - a.x, o.y - a.y);
+    return d < 0.6 || brRay(this.map.g, a.x, a.y, Math.atan2(o.y - a.y, o.x - a.x), d + 0.5).d >= d - BR_R - 0.15;
   }
   // Each page gets the other player only while it could know where they are: in sight (and a moment after), or
   // roughly when running close by (footsteps). Otherwise just "somewhere", so a page can't show them through walls.
   send(now) {
     const r = v => Math.round(v * 1000) / 1000, open = this.st !== 'play' && this.st !== 'prep';
-    const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null}; });
+    const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null, dr: p.drone ? [r(p.drone.x), r(p.drone.y), r(p.drone.a)] : null}; });
     const msg = {...this.base(now), tk: this.tick, rd: this.rd, mp: this.mapIx, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
       ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0)};
     for (const p of this.players) {
@@ -1713,7 +1717,7 @@ export class Breach extends Room {
         if (o === p || open || !o.alive || !p.alive) return x;
         if (this.sees(p, o)) seen[o.pid] = now;
         if (now - (seen[o.pid] || 0) < 300) return x;
-        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, hid: true};
+        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, dr: x.dr, hid: true};
         // Running within 12 units: where the steps are, give or take a little.
         const d = Math.hypot(o.x - p.x, o.y - p.y);
         if (Math.hypot(o.vx, o.vy) > BR_WALK + 0.3 && d < 12) {

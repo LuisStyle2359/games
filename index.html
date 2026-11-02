@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -7494,6 +7494,8 @@ class Breach extends Room {
       const gun = BR_GUN[p.side];
       Object.assign(p, {x, y, a: Math.atan2(def.bomb[1] - y, def.bomb[0] - x), vx: 0, vy: 0, hp: 100, alive: true, q: [], owed: 0, started: false,
         mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, rf: p.side === 'def' ? BR_REINF : 0, hist: [], face: null});
+      // While preparing, the attacker scouts with a small drone instead of walking.
+      p.drone = p.side === 'atk' ? {x, y, a: p.a, vx: 0, vy: 0} : null;
     }
     this.st = 'count';
     this.until = now + 4000;
@@ -7522,7 +7524,7 @@ class Breach extends Room {
   advance(now) {
     // After the countdown, 15 s to prepare: the defender moves and reinforces walls, the attacker waits.
     if (this.st === 'count' && now >= this.until) { this.st = 'prep'; this.until = now + BR_PREP; this.event('prep', {}); }
-    if (this.st === 'prep' && now >= this.until) { this.st = 'play'; this.event('go', {}); }
+    if (this.st === 'prep' && now >= this.until) { this.st = 'play'; for (const p of this.players) p.drone = null; this.event('go', {}); }
     if (this.st === 'roundover' && now >= this.until) {
       for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
       this.round(now);
@@ -7549,8 +7551,9 @@ class Breach extends Room {
       if (p.cd > 0) p.cd -= 1000 / 60;
       // Inputs as in Fußball: one per tick, two to catch up, and a late player runs on with the last input.
       const run = (k, a, rt) => {
-        // Preparing: nobody shoots, and the attacker stays at the spawn (looking around is fine).
-        if (prep) k = p.side === 'atk' ? 0 : k & ~(32 | 128);
+        // Preparing: nobody shoots; the attacker stays at the spawn and steers the drone.
+        if (prep && p.side === 'atk') { p.k = 0; if (p.drone && p.alive) { p.drone.a = a; brMove(p.drone, k & 31, a, this.map.g); } return; }
+        if (prep) k &= ~(32 | 128);
         p.k = k; p.a = a;
         if (!p.alive) return;
         brMove(p, k, a, this.map.g);
@@ -7686,15 +7689,16 @@ class Breach extends Room {
     try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, mp: this.mapIx, g: g.join('')})); } catch (e) {}
   }
   // Can p see o right now: a clear line between them (a little slack for the body's width).
-  sees(p, o) {
-    const d = Math.hypot(o.x - p.x, o.y - p.y);
-    return d < 0.6 || brRay(this.map.g, p.x, p.y, Math.atan2(o.y - p.y, o.x - p.x), d + 0.5).d >= d - BR_R - 0.15;
+  sees(p, o) { return this.clear(p, o) || (this.st === 'prep' && !!p.drone && this.clear(p.drone, o)); }
+  clear(a, o) {
+    const d = Math.hypot(o.x - a.x, o.y - a.y);
+    return d < 0.6 || brRay(this.map.g, a.x, a.y, Math.atan2(o.y - a.y, o.x - a.x), d + 0.5).d >= d - BR_R - 0.15;
   }
   // Each page gets the other player only while it could know where they are: in sight (and a moment after), or
   // roughly when running close by (footsteps). Otherwise just "somewhere", so a page can't show them through walls.
   send(now) {
     const r = v => Math.round(v * 1000) / 1000, open = this.st !== 'play' && this.st !== 'prep';
-    const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null}; });
+    const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null, dr: p.drone ? [r(p.drone.x), r(p.drone.y), r(p.drone.a)] : null}; });
     const msg = {...this.base(now), tk: this.tick, rd: this.rd, mp: this.mapIx, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
       ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0)};
     for (const p of this.players) {
@@ -7705,7 +7709,7 @@ class Breach extends Room {
         if (o === p || open || !o.alive || !p.alive) return x;
         if (this.sees(p, o)) seen[o.pid] = now;
         if (now - (seen[o.pid] || 0) < 300) return x;
-        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, hid: true};
+        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, dr: x.dr, hid: true};
         // Running within 12 units: where the steps are, give or take a little.
         const d = Math.hypot(o.x - p.x, o.y - p.y);
         if (Math.hypot(o.vx, o.vy) > BR_WALK + 0.3 && d < 12) {
@@ -8050,6 +8054,7 @@ function offShow(game) {
       el('p', {text: 'Angreifer gegen Verteidiger, 1 Leben pro Runde. Nach jeder Runde werden die Seiten getauscht. Wer zuerst 4 Runden holt, gewinnt.'}),
       el('p', {text: '⚔ Angreifer: Verteidiger ausschalten oder die Bombe entschärfen (E 7 s gedrückt halten). Mit F klebst du eine Sprengladung an eine Ziegelwand – nach 2 s fliegt ein Loch rein.'}),
       el('p', {text: '🛡 Verteidiger: Angreifer ausschalten oder 2 Minuten durchhalten. In den 15 s Vorbereitung kannst du 2 Ziegelwände mit F verstärken – da kommt dann weder Sprengladung noch Kugel durch.'}),
+      el('p', {text: '📡 In der Vorbereitung steuert der Angreifer eine Drohne (WASD): was sie sieht, sieht er – so findet er den Verteidiger, bevor es losgeht.'}),
       el('p', {text: '🤫 Rennen ist laut, mit Shift schleichst du leise. Was du hören würdest, zeigen Pfeile ums Fadenkreuz: 👣 Schritte, 🔫 Schüsse, 💥 Explosionen.'})] : [
       el('div', {class: 'olabel', text: game === 'kick' ? 'Modus' : 'Gegner'}),
       game === 'kick'
@@ -8168,7 +8173,8 @@ function brTextures() {
   return BR_TEX;
 }
 // Who may move: everyone while playing, only the defender while preparing.
-const brCanMove = (st, side) => st === 'play' || (st === 'prep' && side === 'def');
+// While preparing the attacker moves the drone, the defender themselves.
+const brCanMove = (st, side) => st === 'play' || st === 'prep';
 // The map as the page knows it: floor, concrete, brick; which cells are outside (grass and sky).
 function brFull(g, m) {
   const sg = g.sg;
@@ -8187,8 +8193,14 @@ function brSnapshot(g, m) {
   if (!mine) return;
   sg.side = mine.side;
   if (!Number.isFinite(sg.ang)) sg.ang = mine.a;
-  const p = {x: mine.x, y: mine.y, vx: 0, vy: 0};
-  if (!brCanMove(m.st, mine.side) || !sg.me || !mine.al) {
+  // Scouting with the drone: the page moves and draws the drone instead of the player; back in the body, the view
+  // turns back to where the body looks.
+  const drone = m.st === 'prep' && mine.side === 'atk' && Array.isArray(mine.dr);
+  if (sg.droneMode && !drone) sg.ang = mine.a;
+  const swap = !!sg.droneMode !== drone;
+  sg.droneMode = drone;
+  const p = drone ? {x: mine.dr[0], y: mine.dr[1], vx: 0, vy: 0} : {x: mine.x, y: mine.y, vx: 0, vy: 0};
+  if (!brCanMove(m.st, mine.side) || !sg.me || !mine.al || swap) {
     sg.me = p; sg.hist = []; sg.vis = {x: 0, y: 0};
     if (m.st === 'count' && (sg.ang === undefined || sg.rdSeen !== m.rd)) { sg.ang = mine.a; sg.rdSeen = m.rd; }
     return;
@@ -8251,7 +8263,7 @@ function brEvent(g, ev, s) {
     if (!mine) sgFloat(g, BR_RW / 2, 70, '💥 Sprengladung!', '#ff6b6b');
   } else if (ev.k === 'prep') {
     const def = (s.pl.find(p => p.pid === me.id) || {}).side === 'def';
-    sgBanner(g, 'VORBEREITUNG', def ? 'Vor Ziegelwand stellen + F = Stahl (2×)' : 'Der Verteidiger baut auf – gleich geht\'s los', '#9fd3ff');
+    sgBanner(g, 'VORBEREITUNG', def ? 'Vor Ziegelwand stellen + F = Stahl (2×)' : '📡 Drohne: WASD fahren, Verteidiger suchen', '#9fd3ff');
   } else if (ev.k === 'go') sgBanner(g, 'LOS!', '', '#ffffff');
   else if (ev.k === 'reinforce' && mine) sgFloat(g, BR_RW / 2, 80, '🛡 Wand verstärkt', '#9fd3ff');
   else if (ev.k === 'defusing') sgBanner(g, mine ? 'ENTSCHÄRFEN…' : 'BOMBE WIRD ENTSCHÄRFT!', mine ? 'Stillhalten und E halten' : 'Schnell zur Bombe!', '#ffd23f');
@@ -8291,7 +8303,9 @@ function brDraw(g, cv, now, dt) {
   sg.bob = (sg.bob || 0) + (moving ? dt * ((sg.keys & 16) ? 7 : 11) : 0);
   const px = sg.me.x + sg.vis.x, py = sg.me.y + sg.vis.y, ang = sg.ang, ca = Math.cos(ang), sa = Math.sin(ang);
   sg.shake = Math.max(0, (sg.shake || 0) - dt * 2.5);
-  const horizon = (BR_RH >> 1) + Math.round(Math.sin(sg.bob * 2) * (moving ? 1.5 : 0) + (sg.shake ? (Math.random() * 2 - 1) * 4 * sg.shake : 0));
+  // The drone looks from just above the floor; a person from half the wall height.
+  const eye = sg.droneMode ? 0.12 : 0.5;
+  const horizon = (BR_RH >> 1) + Math.round(Math.sin(sg.bob * 2) * (moving && !sg.droneMode ? 1.5 : 0) + (sg.shake ? (Math.random() * 2 - 1) * 4 * sg.shake : 0));
   // Floor and ceiling: per row the distance on the floor, per pixel the map cell (inside: planks and panels,
   // outside: grass and sky), darker further away.
   const dirL = [ca + sa * Math.tan(BR_FOV / 2), sa - ca * Math.tan(BR_FOV / 2)], dirR = [ca - sa * Math.tan(BR_FOV / 2), sa + ca * Math.tan(BR_FOV / 2)];
@@ -8299,7 +8313,7 @@ function brDraw(g, cv, now, dt) {
     const dy = y - horizon;
     if (!dy) { for (let x = 0; x < BR_RW; x++) buf[y * BR_RW + x] = 0xff1a1410; continue; }
     // A wall 1 unit high at distance d is BR_PLANE / d pixels tall, so the floor at distance d is BR_PLANE / (2 d) below the horizon.
-    const floor = dy > 0, rowDist = BR_PLANE / (2 * Math.abs(dy));
+    const floor = dy > 0, rowDist = BR_PLANE * (floor ? eye : 1 - eye) / Math.abs(dy);
     const fog = Math.max(0.18, 1 - rowDist / 14);
     let fx = px + rowDist * dirL[0], fy = py + rowDist * dirL[1];
     const stx = rowDist * (dirR[0] - dirL[0]) / BR_RW, sty = rowDist * (dirR[1] - dirL[1]) / BR_RW;
@@ -8323,7 +8337,7 @@ function brDraw(g, cv, now, dt) {
     const hx = px + Math.cos(ra) * hit.d, hy = py + Math.sin(ra) * hit.d, fracX = hx - Math.floor(hx), fracY = hy - Math.floor(hy);
     const vertical = Math.abs(fracX - 0.5) > Math.abs(fracY - 0.5) && (fracX < 0.002 || fracX > 0.998);
     const u = ((vertical ? fracY : fracX) * 64) & 63, tex = grid[hit.cell] === 2 ? T.brick : grid[hit.cell] === 3 ? T.steel : tWall;
-    const hgt = BR_PLANE / Math.max(0.05, perp), top = horizon - hgt / 2, y0 = Math.max(0, Math.ceil(top)), y1 = Math.min(BR_RH, Math.floor(horizon + hgt / 2));
+    const hgt = BR_PLANE / Math.max(0.05, perp), top = horizon - hgt * (1 - eye), y0 = Math.max(0, Math.ceil(top)), y1 = Math.min(BR_RH, Math.floor(horizon + hgt * eye));
     const shade = Math.max(0.2, 1 - perp / 16) * (vertical ? 0.82 : 1);
     for (let y = y0; y < y1; y++) {
       const c = tex[(((y - top) / hgt * 64) & 63) * 64 + u];
@@ -8343,6 +8357,7 @@ function brDraw(g, cv, now, dt) {
   const fallen = s.pl.find(p => p.pid !== me.id && !p.al && Number.isFinite(p.x));
   if (fallen && (s.st === 'roundover' || s.st === 'play')) sprites.push({x: fallen.x, y: fallen.y, tex: T[fallen.side + 'Down'], w: 40, h: 24, size: 0.32, pid: fallen.pid, down: true});
   sprites.push({x: bomb[0], y: bomb[1], draw: 'bomb', size: 0.45});
+  for (const p of s.pl) if (p.pid !== me.id && Array.isArray(p.dr) && s.st === 'prep') sprites.push({x: p.dr[0], y: p.dr[1], draw: 'drone', size: 0.16});
   for (const [cx, cy, t] of s.ch || []) sprites.push({x: cx, y: cy, draw: 'charge', size: 0.25, blink: Math.floor(t / 150) % 2});
   sg.impacts = (sg.impacts || []).filter(i => now - i.at < 350);
   for (const i of sg.impacts) sprites.push({x: i.x, y: i.y, draw: 'spark', size: 0.2, hit: i.hit, life: (now - i.at) / 350, z: 0.5});
@@ -8352,7 +8367,7 @@ function brDraw(g, cv, now, dt) {
   sprites.sort((a, b) => b.depth - a.depth);
   for (const sp of sprites) {
     if (sp.depth < 0.15) continue;
-    const sx = BR_RW / 2 + sp.lat / sp.depth * BR_PLANE, scale = BR_PLANE / sp.depth, hgt = sp.size * scale, floorY = horizon + scale * 0.5;
+    const sx = BR_RW / 2 + sp.lat / sp.depth * BR_PLANE, scale = BR_PLANE / sp.depth, hgt = sp.size * scale, floorY = horizon + scale * eye;
     const bottom = floorY, top = floorY - hgt;
     if (sp.tex) {
       const wpx = hgt * sp.w / sp.h, x0 = Math.round(sx - wpx / 2), x1 = Math.round(sx + wpx / 2);
@@ -8368,13 +8383,14 @@ function brDraw(g, cv, now, dt) {
       continue;
     }
     // Small things as filled shapes: the bomb (a box with a light), charges (blinking red), sparks, explosions.
-    const r = hgt / 2, cy = sp.draw === 'bomb' ? floorY - r : horizon;
+    const r = hgt / 2, cy = sp.draw === 'bomb' || sp.draw === 'drone' ? floorY - r : horizon;
     for (let x = Math.max(0, Math.round(sx - r)); x < Math.min(BR_RW, Math.round(sx + r)); x++) {
       if (zb[x] < sp.depth) continue;
       for (let y = Math.max(0, Math.round(cy - r)); y < Math.min(BR_RH, Math.round(cy + r)); y++) {
         const nx = (x - sx) / r, ny = (y - cy) / r, d = nx * nx + ny * ny;
         let c = 0;
         if (sp.draw === 'bomb') c = Math.abs(nx) < 0.8 && ny > -0.6 ? (Math.abs(nx) < 0.25 && ny < -0.2 && ny > -0.5 ? (Math.floor(now / 400) % 2 ? brRGB(255, 60, 60) : brRGB(120, 20, 20)) : brRGB(60, 64, 72)) : 0;
+        else if (sp.draw === 'drone') c = Math.abs(ny) < 0.5 && Math.abs(nx) < 0.9 ? (Math.abs(nx) < 0.18 && ny < 0 ? (Math.floor(now / 250) % 2 ? brRGB(255, 50, 50) : brRGB(90, 20, 20)) : brRGB(34, 38, 44)) : Math.abs(nx) > 0.6 && ny > 0.2 && ny < 0.9 ? brRGB(20, 20, 24) : 0;
         else if (sp.draw === 'charge') c = d < 1 ? (sp.blink ? brRGB(255, 70, 50) : brRGB(90, 30, 25)) : 0;
         else if (sp.draw === 'spark') c = d < 1 - sp.life ? (sp.hit ? brRGB(255, 80, 80) : brRGB(255, 230, 150)) : 0;
         else if (sp.draw === 'boom') { const q = sp.life; c = d < q * 1.1 && d > q * q * 0.8 ? brRGB(255, 200 - 120 * q, 80 - 60 * q) : d < (1 - q) * 0.5 ? brRGB(255, 255, 220) : 0; }
@@ -8407,7 +8423,16 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
   if (!mine) return;
   sg.recoil = Math.max(0, (sg.recoil || 0) - dt * 9);
   // The gun, low on the right, bobbing while walking and kicking back when it fires.
-  if (mine.al) {
+  if (sg.droneMode) {
+    // The drone's camera: a green tint, scan lines, a frame.
+    ctx.fillStyle = 'rgba(40,255,140,.08)'; ctx.fillRect(0, 0, vw, vh);
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; for (let y = (now / 40) % 4; y < vh; y += 4) ctx.fillRect(0, y, vw, 1);
+    ctx.strokeStyle = 'rgba(120,255,170,.6)'; ctx.lineWidth = 2;
+    for (const [x, y, dx, dy] of [[12, 12, 1, 1], [vw - 12, 12, -1, 1], [12, vh - 12, 1, -1], [vw - 12, vh - 12, -1, -1]]) { ctx.beginPath(); ctx.moveTo(x, y + dy * 22); ctx.lineTo(x, y); ctx.lineTo(x + dx * 22, y); ctx.stroke(); }
+    ctx.font = '800 13px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#9dffc4';
+    ctx.fillText('📡 DROHNE · REC', 22, 34);
+  }
+  if (mine.al && !sg.droneMode) {
     const bx = vw * 0.66 + Math.cos(sg.bob) * (moving ? 6 : 0), by = vh - 6 + Math.abs(Math.sin(sg.bob)) * (moving ? 6 : 0) + sg.recoil * 10, side = mine.side, u = 6;
     const box = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(bx + x * u), Math.round(by + y * u), w * u, h * u); };
     if (now - (sg.lastShot || 0) < 50) {
@@ -8475,6 +8500,10 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
   if (s.st === 'prep' && mine.al) {
     ctx.font = '800 15px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#9fd3ff';
     ctx.fillText('VORBEREITUNG · noch ' + sec + ' s', cx, 54);
+    if (sg.droneMode) {
+      ctx.font = '700 13px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#9dffc4';
+      ctx.fillText('WASD fahren · Maus schauen · was die Drohne sieht, siehst du', cx, cy + 50);
+    }
     if (mine.side === 'def') {
       const w = BR.ray(sg.grid, px, py, ang, 1.3);
       ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
