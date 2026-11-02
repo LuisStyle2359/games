@@ -2031,7 +2031,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -7557,11 +7557,38 @@ class Breach extends Room {
     const g = [...this.map.g].map(v => v === 2 ? 2 : v);
     try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, g: g.join('')})); } catch (e) {}
   }
+  // Can p see o right now: a clear line between them (a little slack for the body's width).
+  sees(p, o) {
+    const d = Math.hypot(o.x - p.x, o.y - p.y);
+    return d < 0.6 || brRay(this.map.g, p.x, p.y, Math.atan2(o.y - p.y, o.x - p.x), d + 0.5).d >= d - BR_R - 0.15;
+  }
+  // Each page gets the other player only while it could know where they are: in sight (and a moment after), or
+  // roughly when running close by (footsteps). Otherwise just "somewhere", so a page can't show them through walls.
   send(now) {
-    const r = v => Math.round(v * 1000) / 1000;
-    this.broadcast({...this.base(now), tk: this.tick, rd: this.rd, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
-      ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0),
-      pl: this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null}; })});
+    const r = v => Math.round(v * 1000) / 1000, open = this.st !== 'play' && this.st !== 'prep';
+    const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null}; });
+    const msg = {...this.base(now), tk: this.tick, rd: this.rd, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
+      ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0)};
+    for (const p of this.players) {
+      if (!p.ws) continue;
+      const seen = p.seen || (p.seen = {});
+      const pl = all.map((x, i) => {
+        const o = this.players[i];
+        if (o === p || open || !o.alive || !p.alive) return x;
+        if (this.sees(p, o)) seen[o.pid] = now;
+        if (now - (seen[o.pid] || 0) < 300) return x;
+        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, hid: true};
+        // Running within 12 units: where the steps are, give or take a little.
+        const d = Math.hypot(o.x - p.x, o.y - p.y);
+        if (Math.hypot(o.vx, o.vy) > BR_WALK + 0.3 && d < 12) {
+          const b = o.blur || (o.blur = {at: 0});
+          if (now - b.at > 350) Object.assign(b, {at: now, x: o.x + (Math.random() - 0.5) * 1.2, y: o.y + (Math.random() - 0.5) * 1.2});
+          return {...hid, hid: 'step', x: r(b.x), y: r(b.y)};
+        }
+        return hid;
+      });
+      try { p.ws.send(JSON.stringify({...msg, pl})); } catch (e) {}
+    }
   }
 }
 
@@ -8086,7 +8113,7 @@ function brEvent(g, ev, s) {
       sg.deadAt = performance.now();
       // Where the shot came from: an arrow to the killer while the round ends.
       const k = s.pl.find(p => p.pid === ev.pid);
-      if (k) (sg.cues || (sg.cues = [])).push({x: k.x, y: k.y, at: performance.now(), kind: 'killer', life: 3500});
+      if (k && !k.hid) (sg.cues || (sg.cues = [])).push({x: k.x, y: k.y, at: performance.now(), kind: 'killer', life: 3500});
     }
   } else if (ev.k === 'round') {
     const won = ev.pid === me.id, w = s.pl.find(p => p.pid === ev.pid);
@@ -8157,8 +8184,9 @@ function brDraw(g, cv, now, dt) {
   const sprites = [];
   const smp = sgSample(g);
   const other = smp && smp.b.pl.find(p => p.pid !== me.id);
-  if (other && other.al) {
-    const oa = smp.a.pl.find(p => p.pid === other.pid) || other, f = smp.k;
+  if (other && other.al && !other.hid) {
+    // Hidden by the server a moment ago (out of sight): start from where they are now.
+    const oa0 = smp.a.pl.find(p => p.pid === other.pid), oa = oa0 && !oa0.hid ? oa0 : other, f = smp.k;
     sprites.push({x: oa.x + (other.x - oa.x) * f + other.vx * (smp.ex || 0) / 60, y: oa.y + (other.y - oa.y) * f + other.vy * (smp.ex || 0) / 60, tex: T[other.side], w: 24, h: 40, size: 0.95, pid: other.pid});
   }
   sprites.push({x: BR.BOMB[0], y: BR.BOMB[1], draw: 'bomb', size: 0.45});
@@ -8263,11 +8291,11 @@ function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
     ctx.restore();
     if (label) { ctx.globalAlpha = alpha; ctx.font = '700 11px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = col; ctx.fillText(label, ax, ay + 20); ctx.globalAlpha = 1; }
   };
-  if (other && other.al && s.st === 'play') {
+  if (other && other.al && other.hid !== true && s.st === 'play') {
     // Footsteps are heard step by step: the arrow points to where the last step was (a little blurred) and fades
     // until the next one, so it gives a direction, not a radar.
-    const d = Math.hypot(other.x - px, other.y - py), loud = Math.hypot(other.vx, other.vy) > BR.WALK + 0.3;
-    if (loud && d < 12 && now - ((sg.step && sg.step.at) || 0) > 350) sg.step = {x: other.x + (Math.random() - 0.5) * 1.2, y: other.y + (Math.random() - 0.5) * 1.2, at: now, d};
+    const d = Math.hypot(other.x - px, other.y - py), loud = other.hid === 'step' || (!other.hid && Math.hypot(other.vx, other.vy) > BR.WALK + 0.3);
+    if (other.hid !== true && loud && d < 12 && now - ((sg.step && sg.step.at) || 0) > 350) sg.step = {x: other.x + (Math.random() - 0.5) * 1.2, y: other.y + (Math.random() - 0.5) * 1.2, at: now, d};
   }
   if (sg.step && now - sg.step.at < 450 && s.st === 'play') arrow(sg.step.x, sg.step.y, '#ffffff', Math.max(0.25, 1 - sg.step.d / 12) * (1 - (now - sg.step.at) / 450), '👣');
   sg.cues = (sg.cues || []).filter(c => now - c.at < (c.life || 1500));

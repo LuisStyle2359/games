@@ -1605,10 +1605,37 @@ export class Breach extends Room {
     const g = [...this.map.g].map(v => v === 2 ? 2 : v);
     try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, g: g.join('')})); } catch (e) {}
   }
+  // Can p see o right now: a clear line between them (a little slack for the body's width).
+  sees(p, o) {
+    const d = Math.hypot(o.x - p.x, o.y - p.y);
+    return d < 0.6 || brRay(this.map.g, p.x, p.y, Math.atan2(o.y - p.y, o.x - p.x), d + 0.5).d >= d - BR_R - 0.15;
+  }
+  // Each page gets the other player only while it could know where they are: in sight (and a moment after), or
+  // roughly when running close by (footsteps). Otherwise just "somewhere", so a page can't show them through walls.
   send(now) {
-    const r = v => Math.round(v * 1000) / 1000;
-    this.broadcast({...this.base(now), tk: this.tick, rd: this.rd, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
-      ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0),
-      pl: this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null}; })});
+    const r = v => Math.round(v * 1000) / 1000, open = this.st !== 'play' && this.st !== 'prep';
+    const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null}; });
+    const msg = {...this.base(now), tk: this.tick, rd: this.rd, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
+      ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0)};
+    for (const p of this.players) {
+      if (!p.ws) continue;
+      const seen = p.seen || (p.seen = {});
+      const pl = all.map((x, i) => {
+        const o = this.players[i];
+        if (o === p || open || !o.alive || !p.alive) return x;
+        if (this.sees(p, o)) seen[o.pid] = now;
+        if (now - (seen[o.pid] || 0) < 300) return x;
+        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, hid: true};
+        // Running within 12 units: where the steps are, give or take a little.
+        const d = Math.hypot(o.x - p.x, o.y - p.y);
+        if (Math.hypot(o.vx, o.vy) > BR_WALK + 0.3 && d < 12) {
+          const b = o.blur || (o.blur = {at: 0});
+          if (now - b.at > 350) Object.assign(b, {at: now, x: o.x + (Math.random() - 0.5) * 1.2, y: o.y + (Math.random() - 0.5) * 1.2});
+          return {...hid, hid: 'step', x: r(b.x), y: r(b.y)};
+        }
+        return hid;
+      });
+      try { p.ws.send(JSON.stringify({...msg, pl})); } catch (e) {}
+    }
   }
 }
