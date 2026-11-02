@@ -522,6 +522,7 @@ export class Arena {
     this.spin = 0;
     this.last = i;
     this.stats[i].fire++;
+    this.hide = this.ghost[i] > Date.now();
     this.event('fire', i);
   }
 
@@ -605,6 +606,7 @@ export class Arena {
           this.spin = 0;
           this.last = i;
           this.stats[i].saves++;
+          this.hide = this.ghost[i] > now;
           this.event('godwall', i);
           continue;
         }
@@ -619,6 +621,7 @@ export class Arena {
           const sp = Math.hypot(b.vx, b.vy);
           if (sp > VMAX) { b.vx *= VMAX / sp; b.vy *= VMAX / sp; }
           this.stats[i].saves++;
+          this.hide = this.ghost[i] > now;
           this.event('shield', i);
           continue;
         }
@@ -641,7 +644,7 @@ export class Arena {
     if (a >= CAP || (a >= WIN && a - o >= 2)) return this.finish(scorer + 1);
     // Aufholjagd: the first time someone is 3 behind, they get a free shield wall (once per match).
     const j = 1 - scorer;
-    if (a - o >= 3 && !this.rescued[j]) { this.rescued[j] = true; this.shield[j] = true; this.event('rescue', j); }
+    if (a - o >= 3 && !this.rescued[j] && !this.shield[j]) { this.rescued[j] = true; this.shield[j] = true; this.event('rescue', j); }
     this.dir = scorer === 0 ? 1 : -1;
     this.serve('goal', 1200);
   }
@@ -905,6 +908,7 @@ export class Kick extends Room {
     this.nextItem = Math.max(this.nextItem, 120);
   }
   drop(p) {
+    this.rp = [];
     this.remove(p);
     if (this.hold && this.hold.pid === p.pid) this.hold = null;
     if (this.st === 'vote') { if (this.players.length < 2) this.st = 'lobby'; return; }
@@ -1606,7 +1610,7 @@ export class Breach extends Room {
     if (why === 'defuse') winner.st.defuses++;
     if (why === 'kill' && winner.alive && winner.hp <= 30) winner.st.clutch++;
     const took = BR_ROUND - this.rl;
-    if (!winner.st.fast || took < winner.st.fast) winner.st.fast = Math.round(took);
+    if (why !== 'time' && (!winner.st.fast || took < winner.st.fast)) winner.st.fast = Math.round(took);
     // Whoever lost gets a little more next round: one more charge (attack) or steel wall (defence).
     for (const q of this.players) q.lost = q !== winner ? 1 : 0;
     this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
@@ -1731,7 +1735,6 @@ export class Breach extends Room {
           return;
         }
       }
-      if (wall.cell >= 0 && this.map.g[wall.cell] === 2) this.wear(wall.cell, 9);
       this.event('shot', {pid: p.pid, x: p.x + Math.cos(ang) * hd, y: p.y + Math.sin(ang) * hd, sx: p.x, sy: p.y});
       return;
     }
@@ -1842,7 +1845,8 @@ export class Breach extends Room {
   // Each page gets the other player only while it could know where they are: in sight (and a moment after), or
   // roughly when running close by (footsteps). Otherwise just "somewhere", so a page can't show them through walls.
   send(now) {
-    const r = v => Math.round(v * 1000) / 1000, open = this.st !== 'play' && this.st !== 'prep';
+    // Only between rounds (and after the match) is everything open; a pause or the countdown gives nothing away.
+    const r = v => Math.round(v * 1000) / 1000, open = this.st === 'roundover' || this.st === 'over';
     const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null, dr: p.drone ? [r(p.drone.x), r(p.drone.y), r(p.drone.a)] : null}; });
     const msg = {...this.base(now), tk: this.tick, rd: this.rd, mp: this.mapIx, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse), dfa: !!this.dfOn,
       ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0)};
@@ -1854,7 +1858,9 @@ export class Breach extends Room {
         if (o === p || open || !o.alive || !p.alive) return x;
         if (this.sees(p, o)) seen[o.pid] = now;
         if (now - (seen[o.pid] || 0) < 300) return x;
-        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, dr: x.dr, hid: true};
+        // The drone only where it can be seen.
+        const dr = o.drone && this.clear(p, o.drone) ? x.dr : null;
+        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, dr, hid: true};
         // Running within 12 units: where the steps are, give or take a little.
         const d = Math.hypot(o.x - p.x, o.y - p.y);
         if (Math.hypot(o.vx, o.vy) > BR_WALK + 0.3 && d < 12) {
@@ -1864,7 +1870,18 @@ export class Breach extends Room {
         }
         return hid;
       });
-      try { p.ws.send(JSON.stringify({...msg, pl})); } catch (e) {}
+      // Events say no more than one could hear: where someone reinforced is theirs only, and a shot's origin is
+      // given roughly (enough for the arrow), not exactly.
+      const fev = e => {
+        if (!e || e.pid === p.pid || open) return e;
+        if (e.k === 'reinforce') { const {x: _x, y: _y, ...rest} = e; return rest; }
+        if ((e.k === 'shot' || e.k === 'hit' || e.k === 'drone') && Number.isFinite(e.sx)) {
+          const j = k => ((Math.sin((e.n + k) * 12.9898) * 43758.5453) % 1) * 0.8;
+          return {...e, sx: r(e.sx + j(1)), sy: r(e.sy + j(7))};
+        }
+        return e;
+      };
+      try { p.ws.send(JSON.stringify({...msg, ev: fev(msg.ev), evs: (msg.evs || []).map(fev), pl})); } catch (e) {}
     }
   }
 }

@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 65;
+const APP_VERSION = 66;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3518,6 +3518,8 @@ function pgConnect(g) {
     }
     // Every event since the last one seen (two can happen in one moment); a fresh room counts from 1 again.
     const evs = Array.isArray(s.evs) && s.evs.length ? s.evs : s.ev ? [s.ev] : [];
+    // Joining (or coming back): what happened before isn't shown again.
+    if (!pg.s0) { pg.s0 = true; pg.ev = evs.length ? evs[evs.length - 1].n : 0; }
     if (evs.length && evs[evs.length - 1].n < pg.ev) pg.ev = 0;
     for (const e of evs) if (e && e.n > pg.ev) { pg.ev = e.n; try { pgEvent(g, e); } catch (err) {} }
     if (s.st === 'over' && !g.over && (s.w === 1 || s.w === 2)) {
@@ -3775,7 +3777,7 @@ function trollToast() {
 // uwu: the next message typed into the chat gets "uwu 👉👈🥺" added to its end.
 function uwuTroll(text) {
   // Rückwärts: the next message goes out back to front.
-  if (store.get('trollRev', false)) { store.set('trollRev', false); setTimeout(trollToast, 600); return [...text].reverse().join(''); }
+  if (store.get('trollRev', false)) { store.set('trollRev', false); setTimeout(trollToast, 600); return emGraphemes(text).reverse().join(''); }
   if (!store.get('trollUwu', false)) return text;
   store.set('trollUwu', false);
   setTimeout(trollToast, 600);
@@ -5209,7 +5211,8 @@ let sgGame = null;
 
 // The seat's secret: the game server gives the seat back only to a page that brings it (also after a reload).
 function sgSecret(gid) {
-  try { let s = sessionStorage.getItem('sgsec-' + gid); if (!s) { s = pgKey(); sessionStorage.setItem('sgsec-' + gid, s); } return s; } catch (e) { return pgKey(); }
+  // Kept in this browser (all tabs), so a new tab or a reload gets the seat back; another device doesn't.
+  try { let s = localStorage.getItem('sgsec-' + gid); if (!s) { s = pgKey(); localStorage.setItem('sgsec-' + gid, s); } return s; } catch (e) { return pgKey(); }
 }
 function sgInit(g, key, duo) {
   // Only one of these games at a time: an offline one makes way (its document shows the settings again).
@@ -6033,7 +6036,10 @@ function bzDraw(g, cv, now, dt) {
 const NR_W = 80, NR_H = 50, NR_CELL = 10, NR_COL = ['#22e5ff', '#ff3df0', '#ffe14d', '#7dff4d'], NR_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 // Trail cells are [x, y, time, wall]: wall is 0 where the bike left a gap or a bomb blew the trail away.
 function nrFull(g, m) {
-  const sg = g.sg, cells = t => (Array.isArray(t) ? t : []).map(c => [c[0] | 0, c[1] | 0, 0, c[2] === 0 ? 0 : 1]);
+  // In the same round, cells already known keep their times (for the time-lapse at the end).
+  const sg = g.sg, same = m.rd === sg.rd, old = new Map();
+  if (same) for (const t of sg.trails || []) for (const c of t || []) if (c[2]) old.set(c[0] + ',' + c[1], c[2]);
+  const cells = t => (Array.isArray(t) ? t : []).map(c => [c[0] | 0, c[1] | 0, old.get((c[0] | 0) + ',' + (c[1] | 0)) || 0, c[2] === 0 ? 0 : 1]);
   sg.trails = (m.trails || []).map(cells);
   sg.ghosts = (m.ghosts || []).map(cells);
   sg.rd = m.rd;
@@ -6699,6 +6705,7 @@ class Arena {
     this.spin = 0;
     this.last = i;
     this.stats[i].fire++;
+    this.hide = this.ghost[i] > Date.now();
     this.event('fire', i);
   }
 
@@ -6782,6 +6789,7 @@ class Arena {
           this.spin = 0;
           this.last = i;
           this.stats[i].saves++;
+          this.hide = this.ghost[i] > now;
           this.event('godwall', i);
           continue;
         }
@@ -6796,6 +6804,7 @@ class Arena {
           const sp = Math.hypot(b.vx, b.vy);
           if (sp > VMAX) { b.vx *= VMAX / sp; b.vy *= VMAX / sp; }
           this.stats[i].saves++;
+          this.hide = this.ghost[i] > now;
           this.event('shield', i);
           continue;
         }
@@ -6818,7 +6827,7 @@ class Arena {
     if (a >= CAP || (a >= WIN && a - o >= 2)) return this.finish(scorer + 1);
     // Aufholjagd: the first time someone is 3 behind, they get a free shield wall (once per match).
     const j = 1 - scorer;
-    if (a - o >= 3 && !this.rescued[j]) { this.rescued[j] = true; this.shield[j] = true; this.event('rescue', j); }
+    if (a - o >= 3 && !this.rescued[j] && !this.shield[j]) { this.rescued[j] = true; this.shield[j] = true; this.event('rescue', j); }
     this.dir = scorer === 0 ? 1 : -1;
     this.serve('goal', 1200);
   }
@@ -7082,6 +7091,7 @@ class Kick extends Room {
     this.nextItem = Math.max(this.nextItem, 120);
   }
   drop(p) {
+    this.rp = [];
     this.remove(p);
     if (this.hold && this.hold.pid === p.pid) this.hold = null;
     if (this.st === 'vote') { if (this.players.length < 2) this.st = 'lobby'; return; }
@@ -7783,7 +7793,7 @@ class Breach extends Room {
     if (why === 'defuse') winner.st.defuses++;
     if (why === 'kill' && winner.alive && winner.hp <= 30) winner.st.clutch++;
     const took = BR_ROUND - this.rl;
-    if (!winner.st.fast || took < winner.st.fast) winner.st.fast = Math.round(took);
+    if (why !== 'time' && (!winner.st.fast || took < winner.st.fast)) winner.st.fast = Math.round(took);
     // Whoever lost gets a little more next round: one more charge (attack) or steel wall (defence).
     for (const q of this.players) q.lost = q !== winner ? 1 : 0;
     this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
@@ -7908,7 +7918,6 @@ class Breach extends Room {
           return;
         }
       }
-      if (wall.cell >= 0 && this.map.g[wall.cell] === 2) this.wear(wall.cell, 9);
       this.event('shot', {pid: p.pid, x: p.x + Math.cos(ang) * hd, y: p.y + Math.sin(ang) * hd, sx: p.x, sy: p.y});
       return;
     }
@@ -8019,7 +8028,8 @@ class Breach extends Room {
   // Each page gets the other player only while it could know where they are: in sight (and a moment after), or
   // roughly when running close by (footsteps). Otherwise just "somewhere", so a page can't show them through walls.
   send(now) {
-    const r = v => Math.round(v * 1000) / 1000, open = this.st !== 'play' && this.st !== 'prep';
+    // Only between rounds (and after the match) is everything open; a pause or the countdown gives nothing away.
+    const r = v => Math.round(v * 1000) / 1000, open = this.st === 'roundover' || this.st === 'over';
     const all = this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null, dr: p.drone ? [r(p.drone.x), r(p.drone.y), r(p.drone.a)] : null}; });
     const msg = {...this.base(now), tk: this.tick, rd: this.rd, mp: this.mapIx, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse), dfa: !!this.dfOn,
       ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0)};
@@ -8031,7 +8041,9 @@ class Breach extends Room {
         if (o === p || open || !o.alive || !p.alive) return x;
         if (this.sees(p, o)) seen[o.pid] = now;
         if (now - (seen[o.pid] || 0) < 300) return x;
-        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, dr: x.dr, hid: true};
+        // The drone only where it can be seen.
+        const dr = o.drone && this.clear(p, o.drone) ? x.dr : null;
+        const hid = {pid: x.pid, name: x.name, on: x.on, aw: x.aw, ps: x.ps, sc: x.sc, side: x.side, al: x.al, ch: x.ch, kills: x.kills, dr, hid: true};
         // Running within 12 units: where the steps are, give or take a little.
         const d = Math.hypot(o.x - p.x, o.y - p.y);
         if (Math.hypot(o.vx, o.vy) > BR_WALK + 0.3 && d < 12) {
@@ -8041,7 +8053,18 @@ class Breach extends Room {
         }
         return hid;
       });
-      try { p.ws.send(JSON.stringify({...msg, pl})); } catch (e) {}
+      // Events say no more than one could hear: where someone reinforced is theirs only, and a shot's origin is
+      // given roughly (enough for the arrow), not exactly.
+      const fev = e => {
+        if (!e || e.pid === p.pid || open) return e;
+        if (e.k === 'reinforce') { const {x: _x, y: _y, ...rest} = e; return rest; }
+        if ((e.k === 'shot' || e.k === 'hit' || e.k === 'drone') && Number.isFinite(e.sx)) {
+          const j = k => ((Math.sin((e.n + k) * 12.9898) * 43758.5453) % 1) * 0.8;
+          return {...e, sx: r(e.sx + j(1)), sy: r(e.sy + j(7))};
+        }
+        return e;
+      };
+      try { p.ws.send(JSON.stringify({...msg, ev: fev(msg.ev), evs: (msg.evs || []).map(fev), pl})); } catch (e) {}
     }
   }
 }
@@ -8509,7 +8532,7 @@ function brTextures() {
 }
 // Who may move: everyone while playing, only the defender while preparing.
 // While preparing the attacker moves the drone, the defender themselves.
-const brCanMove = (st, side) => st === 'play' || st === 'prep';
+const brCanMove = (st, side, dr) => st === 'play' || (st === 'prep' && (side === 'def' || !!dr));
 // The map as the page knows it: floor, concrete, brick; which cells are outside (grass and sky).
 function brFull(g, m) {
   const sg = g.sg;
@@ -8535,7 +8558,7 @@ function brSnapshot(g, m) {
   const swap = !!sg.droneMode !== drone;
   sg.droneMode = drone;
   const p = drone ? {x: mine.dr[0], y: mine.dr[1], vx: 0, vy: 0} : {x: mine.x, y: mine.y, vx: 0, vy: 0};
-  if (!brCanMove(m.st, mine.side) || !sg.me || !mine.al || swap) {
+  if (!brCanMove(m.st, mine.side, mine.dr) || !sg.me || !mine.al || swap) {
     sg.me = p; sg.hist = []; sg.vis = {x: 0, y: 0};
     if (m.st === 'count' && (sg.ang === undefined || sg.rdSeen !== m.rd)) { sg.ang = mine.a; sg.rdSeen = m.rd; }
     return;
@@ -8559,7 +8582,7 @@ function brTicks(g, now) {
   if (!sg.simAt) sg.simAt = now;
   let n = Math.floor((now - sg.simAt) / (1000 / 60));
   if (n > 6) { sg.simAt = now - 6 * 1000 / 60; n = 6; }
-  const mine = s.pl.find(p => p.pid === me.id), live = mine && mine.al && brCanMove(s.st, mine.side);
+  const mine = s.pl.find(p => p.pid === me.id), live = mine && mine.al && brCanMove(s.st, mine.side, mine.dr);
   for (let i = 0; i < n; i++) {
     sg.simAt += 1000 / 60;
     // A key tapped between two ticks (R, a short step) still counts once.
