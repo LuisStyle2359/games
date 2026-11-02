@@ -575,12 +575,14 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
           <tr data-doc="Commercial Invoice" data-game="snake"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-03</td><td>Commercial Invoice</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
           <tr data-doc="Correspondence" data-chat="1"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-11</td><td>Correspondence</td><td>Email</td><td></td><td>1</td><td>16.10.2026 08:47</td><td></td><td></td></tr>
           <tr data-doc="Customer Images" data-video="1"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-10</td><td>Customer Images</td><td>Scan</td><td class="flag">Q</td><td>1</td><td>15.10.2026 09:12</td><td></td><td></td></tr>
+          <tr data-doc="Freight Invoice" data-offline="pong"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-15</td><td>Freight Invoice</td><td>Billing</td><td></td><td>2</td><td>30.10.2026 14:18</td><td></td><td></td></tr>
           <tr data-doc="House Airway Bill" data-game="tetris"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-04</td><td>House Airway Bill - Original</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:32</td><td></td><td></td></tr>
           <tr data-doc="OLA"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-05</td><td>OLA</td><td></td><td></td><td>6</td><td>24.09.2026 14:48</td><td></td><td></td></tr>
           <tr data-doc="OLA" data-game="2048"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-06</td><td>OLA</td><td>generell</td><td class="flag">Q</td><td>4</td><td>08.10.2026 12:05</td><td></td><td></td></tr>
           <tr data-doc="Packing List" data-offline="tron"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-12</td><td>Packing List</td><td>Routing</td><td></td><td>3</td><td>27.10.2026 09:41</td><td></td><td></td></tr>
           <tr data-doc="Proof of Delivery" data-offline="kick"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-13</td><td>Proof of Delivery</td><td>POD</td><td></td><td>1</td><td>28.10.2026 15:06</td><td></td><td></td></tr>
           <tr data-doc="Shipment Alert" data-game="flappy"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-07</td><td>Shipment Alert</td><td>24.09.2026 10:29</td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:29</td><td></td><td></td></tr>
+          <tr data-doc="Site Survey" data-offline="breach"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-14</td><td>Site Survey</td><td>Inspection</td><td></td><td>5</td><td>29.10.2026 11:22</td><td></td><td></td></tr>
           <tr data-doc="T1 Document" data-game="wordle"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-08</td><td>T1 Document</td><td></td><td class="flag">Q</td><td>2</td><td>24.09.2026 10:33</td><td></td><td></td></tr>
           <tr data-doc="T1 Document" data-game="pongbot"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-09</td><td>T1 Document</td><td></td><td></td><td>2</td><td>03.10.2026 12:17</td><td></td><td></td></tr>
           <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
@@ -635,7 +637,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
-            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button><button class="vbtn" id="cmpKick" type="button" style="width:100%">⚽ Fußball</button><button class="vbtn" id="cmpTron" type="button" style="width:100%">🏍️ Neon Rush</button></div>
+            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button><button class="vbtn" id="cmpKick" type="button" style="width:100%">⚽ Fußball</button><button class="vbtn" id="cmpTron" type="button" style="width:100%">🏍️ Neon Rush</button><button class="vbtn" id="cmpBreach" type="button" style="width:100%">⚔️ Breach (1 gegen 1)</button></div>
             <div class="cpop" id="cflexpop" hidden role="dialog" aria-label="Score zeigen" style="padding:8px;gap:4px;flex-direction:column"></div>
             <div class="cimgbar" id="cimgbar" hidden><img id="cimgthumb" alt=""><span id="cimginfo">Bild senden?</span><button class="vbtn" id="cimgsend" type="button">Senden</button><button class="vbtn" id="cimgcancel" type="button">Abbrechen</button></div>
             <div class="cimgview" id="cimgview" hidden></div>
@@ -729,6 +731,9 @@ const UI = '"Segoe UI", Tahoma, Arial, sans-serif';
 const canvas = $('c');
 const ctx = canvas.getContext('2d');
 const previewEl = $('preview'), stage = $('stage'), placeholder = $('placeholder');
+// ⚔️ Breach is still being built: hidden until its game server is live.
+const BR_READY = false;
+if (!BR_READY) document.querySelectorAll('#docs tr[data-offline="breach"]').forEach(r => r.remove());
 const rows = [...document.querySelectorAll('#docs tr[data-doc]')];
 const dpr = window.devicePixelRatio || 1;
 
@@ -1870,7 +1875,7 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong vs Bot', kick: 'Fußball', tron: 'Neon Rush'};
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong vs Bot', kick: 'Fußball', tron: 'Neon Rush', breach: 'Breach'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -2027,7 +2032,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 40;
+const APP_VERSION = 41;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2461,7 +2466,7 @@ function toggleLb() {
   if (!p.hidden) renderLb();
 }
 function renderLb() {
-  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong', 'pongtop', 'kick', 'tron'];
+  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong', 'pongtop', 'kick', 'tron', 'breach'];
   const avail = allGames.filter(g => lb[g] && Object.keys(lb[g]).length);
   if (!avail.includes(lbGame)) lbGame = avail[0] || 'snake';
   $('clbtabs').replaceChildren(...avail.map(g =>
@@ -2472,7 +2477,7 @@ function renderLb() {
     .sort((a, b) => b.score - a.score);
   if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Scores für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
   const medals = ['gold', 'silver', 'bronze'];
-  const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong', 'kick', 'tron'];
+  const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong', 'kick', 'tron', 'breach'];
   $('clbbody').replaceChildren(el('table', {class: 'clbtable'},
     el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : ['pongbot', 'pongtop'].includes(lbGame) ? 'Tempo' : 'Score'}))),
     el('tbody', {}, ...entries.map((e, i) => el('tr', {},
@@ -2543,7 +2548,7 @@ function syncMpView() {
 }
 function renderMpBoard() {
   if (!mpGame) return;
-  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron'].includes(mpGame.game));
+  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach'].includes(mpGame.game));
   if (mpGame.game === 'draw') { renderDraw(); return; }
   if (mpGame.game === 'emoji') { renderEmoji(); return; }
   if (mpGame.game === 'react') { renderReact(); return; }
@@ -2640,7 +2645,7 @@ setInterval(() => {
 function inviteMp(game) {
   if (conv === ALL || !people.has(conv) || !mq || mpRunning()) return;
   closePops();
-  const gid = me.id + Date.now().toString(36), key = ['pong', 'kick', 'tron'].includes(game) ? pgKey() : undefined;
+  const gid = me.id + Date.now().toString(36), key = ['pong', 'kick', 'tron', 'breach'].includes(game) ? pgKey() : undefined;
   sendMpMsg(conv, {type: 'invite', game, gid, name: me.name, key}).catch(() => {});
   addMsg(conv, {id: 'inv-' + gid, from: 'system', name: '', text: GAME_NAMES[game] + ': Einladung an ' + nameOf(conv) + ' gesendet…', ts: Date.now()});
   if ((people.get(conv).v || 0) < APP_VERSION) addMsg(conv, {id: 'old-' + gid, from: 'system', name: '', text: 'Hinweis: ' + nameOf(conv) + ' hat noch eine ältere Version der Seite offen. Kommt die Einladung nicht an, muss ' + nameOf(conv) + ' die Seite mit Strg+F5 neu laden.', ts: Date.now()});
@@ -3419,8 +3424,19 @@ function pgInit(g, key) {
   g.key = /^[a-z0-9]{12,40}$/.test(key || '') ? key : '';
   g.pg = {ws: null, s: null, at: 0, y: PG_H / 2, aimY: PG_H / 2, dirty: true, conn: 'connecting', raf: 0, tries: 0, buf: [], offs: [], off: 0,
     rtt: 0, pingAt: 0, ev: 0, hist: [], sm: {ex: 0, ey: 0}, sentAt: 0, pushT: 0, trail: [], flash: 0, shake: 0, toast: null, parts: [], rings: [], burstAt: null, wasTurbo: false, frameAt: 0};
+  if (pgGame && pgGame.offline && pgGame !== g) offStop();
   pgGame = g;
   pgConnect(g);
+}
+// The running Ping Pong: the online match in the chat, or the offline one against the bot.
+const pgLive = g => !!g && (g === mpGame || (!!g.offline && g === pgGame));
+function pgUi(g) {
+  if (g.offline) {
+    const here = () => showing && current === offlineDocs.pong;
+    return {grid: $('ogrid'), status: $('ostatus'), result: $('oresult'), here, shown: () => here() && document.visibilityState === 'visible'};
+  }
+  const here = () => conv === mpConv(g) && !$('cmpboard').hidden;
+  return {grid: $('cmpgrid'), status: $('cmpstatus'), result: $('cmpresult'), here, shown: () => here() && chatVisible()};
 }
 // Mirrored for seat 2, so everyone plays from the left.
 function pgView(g, x) { return g.myMark === 1 ? x : PG_W - x; }
@@ -3428,11 +3444,11 @@ function pgSend(g, msg) { const ws = g.pg.ws; if (ws && ws.readyState === 1) ws.
 function pgMine(g, s) { return s && s.stuck === g.myMark - 1; }
 function pgHalf(g, s, i) { return ((s && s.ph && s.ph[i]) || PG_PH) / 2; }
 function pgConnect(g) {
-  if (mpGame !== g || g.over || !OWN_BROKER.url || !g.key) { if (g.pg) g.pg.conn = 'lost'; return; }
+  if (!pgLive(g) || g.over || (!g.offline && (!OWN_BROKER.url || !g.key))) { if (g.pg) g.pg.conn = 'lost'; return; }
   const pg = g.pg;
   let ws;
   try {
-    ws = new WebSocket(OWN_BROKER.url.replace(/\/+$/, '') + '/game/' + g.gid + '?seat=' + g.myMark + '&key=' + g.key + '&name=' + encodeURIComponent(me.name));
+    ws = g.offline ? pgLocal(g) : new WebSocket(OWN_BROKER.url.replace(/\/+$/, '') + '/game/' + g.gid + '?seat=' + g.myMark + '&key=' + g.key + '&name=' + encodeURIComponent(me.name));
   } catch (e) { pg.conn = 'lost'; return; }
   pg.ws = ws;
   ws.onopen = () => { pg.conn = 'open'; pg.tries = 0; pg.dirty = true; };
@@ -3469,29 +3485,32 @@ function pgConnect(g) {
     if (s.st === 'over' && !g.over && (s.w === 1 || s.w === 2)) {
       g.over = true;
       g.winner = s.w;
-      finishMp();
-      if (conv === g.opponent) renderMpBoard();
+      if (g.offline) { offRecord(g, s.w === 1); if (pgUi(g).here()) renderPong(g); }
+      else {
+        finishMp();
+        if (conv === g.opponent) renderMpBoard();
+      }
     }
   };
   ws.onclose = () => {
     if (pg.ws !== ws) return;
     pg.ws = null;
     pg.conn = 'lost';
-    if (mpGame === g && !g.over && pg.tries++ < 30) setTimeout(() => pgConnect(g), 1000);
+    if (pgLive(g) && !g.over && !g.offline && pg.tries++ < 30) setTimeout(() => pgConnect(g), 1000);
   };
 }
 setInterval(() => {
   const g = pgGame;
   if (!g) return;
   const pg = g.pg;
-  if (mpGame !== g || g.over) {
-    if (pg.ws && (mpGame !== g || performance.now() - pg.at > 3000)) { const ws = pg.ws; pg.ws = null; try { ws.close(); } catch (e) {} }
-    if (mpGame !== g) pgGame = null;
+  if (!pgLive(g) || g.over) {
+    if (pg.ws && (!pgLive(g) || performance.now() - pg.at > 3000)) { const ws = pg.ws; pg.ws = null; try { ws.close(); } catch (e) {} }
+    if (!pgLive(g)) pgGame = null;
     return;
   }
   pgAssistStep(g);
   // Until the round runs, tell the opponent how our connection to the game server is doing.
-  if ((!pg.s || pg.s.st === 'wait') && performance.now() - (pg.statAt || 0) > 3000) {
+  if (!g.offline && (!pg.s || pg.s.st === 'wait') && performance.now() - (pg.statAt || 0) > 3000) {
     pg.statAt = performance.now();
     if (!pg.waitFrom) pg.waitFrom = Date.now();
     sendMpMsg(g.opponent, {type: 'pgstat', gid: g.gid, c: pg.conn}).catch(() => {});
@@ -3499,7 +3518,8 @@ setInterval(() => {
   if (pg.ws && pg.ws.readyState === 1) {
     // Tell the server whether the game is in sight; when both players have it hidden (Esc, another tab or
     // chat), the match pauses.
-    const away = !(chatVisible() && conv === mpConv(g) && !$('cmpboard').hidden);
+    // Offline the match also pauses with P.
+    const away = !pgUi(g).shown() || !!pg.paused;
     if (away !== pg.away || performance.now() - (pg.awayAt || 0) > 2000) { pg.away = away; pg.awayAt = performance.now(); pgSend(g, {t: 'away', v: away}); }
     pgPush(g);
     if (performance.now() - pg.pingAt > 2000) { pg.pingAt = performance.now(); pgSend(g, {t: 'ping', c: pg.pingAt, rtt: Math.round(pg.rtt)}); }
@@ -3952,8 +3972,8 @@ const TROLLS = {hischam: hischamMode, poop: () => emojiRain('💩'), pig: () => 
 function runTroll(what) { if (TROLLS[what]) TROLLS[what](); }
 // Asks the game server for the divine item right now, signed with the admin key (the server checks it).
 async function adminGod() {
-  const g = mpGame;
-  if (!g || g.game !== 'pong' || g.over || !g.pg || !g.pg.ws || g.pg.ws.readyState !== 1 || !g.pg.s || g.pg.s.st !== 'play') return false;
+  const g = pgGame;
+  if (!pgLive(g) || g.game !== 'pong' || g.over || !g.pg || !g.pg.ws || g.pg.ws.readyState !== 1 || !g.pg.s || g.pg.s.st !== 'play') return false;
   const ts = Date.now(), sig = b64u(await crypto.subtle.sign({name: 'ECDSA', hash: 'SHA-256'}, await adminKey(), new TextEncoder().encode('god|' + g.key + '|' + ts)));
   pgSend(g, {t: 'god', ts, sig});
   return true;
@@ -4056,12 +4076,12 @@ const pgResize = new ResizeObserver(() => {
   if (cv.width !== bw) { cv.width = bw; cv.height = Math.round(bw * PG_H / PG_W); }
 });
 function buildPong(g) {
-  const grid = $('cmpgrid');
+  const grid = pgUi(g).grid;
   grid.className = 'dr-wrap';
   grid.dataset.gid = g.gid;
   const cv = el('canvas', {class: 'dr-canvas pg-canvas', id: 'pgcanvas', width: PG_W, height: PG_H});
   const move = e => {
-    if (mpGame !== g || g.over || (pgAssistOn && pgAssistHeld)) return;
+    if (!pgLive(g) || g.over || (pgAssistOn && pgAssistHeld)) return;
     const r = cv.getBoundingClientRect(), y = (e.clientY - r.top) / r.height * PG_H, s = g.pg.s, half = pgHalf(g, s, g.myMark - 1);
     if (pgMine(g, s)) g.pg.aimY = Math.max(PG_BR, Math.min(PG_H - PG_BR, y));
     else g.pg.y = Math.max(half, Math.min(PG_H - half, y));
@@ -4075,7 +4095,7 @@ function buildPong(g) {
     move(e);
     if (pgMine(g, g.pg.s)) pgSend(g, {t: 'fire'});
   });
-  const vote = v => { pgSend(g, {t: 'vote', v}); g.pg.voted = v; renderPong(); };
+  const vote = v => { pgSend(g, {t: 'vote', v}); g.pg.voted = v; renderPong(g); };
   const voteBox = el('div', {class: 'pg-vote', id: 'pgvote', hidden: true},
     el('div', {class: 'pg-vote-q', text: 'Diese Runde mit Power-ups?'}),
     el('div', {class: 'pg-vote-row'},
@@ -4087,15 +4107,22 @@ function buildPong(g) {
   pgResize.disconnect();
   pgResize.observe(stage);
 }
-function renderPong() {
-  const g = mpGame;
+function renderPong(g = mpGame) {
   if (!g || g.game !== 'pong') return;
-  if ($('cmpgrid').dataset.gid !== g.gid || !$('pgcanvas')) buildPong(g);
-  $('cmpstatus').textContent = g.over ? (g.winner === g.myMark ? 'Du hast gewonnen!' : g.opName + ' hat gewonnen!')
+  const ui = pgUi(g);
+  if (ui.grid.dataset.gid !== g.gid || !$('pgcanvas')) buildPong(g);
+  ui.status.textContent = g.over ? (g.winner === g.myMark ? 'Du hast gewonnen!' : g.opName + ' hat gewonnen!')
+    : g.offline ? '🏓 Ping Pong gegen Bot (' + OFF_LEVEL_NAMES[g.offline.lvl] + ', Power-ups ' + (g.offline.pu ? 'an' : 'aus') + ') — Maus hoch und runter, du bist links'
     : 'Ping Pong vs ' + g.opName + ' — Maus hoch und runter bewegen, du bist links';
-  const res = $('cmpresult');
+  const res = ui.result;
   res.hidden = false;
-  res.replaceChildren(g.over
+  if (g.offline) {
+    res.replaceChildren(...(g.over
+      ? [el('button', {class: 'vbtn', type: 'button', text: '▶ Nochmal', onclick: () => offStart('pong')}),
+        el('button', {class: 'vbtn', type: 'button', text: 'Einstellungen', onclick: () => { offStop(); offShow('pong'); }})]
+      : [el('button', {class: 'vbtn', type: 'button', text: g.pg.paused ? '▶ Weiter' : '⏸ Pause', onclick: () => pgPause(g)}),
+        el('button', {class: 'vbtn', type: 'button', text: 'Aufgeben', onclick: () => pgQuit(g)})]));
+  } else res.replaceChildren(g.over
     ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
     : el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
   if (!g.pg.raf) g.pg.raf = requestAnimationFrame(ts => pgFrame(g, ts));
@@ -4323,7 +4350,7 @@ function pgPixels(ctx, k) {
 function pgFrame(g, ts) {
   g.pg.raf = 0;
   const cv = $('pgcanvas');
-  if (mpGame !== g || !cv || $('cmpboard').hidden) return;
+  if (!pgLive(g) || !cv || !pgUi(g).here()) return;
   const pg = g.pg, ctx = cv.getContext('2d'), me1 = g.myMark - 1, op1 = 1 - me1, now = ts || performance.now(), fx = pgFx(pg), k = cv.width / PG_W;
   pgClock(pg, performance.timeOrigin + now);
   pgPixels(ctx, k);
@@ -4399,7 +4426,7 @@ function pgFrame(g, ts) {
     const total = s.sc[0] + s.sc[1];
     // Baby-Ball troll: the face is the ball until the next point, for both players.
     const face = s.st === 'play' && babyTake();
-    if (face) { pg.babyReq = face; sendMpMsg(g.opponent, {type: 'pgbaby', gid: g.gid, face}).catch(() => {}); }
+    if (face) { pg.babyReq = face; if (!g.offline) sendMpMsg(g.opponent, {type: 'pgbaby', gid: g.gid, face}).catch(() => {}); }
     if (pg.babyReq && s.st === 'play') { pg.babyFace = pg.babyReq; pg.babyReq = false; pg.baby = total; }
     if (pg.baby !== undefined && (total !== pg.baby || s.st === 'over')) pg.baby = undefined;
     if (pg.prevTotal !== undefined && total > pg.prevTotal && s.st !== 'over') {
@@ -4963,7 +4990,7 @@ function pgFrame(g, ts) {
   }
   ctx.pgOx = ctx.pgOy = 0;
 
-  const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis ' + pgTarget(s.sc) + ')' : 'Du 0 : 0 ' + g.opName) + (pg.rtt ? '   ·   Ping ' + Math.round(pg.rtt) + (pgAssistOn ? 'ms' : ' ms') : '');
+  const score = (s ? 'Du ' + s.sc[me1] + ' : ' + s.sc[op1] + ' ' + g.opName + '   (bis ' + pgTarget(s.sc) + ')' : 'Du 0 : 0 ' + g.opName) + (pg.rtt && !g.offline ? '   ·   Ping ' + Math.round(pg.rtt) + (pgAssistOn ? 'ms' : ' ms') : '');
   if ($('pgscore').textContent !== score) $('pgscore').textContent = score;
   const voting = !g.over && s && s.st === 'vote';
   $('pgvote').hidden = !voting;
@@ -4976,7 +5003,7 @@ function pgFrame(g, ts) {
   const over = $('pgover');
   let text = '';
   if (g.over) text = g.winner === g.myMark ? '🏆 Gewonnen!' : g.opName + ' gewinnt';
-  else if (!OWN_BROKER.url) text = 'Kein eigener Spielserver eingerichtet';
+  else if (!g.offline && !OWN_BROKER.url) text = 'Kein eigener Spielserver eingerichtet';
   else if (pg.conn !== 'open') text = pg.conn === 'lost' ? 'Spielserver nicht erreichbar – neuer Versuch…' : 'Verbinde mit dem Spielserver…';
   else if (!s || s.st === 'wait') {
     const waited = Date.now() - (pg.waitFrom || Date.now());
@@ -4989,7 +5016,7 @@ function pgFrame(g, ts) {
   else if (!s.on[op1]) text = g.opName + ' ist weg… (gewinnst in 10 s)';
   else if (s.st === 'count') text = (s.pu ? '⚡ Power-ups AN' : 'Power-ups AUS') + (s.coin ? ' (Münzwurf)' : '') + '\n' + Math.max(1, Math.ceil(s.c / 1000));
   else if (s.st === 'goal') text = 'Punkt!';
-  else if (s.st === 'pause') text = 'Pausiert\n' + (s.aw && s.aw[op1] ? 'Warte auf ' + g.opName + '…' : 'Gleich geht\'s weiter…');
+  else if (s.st === 'pause') text = 'Pausiert\n' + (g.offline ? (pg.paused ? 'P = weiter' : 'Gleich geht\'s weiter…') : s.aw && s.aw[op1] ? 'Warte auf ' + g.opName + '…' : 'Gleich geht\'s weiter…');
   else if (s.st === 'resume') text = 'Weiter in\n' + Math.max(1, Math.ceil(s.c / 1000));
   if (over.textContent !== text) over.textContent = text;
   over.hidden = !text;
@@ -4999,9 +5026,10 @@ function pgFrame(g, ts) {
 /* Fußball and Neon Rush: games for two to four players that run on our own game server, like Ping Pong.
    One against one from a direct invitation, up to four at a table in the group chat (like Uno). The page
    connects with the game's key and its chat id; the server keeps the lobby, the game and the score. */
-const SG_GAMES = ['kick', 'tron'], SG_MAX = 4;
-const SG_TITLE = {kick: '⚽ Fußball', tron: '🏍️ Neon Rush'};
-const SG_HINT = {kick: 'Pfeiltasten oder WASD laufen, Leertaste schießen', tron: 'Pfeiltasten oder WASD lenken, Leertaste hält den Boost'};
+const SG_GAMES = ['kick', 'tron', 'breach'], SG_MAX = 4;
+const SG_TITLE = {kick: '⚽ Fußball', tron: '🏍️ Neon Rush', breach: '⚔️ Breach'};
+const SG_HINT = {kick: 'Pfeiltasten oder WASD laufen, Leertaste schießen', tron: 'Pfeiltasten oder WASD lenken, Leertaste hält den Boost',
+  breach: 'Ins Bild klicken · Maus zielen · WASD laufen · Shift leise · Klick schießen · R laden · F Sprengladung · E entschärfen'};
 let sgGame = null;
 
 function sgInit(g, key, duo) {
@@ -5051,7 +5079,7 @@ const sgRosterKey = s => s.st + '|' + s.host + '|' + s.pb + '|' + JSON.stringify
 function sgMessage(g, m) {
   const sg = g.sg;
   if (m.t === 'pong' && Number.isFinite(m.c)) { const r = performance.now() - m.c; sg.rtt = sg.rtt ? sg.rtt * 0.7 + r * 0.3 : r; return; }
-  if (m.t === 'full') { if (g.game === 'tron') nrFull(g, m); return; }
+  if (m.t === 'full') { if (g.game === 'tron') nrFull(g, m); else if (g.game === 'breach') brFull(g, m); return; }
   if (m.t !== 's' || !Array.isArray(m.pl)) return;
   const prev = sg.s;
   sg.s = m;
@@ -5069,6 +5097,7 @@ function sgMessage(g, m) {
   if (mine && mine.team !== undefined) sg.team = mine.team;
   if (m.ev && m.ev.n !== sg.ev) { if (prev) sgEvent(g, m.ev, m); sg.ev = m.ev.n; }
   if (g.game === 'kick') { if (m.ko >= 0 && (!prev || prev.ko < 0 || prev.st !== m.st)) sg.koAt = performance.now(); bzSnapshot(g, m); }
+  else if (g.game === 'breach') brSnapshot(g, m);
   else nrSnapshot(g, m);
   if (m.st === 'over' && !g.over) sgFinish(g, m);
   const rk = sgRosterKey(m);
@@ -5137,6 +5166,7 @@ function sgFinish(g, s) {
 function sgEvent(g, ev, s) {
   if (ev.k === 'vote') { sgBanner(g, ev.pu ? '⚡ POWER-UPS AN' : 'OHNE POWER-UPS', ev.coin ? 'Unentschieden – die Münze hat entschieden' : '', ev.pu ? '#ffd23f' : '#ffffff'); return; }
   if (g.game === 'kick') bzEvent(g, ev, s);
+  else if (g.game === 'breach') brEvent(g, ev, s);
   else nrEvent(g, ev, s);
 }
 // Steady chores: keep the connection alive, tell the server whether the game is in sight, announce an open
@@ -5158,9 +5188,17 @@ setInterval(() => {
   // The owner's face-ball prank also works here: the victim's page hands it to the game server.
   if (sg.s && sg.s.st === 'play' && !g.over) { const face = babyTake(); if (face) sgSend(g, {t: 'face', f: face}); }
   if (g.game === 'kick') bzTicks(g, now);
+  else if (g.game === 'breach') brTicks(g, now);
 }, 8);
 
 const SG_KEYS = {arrowup: 1, w: 1, arrowdown: 2, s: 2, arrowleft: 4, a: 4, arrowright: 8, d: 8, ' ': 16, x: 16};
+// Breach: W/S forward and back, A/D sideways, Shift walks quietly, R reloads, E defuses (bits as the server reads them).
+const BR_KEYS = {w: 1, arrowup: 1, s: 2, arrowdown: 2, a: 4, d: 8, shift: 16, r: 64, e: 128};
+// The mouse turns the view once the picture has captured it (a click into the picture); its button fires.
+document.addEventListener('mousemove', e => { const g = sgGame; if (g && g.game === 'breach' && g.el && document.pointerLockElement === g.el.canvas) g.sg.ang += e.movementX * 0.0028; });
+document.addEventListener('mousedown', e => { const g = sgGame; if (g && g.game === 'breach' && g.el && document.pointerLockElement === g.el.canvas && e.button === 0) { g.sg.fire = true; e.preventDefault(); } });
+document.addEventListener('mouseup', e => { const g = sgGame; if (g && g.game === 'breach' && e.button === 0) g.sg.fire = false; });
+document.addEventListener('pointerlockchange', () => { const g = sgGame; if (g && g.game === 'breach' && g.el && document.pointerLockElement !== g.el.canvas) { g.sg.fire = false; g.sg.keys = 0; } });
 function sgActive() {
   const g = sgGame;
   return sgLive(g) && SG_GAMES.includes(g.game) && !!g.sg && !g.over && sgUi(g).shown();
@@ -5175,6 +5213,16 @@ document.addEventListener('keydown', e => {
     else if (g.sg.s.st === 'play') sgSend(g, {t: 'pause'});
     return;
   }
+  if (g.game === 'breach') {
+    const key = e.key.toLowerCase(), b = BR_KEYS[key];
+    if (key === 'f' && !e.repeat) sgSend(g, {t: 'charge'});
+    else if (key === 'arrowleft' || key === 'arrowright') g.sg.turn = key === 'arrowleft' ? -1 : 1;
+    else if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (b) g.sg.keys |= b;
+    return;
+  }
   const bit = SG_KEYS[e.key.toLowerCase()];
   if (!bit) return;
   e.preventDefault();
@@ -5185,6 +5233,12 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => {
   const g = sgGame;
   if (!g || !g.sg || !SG_GAMES.includes(g.game)) return;
+  if (g.game === 'breach') {
+    const key = e.key.toLowerCase();
+    if (key === 'arrowleft' || key === 'arrowright') g.sg.turn = 0;
+    if (BR_KEYS[key]) g.sg.keys &= ~BR_KEYS[key];
+    return;
+  }
   const bit = SG_KEYS[e.key.toLowerCase()];
   if (!bit) return;
   if (g.game === 'kick') g.sg.keys &= ~bit;
@@ -5194,11 +5248,13 @@ window.addEventListener('blur', () => {
   const g = sgGame;
   if (!g || !g.sg) return;
   g.sg.keys = 0;
+  g.sg.fire = false;
+  g.sg.turn = 0;
   if (g.game === 'tron') sgSend(g, {t: 'boost', v: false});
 });
 
 // The board: a score line, the canvas with an overlay for countdowns and results, and the lobby on top.
-const SG_VIEW = {kick: [852, 472], tron: [800, 500]};
+const SG_VIEW = {kick: [852, 472], tron: [800, 500], breach: [640, 360]};
 const sgResize = new ResizeObserver(() => {
   const g = sgGame, st = g && g.el && g.el.stage, cv = g && g.el && g.el.canvas;
   if (!st || !cv || !SG_VIEW[g.game]) return;
@@ -5218,6 +5274,7 @@ function buildSg(g) {
   const stage = el('div', {class: 'dr-stage', id: id + 'sgstage'}, cv, over, lobby), score = el('div', {class: 'rx-score sg-score', id: id + 'sgscore'});
   grid.replaceChildren(score, stage);
   g.el = {canvas: cv, over, lobby, stage, score};
+  if (g.game === 'breach') cv.addEventListener('click', () => { if (document.pointerLockElement !== cv && cv.requestPointerLock) try { cv.requestPointerLock(); } catch (e) {} });
   sgResize.disconnect();
   sgResize.observe(stage);
 }
@@ -5231,7 +5288,7 @@ function renderSgChrome(g) {
   const ui = sgUi(g);
   if (!sgLive(g) || !g.el || ui.grid.dataset.gid !== g.gid) return;
   const s = g.sg.s, lobby = g.el.lobby;
-  ui.status.textContent = SG_TITLE[g.game] + (g.offline ? ' gegen ' + (g.game === 'kick' && g.offline.mode === 2 ? '3 Bots' : g.game === 'kick' ? 'Bot' : g.offline.bots + (g.offline.bots === 1 ? ' Bot' : ' Bots')) + ' · ' + OFF_LEVEL_NAMES[g.offline.lvl] : '')
+  ui.status.textContent = SG_TITLE[g.game] + (g.offline ? ' gegen ' + (g.game === 'kick' && g.offline.mode === 2 ? '3 Bots' : g.game === 'kick' || g.game === 'breach' ? 'Bot' : g.offline.bots + (g.offline.bots === 1 ? ' Bot' : ' Bots')) + ' · ' + OFF_LEVEL_NAMES[g.offline.lvl] : '')
     + (g.over ? '' : ' — ' + SG_HINT[g.game]);
   const res = ui.result;
   res.hidden = false;
@@ -5294,13 +5351,15 @@ function sgFrame(g, ts) {
   const sg = g.sg, now = ts || performance.now(), dt = Math.min(0.05, sg.frameAt ? (now - sg.frameAt) / 1000 : 0.016);
   sg.frameAt = now;
   if (g.game === 'kick') bzDraw(g, cv, now, dt);
+  else if (g.game === 'breach') brDraw(g, cv, now, dt);
   else nrDraw(g, cv, now, dt);
   // Score line and overlay text.
   const s = sg.s;
   let score = '';
   if (s && g.game === 'kick') {
     score = sg.team === 0 ? 'Du spielst 🔴 Rot → nach rechts' : sg.team === 1 ? 'Du spielst 🔵 Blau ← nach links' : '';
-  } else if (s) score = 'Erster mit 3 Runden gewinnt';
+  } else if (s && g.game === 'breach') score = 'Wer zuerst 4 Runden gewinnt';
+  else if (s) score = 'Erster mit 3 Runden gewinnt';
   if (sg.rtt) score += '     Ping ' + Math.round(sg.rtt) + ' ms';
   if (g.el.score.textContent !== score) g.el.score.textContent = score;
   let text = '';
@@ -5310,7 +5369,7 @@ function sgFrame(g, ts) {
   else if (g.over && s.st === 'over') text = g.winner ? '🏆 Gewonnen!' : g.game === 'kick' ? (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt' : ((s.pl.find(p => p.pid === s.w) || {}).name || 'Niemand') + ' gewinnt';
   else if (g.over) text = '';
   else if (sg.conn === 'lost') text = 'Verbindung weg – neuer Versuch…';
-  else if (s.st === 'count') text = (g.game === 'kick' ? 'Anstoß in\n' : 'Runde ' + s.rd + '\n') + Math.max(1, Math.ceil(s.c / 1000));
+  else if (s.st === 'count') text = (g.game === 'kick' ? 'Anstoß in\n' : g.game === 'breach' ? 'Runde ' + s.rd + ' · ' + (sg.side === 'atk' ? 'Du greifst an' : 'Du verteidigst die Bombe') + '\n' : 'Runde ' + s.rd + '\n') + Math.max(1, Math.ceil(s.c / 1000));
   else if (s.st === 'pause' && s.pb) text = (s.pb === me.id ? 'Du hast' : ((s.pl.find(p => p.pid === s.pb) || {}).name || 'Jemand') + ' hat') + ' pausiert\nspätestens in ' + Math.ceil(s.pz / 1000) + ' s geht\'s weiter';
   else if (s.st === 'pause') text = 'Pausiert\n' + (s.pl.some(p => p.aw && p.pid !== me.id) ? 'Warte auf ' + s.pl.filter(p => p.aw && p.pid !== me.id).map(p => p.name).join(', ') + '…' : 'Gleich geht\'s weiter…');
   else if (s.st === 'resume') text = 'Weiter in\n' + Math.max(1, Math.ceil(s.c / 1000));
@@ -6036,6 +6095,428 @@ function nrDraw(g, cv, now, dt) {
    own rooms (copied in when the page is built) and talks to them through a socket-like object, so a game plays
    and looks exactly like online: same physics, power-ups, pause, prediction. */
 const SG_LOCAL = (() => {
+// Ping Pong: the server runs the ball so both players see the same game. Each player only sends where
+// their paddle is; the page draws its own paddle right away and the rest from these updates.
+const W = 640, H = 360, PH = 70, BIG = 105, MINI = 44, PW = 10, PX = 24, BR = 7, WIN = 7, CAP = 10, V0 = 330, VFAST = 1150, VMAX = 1900,
+  TURBO = 2000, PADDLE_V = 1600, TICK = 1000 / 120, ITEM_R = 16, ITEMS = ['big', 'shield', 'magnet', 'slow', 'mini', 'curve'], SLOW_MS = 4000, SLOW_F = 0.5, ITEM_LIFE = 12000,
+  GOD_CHANCE = 0.025, GOD_MS = 8000, GOD_PH = 140, CURVE_MS = 12000, FACE_GAP = W - 2 * (PX + PW / 2 + BR);
+// The owner's admin key (public half): a signed request from the owner's page can spawn the divine item.
+const ADMIN_PUB = {kty: 'EC', crv: 'P-256', x: '30m7AWoz9Hby1aY-forxylWjKyUcxg5hykvUolJKZVg', y: '-BaBgI413Atu8-Ep57UHLwkFhcZbidMNGSwQ0hR1LpA'};
+
+class Arena {
+  constructor(ctx) {
+    this.ctx = ctx;
+    this.key = '';
+    this.seats = [null, null];
+    this.names = ['', ''];
+    this.left = [0, 0];
+    this.timer = 0;
+    this.b = {x: W / 2, y: H / 2, vx: 0, vy: 0};
+    this.pad = [{y: H / 2, ty: H / 2}, {y: H / 2, ty: H / 2}];
+    this.sc = [0, 0];
+    this.st = 'wait';
+    this.until = 0;
+    this.w = 0;
+    this.dir = Math.random() < 0.5 ? -1 : 1;
+    this.rtt = [80, 80];
+    this.hist = [[], []];
+    this.pend = [null, null];
+    this.votes = [null, null];
+    this.pu = null;
+    this.coin = false;
+    this.item = null;
+    this.nextItem = 0;
+    this.since = ITEMS.map(() => 0);
+    this.ph = [PH, PH];
+    this.bigUntil = [0, 0];
+    this.god = [0, 0];
+    this.curve = [0, 0];
+    this.spin = 0;
+    this.adminT = 0;
+    this.miniUntil = [0, 0];
+    this.slow = [0, 0];
+    this.shield = [false, false];
+    this.magnet = [false, false];
+    this.stuck = -1;
+    this.stuckUntil = 0;
+    this.aim = [H / 2, H / 2];
+    this.turbo = false;
+    this.last = -1;
+    this.ev = {n: 0};
+    // Pause: when both players have the game out of sight (Esc, another tab), the match stops until both are back.
+    this.away = [false, false];
+    this.pausedAt = 0;
+    this.pausedSt = '';
+  }
+
+  async fetch(req) {
+    const u = new URL(req.url), seat = Number(u.searchParams.get('seat')), key = u.searchParams.get('key') || '';
+    if ((seat !== 1 && seat !== 2) || !/^[a-z0-9]{12,40}$/.test(key)) return new Response('bad request', {status: 400});
+    if (this.key && this.key !== key) return new Response('forbidden', {status: 403});
+    this.key = key;
+    const [client, server] = Object.values(new WebSocketPair());
+    server.accept();
+    const i = seat - 1, old = this.seats[i];
+    if (old) { this.seats[i] = null; try { old.close(1000, 'replaced'); } catch (e) {} }
+    this.seats[i] = server;
+    this.away[i] = false;
+    this.names[i] = (u.searchParams.get('name') || '').slice(0, 24);
+    server.addEventListener('message', e => this.onMessage(i, e.data));
+    const gone = () => { if (this.seats[i] === server) { this.seats[i] = null; this.left[i] = Date.now(); } };
+    server.addEventListener('close', gone);
+    server.addEventListener('error', gone);
+    if (this.st === 'wait' && this.seats[0] && this.seats[1]) { this.st = 'vote'; this.until = Date.now() + 20000; }
+    if (!this.timer) this.timer = setInterval(() => this.tick(), TICK);
+    return new Response(null, {status: 101, webSocket: client});
+  }
+
+  onMessage(i, data) {
+    let msg;
+    try { msg = JSON.parse(data); } catch (e) { return; }
+    const now = Date.now();
+    if (msg.t === 'm' && Number.isFinite(msg.y)) {
+      if (this.stuck === i) { this.aim[i] = Math.max(BR, Math.min(H - BR, msg.y)); return; }
+      const y = Math.max(this.ph[i] / 2, Math.min(H - this.ph[i] / 2, msg.y)), h = this.hist[i];
+      this.pad[i].ty = y;
+      h.push([now, y]);
+      while (h.length && now - h[0][0] > 800) h.shift();
+    } else if (msg.t === 'ping' && Number.isFinite(msg.c)) {
+      if (Number.isFinite(msg.rtt)) this.rtt[i] = Math.max(0, Math.min(400, msg.rtt));
+      try { this.seats[i].send(JSON.stringify({t: 'pong', c: msg.c})); } catch (e) {}
+    } else if (msg.t === 'vote' && this.st === 'vote' && typeof msg.v === 'boolean') {
+      this.votes[i] = msg.v;
+      if (this.votes[0] !== null && this.votes[1] !== null) this.decide();
+    } else if (msg.t === 'fire' && this.stuck === i) {
+      this.release(now);
+    } else if (msg.t === 'god' && Number.isFinite(msg.ts) && typeof msg.sig === 'string') {
+      this.adminGod(msg.ts, msg.sig);
+    } else if (msg.t === 'away' && typeof msg.v === 'boolean') {
+      this.away[i] = msg.v;
+    } else if (msg.t === 'quit' && this.st !== 'over') {
+      this.finish(2 - i);
+    }
+  }
+
+  // Same vote wins; a tie (one for, one against) is a coin toss. A missing vote just doesn't count.
+  decide() {
+    const [a, b] = this.votes;
+    this.coin = a !== null && b !== null && a !== b;
+    this.pu = this.coin ? Math.random() < 0.5 : (a !== null ? a : b === true);
+    this.nextItem = Date.now() + 3000 + 6000;
+    this.serve('count', 3000);
+  }
+
+  serve(st, ms) {
+    this.st = st;
+    this.until = Date.now() + ms;
+    Object.assign(this.b, {x: W / 2, y: H / 2, vx: 0, vy: 0});
+    this.pend = [null, null];
+    this.stuck = -1;
+    this.turbo = false;
+    this.spin = 0;
+    this.last = -1;
+  }
+
+  launch() {
+    const a = (Math.random() * 2 - 1) * Math.PI / 6;
+    this.b.vx = this.dir * V0 * Math.cos(a);
+    this.b.vy = V0 * Math.sin(a);
+  }
+
+  finish(winnerSeat) {
+    this.st = 'over';
+    this.w = winnerSeat;
+    this.until = Date.now() + 8000;
+  }
+
+  event(k, i, kind) { this.ev = {n: this.ev.n + 1, k, i, kind}; }
+
+  tick() {
+    const now = Date.now(), prevTick = this.tickAt;
+    this.tickAt = now;
+    if (this.st === 'over') {
+      if (now > this.until || (!this.seats[0] && !this.seats[1])) { clearInterval(this.timer); this.timer = 0; }
+    } else if (this.st === 'vote') {
+      if (now > this.until) this.decide();
+    } else if (this.st !== 'wait') {
+      for (let i = 0; i < 2; i++) if (!this.seats[i] && now - this.left[i] > 10000) this.finish(2 - i);
+      if (this.st !== 'over' && this.seats[0] && this.seats[1]) {
+        if (this.st === 'pause') { if (!this.away[0] && !this.away[1]) this.resume(now); }
+        else if (this.away[0] && this.away[1]) this.pause(now);
+        if (this.st === 'resume' && now >= this.until) this.st = 'play';
+        if ((this.st === 'count' || this.st === 'goal') && now >= this.until) { this.st = 'play'; this.launch(); }
+        // The ball moves by the time that really passed, so a late timer never slows or speeds it.
+        const el = Math.min(0.05, Math.max(0, now - (prevTick || now - TICK)) / 1000);
+        if (this.st === 'play') { this.powers(now); this.judge(now); this.physics(el, now); }
+      }
+    } else if (!this.seats[0] && !this.seats[1] && now - Math.max(...this.left) > 60000) {
+      clearInterval(this.timer);
+      this.timer = 0;
+    }
+    this.broadcast(now);
+  }
+
+  pause(now) {
+    this.pausedSt = this.st === 'resume' ? 'play' : this.st;
+    this.pausedAt = now;
+    this.st = 'pause';
+  }
+
+  // Back from a pause: every running timer moves on by the paused time, so power-ups, items and a held magnet
+  // shot have as long left as before. A rally goes on from where it stopped after a 3 s countdown; a pause
+  // between points ends in the usual countdown before the serve.
+  resume(now) {
+    const d = now - this.pausedAt + (this.pausedSt === 'play' ? 3000 : 0), sh = t => t ? t + d : t;
+    for (const k of ['bigUntil', 'miniUntil', 'god', 'curve', 'slow']) this[k] = this[k].map(sh);
+    if (this.item) this.item.t += d;
+    this.nextItem = sh(this.nextItem);
+    this.stuckUntil = sh(this.stuckUntil);
+    for (const h of this.hist) for (const e of h) e[0] += d;
+    for (const p of this.pend) if (p) p.t += d;
+    this.st = this.pausedSt === 'play' ? 'resume' : this.pausedSt;
+    this.until = now + 3000;
+  }
+
+  powers(now) {
+    for (let i = 0; i < 2; i++) {
+      if (this.bigUntil[i] && now > this.bigUntil[i]) { this.bigUntil[i] = 0; this.ph[i] = PH; }
+      if (this.miniUntil[i] && now > this.miniUntil[i]) { this.miniUntil[i] = 0; this.ph[i] = PH; }
+      if (this.god[i] && now > this.god[i]) { this.god[i] = 0; this.ph[i] = this.bigUntil[i] ? BIG : PH; this.event('godend', i); }
+    }
+    if (!this.pu && !(this.item && this.item.k === 'god')) return;
+    if (!this.item && now > this.nextItem) {
+      // A 2.5 % roll for the divine item first; otherwise the usual fair pick.
+      this.item = {k: Math.random() < GOD_CHANCE ? 'god' : this.pickItem(), x: W / 2 + (Math.random() * 2 - 1) * 110, y: 50 + Math.random() * (H - 100), t: now};
+    }
+    // An item nobody hits goes away after a while and makes room for a new one.
+    if (this.item && now - this.item.t > ITEM_LIFE) {
+      this.event('gone', -1, this.item.k);
+      this.item = null;
+      this.nextItem = now + 1500 + Math.random() * 1500;
+    }
+    const it = this.item, b = this.b;
+    if (it && this.last >= 0 && this.stuck < 0 && Math.hypot(b.x - it.x, b.y - it.y) < BR + ITEM_R) {
+      const i = this.last;
+      if (it.k === 'big') { this.ph[i] = BIG; this.bigUntil[i] = now + 10000; this.miniUntil[i] = 0; }
+      // Slow motion: for a few seconds the ball moves at half speed while it comes toward the taker.
+      if (it.k === 'slow') this.slow[i] = now + SLOW_MS;
+      // Mini paddle: the opponent's paddle shrinks for a while.
+      if (it.k === 'mini') { const j = 1 - i; this.ph[j] = MINI; this.miniUntil[j] = now + 8000; this.bigUntil[j] = 0; }
+      // Divine paddle: for 8 s a double-size paddle, every return a fireball, and a goal nothing gets through.
+      // Curveball: for 12 s every return of the taker bends on its way across.
+      if (it.k === 'curve') this.curve[i] = now + CURVE_MS;
+      if (it.k === 'god') { this.god[i] = now + GOD_MS; this.ph[i] = GOD_PH; this.miniUntil[i] = 0; }
+      if (it.k === 'shield') this.shield[i] = true;
+      if (it.k === 'magnet') this.magnet[i] = true;
+      this.event('get', i, it.k);
+      this.item = null;
+      this.nextItem = now + 7000 + Math.random() * 5000;
+    }
+  }
+
+  // Power-ups that haven't come for a while are more likely: each one's weight is (items since it last came + 1)²,
+  // so the one that just came drops to the bottom and the others climb. Starts even every match.
+  pickItem() {
+    const w = this.since.map(s => (s + 1) ** 2);
+    let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0;
+    while (i < w.length - 1 && r >= w[i]) r -= w[i++];
+    this.since = this.since.map((s, j) => j === i ? 0 : s + 1);
+    return ITEMS[i];
+  }
+
+  // A player sees the ball a little late but their own paddle at once, so a miss on the server can be a hit
+  // on their screen. Before a miss counts, wait about one round trip for paddle reports from that moment.
+  grace(i) { return Math.min(260, this.rtt[i] + 70); }
+
+  bounce(i, paddleY, x, y, speed) {
+    const s = i === 0 ? -1 : 1, rel = Math.max(-1, Math.min(1, (y - paddleY) / (this.ph[i] / 2))), a = rel * Math.PI / 3;
+    // +5 % per return up to VFAST, then only +2 %, so the top speeds take a long rally.
+    const v = Math.min(VMAX, speed * (speed < VFAST ? 1.05 : 1.02));
+    Object.assign(this.b, {x, y, vx: -s * v * Math.cos(a), vy: v * Math.sin(a)});
+    this.last = i;
+    this.turbo = false;
+    this.spin = 0;
+    if (this.god[i] > Date.now()) { this.b.vx = -s * TURBO * Math.cos(a); this.b.vy = TURBO * Math.sin(a); this.turbo = true; }
+    else if (this.curve[i] > Date.now()) this.spin = this.curveSpin(i, Math.abs(this.b.vx));
+  }
+
+  // The bend follows the paddle: moving up at the hit curves the ball up, moving down curves it down; from a
+  // still paddle it bends against the ball's flight, so it flies a clear arc. It is scaled to the ball's speed
+  // so a curve shifts the ball by about the same distance across the table (170–260 px), however fast it is.
+  curveSpin(i, vx) {
+    const h = this.hist[i], last = h[h.length - 1];
+    let vel = 0;
+    if (last) { const old = h.find(([t]) => t >= last[0] - 80) || last; vel = (last[1] - old[1]) / Math.max(0.03, (last[0] - old[0]) / 1000); }
+    const dir = Math.abs(vel) > 120 ? Math.sign(vel) : Math.abs(this.b.vy) > 40 ? -Math.sign(this.b.vy) : Math.random() < 0.5 ? -1 : 1;
+    const shift = 170 + 90 * Math.min(1, Math.abs(vel) / 800);
+    return dir * 2 * shift * vx * vx / (FACE_GAP * FACE_GAP);
+  }
+
+  // The owner's page asks for the divine item, signed with the admin key; it appears at once.
+  async adminGod(ts, sig) {
+    if (Math.abs(Date.now() - ts) > 60000 || ts <= this.adminT || this.st !== 'play') return;
+    try {
+      const key = await crypto.subtle.importKey('jwk', ADMIN_PUB, {name: 'ECDSA', namedCurve: 'P-256'}, false, ['verify']);
+      const raw = Uint8Array.from(atob(sig.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+      if (!await crypto.subtle.verify({name: 'ECDSA', hash: 'SHA-256'}, key, raw, new TextEncoder().encode('god|' + this.key + '|' + ts))) return;
+    } catch (e) { return; }
+    this.adminT = ts;
+    this.item = {k: 'god', x: W / 2 + (Math.random() * 2 - 1) * 80, y: 70 + Math.random() * (H - 140), t: Date.now()};
+  }
+
+  stick(i, now) {
+    this.stuck = i;
+    this.spin = 0;
+    this.stuckUntil = now + 3000;
+    this.magnet[i] = false;
+    this.pad[i].ty = this.pad[i].y;
+    this.aim[i] = H / 2;
+    this.pend[i] = null;
+    this.event('catch', i);
+  }
+
+  // The magnet shot leaves at full speed toward the aimed point on the other side.
+  release() {
+    const i = this.stuck, s = i === 0 ? -1 : 1, b = this.b;
+    const dx = -s * (W - 2 * (PX + PW / 2 + BR)), dy = this.aim[i] - b.y;
+    let a = Math.atan2(dy, Math.abs(dx));
+    a = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, a));
+    b.vx = -s * TURBO * Math.cos(a);
+    b.vy = TURBO * Math.sin(a);
+    this.stuck = -1;
+    this.turbo = true;
+    this.spin = 0;
+    this.last = i;
+    this.event('fire', i);
+  }
+
+  judge(now) {
+    for (let i = 0; i < 2; i++) {
+      const p = this.pend[i];
+      if (!p) continue;
+      const g = this.grace(i), reach = this.ph[i] / 2 + BR + 3;
+      const hit = this.hist[i].find(([t, y]) => t >= p.t - 60 && t <= p.t + g && Math.abs(p.y - y) <= reach);
+      if (hit) {
+        this.pend[i] = null;
+        this.bounce(i, hit[1], p.x, p.y, p.v);
+        const b = this.b, el = (now - p.t) / 1000;
+        b.x += b.vx * el;
+        b.y += b.vy * el;
+        if (b.y < BR) b.y = 2 * BR - b.y;
+        if (b.y > H - BR) b.y = 2 * (H - BR) - b.y;
+        b.y = Math.max(BR, Math.min(H - BR, b.y));
+      } else if (now > p.t + g) {
+        p.done = true;
+      }
+    }
+  }
+
+  physics(dt, now) {
+    const steps = Math.max(1, Math.ceil(dt / 0.0042)), h = dt / steps, b = this.b, maxStep = PADDLE_V * h;
+    for (let k = 0; k < steps; k++) {
+      for (let i = 0; i < 2; i++) {
+        const p = this.pad[i], half = this.ph[i] / 2;
+        p.ty = Math.max(half, Math.min(H - half, p.ty));
+        if (this.stuck !== i) p.y += Math.max(-maxStep, Math.min(maxStep, p.ty - p.y));
+        p.y = Math.max(half, Math.min(H - half, p.y));
+      }
+      if (this.stuck >= 0) {
+        const i = this.stuck;
+        b.x = i === 0 ? PX + PW / 2 + BR : W - PX - PW / 2 - BR;
+        b.y = this.pad[i].y;
+        if (now >= this.stuckUntil) this.release();
+        return;
+      }
+      // An armed magnet pulls the ball toward its paddle while the ball is on its way there.
+      for (let i = 0; i < 2; i++) {
+        if (!this.magnet[i] || (i === 0 ? b.vx >= 0 : b.vx <= 0)) continue;
+        b.vy += (this.pad[i].y - b.y) * 9 * h;
+        const cap = Math.max(250, Math.abs(b.vx) * 1.4);
+        b.vy = Math.max(-cap, Math.min(cap, b.vy));
+      }
+      const px = b.x, f = this.slowAt(b.vx, now);
+      b.x += b.vx * h * f;
+      b.y += b.vy * h * f;
+      if (this.spin) {
+        // The curve turns the ball's direction without changing its speed.
+        const sp = Math.hypot(b.vx, b.vy);
+        b.vy += this.spin * h * f;
+        const k = sp / Math.hypot(b.vx, b.vy);
+        b.vx *= k; b.vy *= k;
+      }
+      // A curving ball that hits a wall comes off it with the curve turned around.
+      if (b.y < BR) { b.y = BR; b.vy = Math.abs(b.vy); if (this.spin < 0) this.spin = -this.spin; }
+      if (b.y > H - BR) { b.y = H - BR; b.vy = -Math.abs(b.vy); if (this.spin > 0) this.spin = -this.spin; }
+      for (let i = 0; i < 2; i++) {
+        const face = i === 0 ? PX + PW / 2 : W - PX - PW / 2, s = i === 0 ? -1 : 1;
+        const crossed = s < 0 ? b.vx < 0 && px - BR >= face - 1 && b.x - BR < face : b.vx > 0 && px + BR <= face + 1 && b.x + BR > face;
+        if (!crossed) continue;
+        if (this.magnet[i]) { this.stick(i, now); return; }
+        // Where the ball meets the paddle sets the angle; every return is a bit faster.
+        if (Math.abs(b.y - this.pad[i].y) <= this.ph[i] / 2 + BR) this.bounce(i, this.pad[i].y, face - s * BR, b.y, Math.hypot(b.vx, b.vy));
+        else if (!this.pend[i] && !(this.god[i] > now)) this.pend[i] = {t: now, x: face - s * BR, y: b.y, v: Math.hypot(b.vx, b.vy)};
+      }
+      for (let i = 0; i < 2; i++) {
+        const out = i === 0 ? b.x < -BR : b.x > W + BR;
+        if (!out) continue;
+        if (this.pend[i] && !this.pend[i].done) { b.x = i === 0 ? -BR : W + BR; continue; }
+        if (this.god[i] > now) {
+          // The golden wall sends everything back, as a fireball.
+          b.x = i === 0 ? BR : W - BR;
+          const sp = Math.hypot(b.vx, b.vy) || 1;
+          b.vx = (i === 0 ? 1 : -1) * Math.abs(b.vx) / sp * TURBO;
+          b.vy = b.vy / sp * TURBO;
+          this.turbo = true;
+          this.spin = 0;
+          this.last = i;
+          this.event('godwall', i);
+          continue;
+        }
+        if (this.shield[i]) {
+          this.shield[i] = false;
+          this.pend[i] = null;
+          this.spin = 0;
+          b.x = i === 0 ? BR : W - BR;
+          b.vx = i === 0 ? Math.abs(b.vx) : -Math.abs(b.vx);
+          this.turbo = false;
+          // A fireball bounced off a shield goes back as a normal ball: overall speed capped, direction kept.
+          const sp = Math.hypot(b.vx, b.vy);
+          if (sp > VMAX) { b.vx *= VMAX / sp; b.vy *= VMAX / sp; }
+          this.event('shield', i);
+          continue;
+        }
+        return this.point(1 - i);
+      }
+    }
+  }
+
+  // Slow motion only holds the ball back while it comes toward the taker; once it bounces off, it's full speed.
+  slowAt(vx, now) { return now < this.slow[vx < 0 ? 0 : 1] ? SLOW_F : 1; }
+
+  // First to 7, but from 6:6 on a set needs a two-point lead, up to 10: at 9:9 the next point wins.
+  point(scorer) {
+    this.sc[scorer]++;
+    const a = this.sc[scorer], o = this.sc[1 - scorer];
+    if (a >= CAP || (a >= WIN && a - o >= 2)) return this.finish(scorer + 1);
+    this.dir = scorer === 0 ? 1 : -1;
+    this.serve('goal', 1200);
+  }
+
+  broadcast(now) {
+    const r = v => Math.round(v), f = this.st === 'play' && this.stuck < 0 ? this.slowAt(this.b.vx, now) : 1;
+    const s = JSON.stringify({t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, sc: this.sc, names: this.names,
+      on: [!!this.seats[0], !!this.seats[1]], p: [r(this.b.x), r(this.b.y), r(this.b.vx * f), r(this.b.vy * f)],
+      sl: [Math.max(0, this.slow[0] - now), Math.max(0, this.slow[1] - now)],
+      m: [[PX, r(this.pad[0].y)], [W - PX, r(this.pad[1].y)]], ph: this.ph,
+      votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
+      sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)],
+      aw: this.away, cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
+      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev});
+    for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
+  }
+}
+
+
 // Fußball and Neon Rush: game rooms for two to four players, run on the server like Ping Pong. Players join
 // with the room's key and their chat id; the first one in hosts. From a direct invitation (auto=2) the match
 // starts as soon as both are there; at a table in the group chat the host starts it. First everyone votes for
@@ -6743,18 +7224,289 @@ function tronFx() { return {ghost: 0, gap: 0, brake: 0, confuse: 0, shield: 0, g
 // Cells per second: boost and the divine power double it, the brake halves it.
 function tronSpeed(p) { return T_SPEED * ((p.boost && p.fuel > 0) || p.fx.god > 0 ? 2 : 1) * (p.fx.brake > 0 ? 0.5 : 1); }
 
-  return {Kick, Tron};
+// ⚔️ Breach: a 1 v 1 tactical shooter in first person (drawn by the page with ray casting, like the old 3D
+// shooters). An attacker and a defender, one life each per round; the attacker wins the round by taking the
+// defender out or defusing the bomb (holding E for 7 s), the defender by taking the attacker out or holding on
+// for 2 minutes. Sides swap every round; first to 4 rounds. Brick walls break (bullets wear them down, a breach
+// charge blows a hole), concrete doesn't. Movement runs 60 times a second from each player's inputs, like
+// Fußball, so the page can show its own player at once; shots are judged against where the shooter saw the
+// other player (the server rewinds to that moment), as long as no wall is in between now.
+const BR_MAP = [
+  '################################',
+  '#aoooooooooooooooooooooooooooaa#',
+  '#oooooooooooooooooooooooooooooo#',
+  '#ooo###=====###..###=====###ooo#',
+  '#ooo#........=.....=.......#ooo#',
+  '#ooo#........=.....=.......#ooo#',
+  '#ooo=...........B..........=ooo#',
+  '#ooo#........=.....=.......#ooo#',
+  '#ooo#........==.====.......#ooo#',
+  '#ooo###.######.....######=##ooo#',
+  '#oooo#.....#...d......#....#ooo#',
+  '#oooo=.....#..........=....=ooo#',
+  '#oooo#.....=....d.....#....#ooo#',
+  '#oooo#.....#..........#....#ooo#',
+  '#oooo##=####===..===#####.##ooo#',
+  '#ooooooooooooooooooooooooooooaa#',
+  '#aooooooooooooooooooooooooooooo#',
+  '################################'];
+const BR_W = 32, BR_H = 18, BR_R = 0.25, BR_RUN = 3, BR_WALK = 1.4, BR_WIN = 4, BR_ROUND = 120000, BR_DEFUSE = 7000;
+// Weapons: damage close up and far away (falls off over 4..16 units), shots per second, magazine, reload ms, spread.
+const BR_GUN = {atk: {name: 'Sturmgewehr', dmg: 34, far: 22, rate: 9, mag: 30, reload: 2200, spread: 0.012},
+  def: {name: 'MP', dmg: 26, far: 14, rate: 13, mag: 32, reload: 1900, spread: 0.02}};
+// Map cells: 0 floor, 1 concrete, 2 brick (with hit points), 3 bomb (stands on floor, blocks nothing).
+function brGrid() {
+  const g = new Uint8Array(BR_W * BR_H), hp = new Uint8Array(BR_W * BR_H);
+  BR_MAP.forEach((row, y) => [...row].forEach((c, x) => { g[y * BR_W + x] = c === '#' ? 1 : c === '=' ? 2 : 0; hp[y * BR_W + x] = c === '=' ? 100 : 0; }));
+  return {g, hp};
+}
+const brSpots = ch => BR_MAP.flatMap((row, y) => [...row].map((c, x) => c === ch ? [x + 0.5, y + 0.5] : null)).filter(Boolean);
+const BR_BOMB = brSpots('B')[0];
+function brSolid(g, x, y) { const cx = Math.floor(x), cy = Math.floor(y); return cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H || g[cy * BR_W + cx] === 1 || g[cy * BR_W + cx] === 2; }
+// One movement step (1/60 s) from keys k (1 W, 2 S, 4 A, 8 D, 16 walk) and view angle a; slides along walls.
+function brMove(p, k, a, g) {
+  let f = ((k & 1) ? 1 : 0) - ((k & 2) ? 1 : 0), s = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0);
+  if (f && s) { f *= Math.SQRT1_2; s *= Math.SQRT1_2; }
+  const v = ((k & 16) ? BR_WALK : BR_RUN) / 60, c = Math.cos(a), sn = Math.sin(a);
+  const dx = (c * f - sn * s) * v, dy = (sn * f + c * s) * v;
+  p.vx = dx * 60; p.vy = dy * 60;
+  const r = BR_R;
+  if (dx && !brSolid(g, p.x + dx + Math.sign(dx) * r, p.y - r + 0.01) && !brSolid(g, p.x + dx + Math.sign(dx) * r, p.y + r - 0.01)) p.x += dx;
+  if (dy && !brSolid(g, p.x - r + 0.01, p.y + dy + Math.sign(dy) * r) && !brSolid(g, p.x + r - 0.01, p.y + dy + Math.sign(dy) * r)) p.y += dy;
+}
+// Distance along a ray to the first wall, and which cell it is (DDA through the grid).
+function brRay(g, x, y, a, max = 40) {
+  const dx = Math.cos(a), dy = Math.sin(a);
+  let cx = Math.floor(x), cy = Math.floor(y);
+  const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, tdx = Math.abs(1 / dx), tdy = Math.abs(1 / dy);
+  let tx = dx > 0 ? (cx + 1 - x) * tdx : (x - cx) * tdx, ty = dy > 0 ? (cy + 1 - y) * tdy : (y - cy) * tdy, d = 0;
+  while (d < max) {
+    if (tx < ty) { d = tx; tx += tdx; cx += sx; } else { d = ty; ty += tdy; cy += sy; }
+    if (cx < 0 || cy < 0 || cx >= BR_W || cy >= BR_H) return {d, cell: -1};
+    const v = g[cy * BR_W + cx];
+    if (v === 1 || v === 2) return {d, cell: cy * BR_W + cx};
+  }
+  return {d: max, cell: -1};
+}
+class Breach extends Room {
+  constructor(ctx) {
+    super(ctx, 2, 1000 / 60);
+    this.rd = 0;
+    this.map = brGrid();
+    this.changed = [];
+    this.charges = [];
+    this.acc = 0;
+    this.tick = 0;
+    this.defuse = 0;
+    this.rl = BR_ROUND;
+  }
+  joined(p) { Object.assign(p, {sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
+    mag: 30, reload: 0, cd: 0, nade: 2, hist: [], kills: 0}); }
+  extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, kills: p.kills}; }
+  input(p, m) {
+    if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i) && Number.isFinite(m.a)) {
+      p.q.push([m.k & 255, m.i, m.a, Number.isFinite(m.rt) ? m.rt : 0]);
+      if (p.q.length > 12) p.q.splice(0, p.q.length - 12);
+    } else if (m.t === 'charge' && this.st === 'play') this.place(p);
+    else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f)) p.face = m.f;
+    else if (m.t === 'full') this.full(p);
+  }
+  begin(now) {
+    // The first attacker is drawn by lot.
+    if (Math.random() < 0.5) this.players.reverse();
+    this.players[0].side = 'atk';
+    if (this.players[1]) this.players[1].side = 'def';
+    this.round(now);
+  }
+  round(now) {
+    this.rd++;
+    this.map = brGrid();
+    this.changed = [];
+    this.charges = [];
+    this.defuse = 0;
+    this.rl = BR_ROUND;
+    for (const p of this.players) {
+      const spots = brSpots(p.side === 'atk' ? 'a' : 'd'), [x, y] = spots[Math.floor(Math.random() * spots.length)];
+      const gun = BR_GUN[p.side];
+      Object.assign(p, {x, y, a: Math.atan2(BR_BOMB[1] - y, BR_BOMB[0] - x), vx: 0, vy: 0, hp: 100, alive: true, q: [], owed: 0, started: false,
+        mag: gun.mag, reload: 0, cd: 0, nade: p.side === 'atk' ? 2 : 0, hist: [], face: null});
+    }
+    this.st = 'count';
+    this.until = now + 4000;
+    for (const p of this.players) this.full(p);
+  }
+  drop(p) {
+    this.remove(p);
+    if (this.st === 'vote') { if (this.players.length < 2) this.st = 'lobby'; return; }
+    if (this.st === 'lobby' || this.st === 'over') return;
+    this.finish(this.players[0] || null);
+  }
+  finish(p) {
+    this.st = 'over';
+    this.w = p ? p.pid : null;
+    this.until = Date.now() + 10000;
+    this.event('over', {pid: this.w});
+  }
+  endRound(winner, why) {
+    if (this.st !== 'play') return;
+    winner.sc++;
+    this.event('round', {pid: winner.pid, why, side: winner.side});
+    if (winner.sc >= BR_WIN) return this.finish(winner);
+    this.st = 'roundover';
+    this.until = Date.now() + 3500;
+  }
+  advance(now) {
+    if (this.st === 'count' && now >= this.until) this.st = 'play';
+    if (this.st === 'roundover' && now >= this.until) {
+      for (const p of this.players) p.side = p.side === 'atk' ? 'def' : 'atk';
+      this.round(now);
+    }
+    // While counting down players may turn but not move.
+    if (this.st !== 'play') {
+      this.acc = 0;
+      for (const p of this.players) while (p.q.length) { const [, i, a] = p.q.shift(); p.ack = i; p.a = a; }
+      return;
+    }
+    this.acc += Math.min(100, now - this.last);
+    while (this.acc >= 1000 / 60 && this.st === 'play') {
+      this.acc -= 1000 / 60;
+      this.step(now);
+    }
+  }
+  step(now) {
+    this.tick++;
+    if (this.think) this.think();
+    const [atk, def] = ['atk', 'def'].map(s => this.players.find(p => p.side === s));
+    for (const p of this.players) {
+      if (p.reload > 0 && (p.reload -= 1000 / 60) <= 0) { p.reload = 0; p.mag = BR_GUN[p.side].mag; }
+      if (p.cd > 0) p.cd -= 1000 / 60;
+      // Inputs as in Fußball: one per tick, two to catch up, and a late player runs on with the last input.
+      const run = (k, a, rt) => {
+        p.k = k; p.a = a;
+        if (!p.alive) return;
+        brMove(p, k, a, this.map.g);
+        if ((k & 64) && !p.reload && p.mag < BR_GUN[p.side].mag) p.reload = BR_GUN[p.side].reload;
+        if ((k & 32) && p.cd <= 0 && !p.reload) {
+          if (p.mag <= 0) p.reload = BR_GUN[p.side].reload;
+          else this.fire(p, a, rt);
+        }
+      };
+      if (!p.q.length) {
+        if (p.started && p.owed < 8) { p.owed++; run(p.k & ~32, p.a, 0); }
+      } else {
+        p.started = true;
+        while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
+        for (let n = p.q.length > 4 ? 2 : 1; n > 0 && p.q.length; n--) { const [k, i, a, rt] = p.q.shift(); p.ack = i; run(k, a, rt); }
+      }
+      p.hist.push([this.tick, now, p.x, p.y]);
+      if (p.hist.length > 40) p.hist.shift();
+    }
+    // Breach charges go off 2 s after they are placed.
+    for (const c of this.charges) if ((c.t -= 1000 / 60) <= 0) this.blow(c);
+    this.charges = this.charges.filter(c => c.t > 0);
+    // Defusing: the attacker stands at the bomb holding E and doesn't move.
+    if (atk && atk.alive && (atk.k & 128) && Math.hypot(atk.x - BR_BOMB[0], atk.y - BR_BOMB[1]) < 1.3 && !(atk.k & 15)) {
+      if (!this.defuse) this.event('defusing', {pid: atk.pid});
+      this.defuse += 1000 / 60;
+      if (this.defuse >= BR_DEFUSE) return this.endRound(atk, 'defuse');
+    } else this.defuse = 0;
+    this.rl -= 1000 / 60;
+    if (this.rl <= 0 && def) return this.endRound(def, 'time');
+  }
+  // A shot: the other player is put back to where the shooter saw them (the page says which moment it drew),
+  // then the bullet goes until it meets that player or a wall. Brick takes some damage and breaks after a while.
+  fire(p, a, rt) {
+    const gun = BR_GUN[p.side];
+    p.mag--;
+    p.cd = 1000 / gun.rate;
+    const moving = Math.hypot(p.vx, p.vy) > 0.5, ang = a + (Math.random() * 2 - 1) * (gun.spread + (moving ? gun.spread * 2 : 0));
+    const wall = brRay(this.map.g, p.x, p.y, ang);
+    let hitP = null, hd = wall.d;
+    for (const o of this.players) {
+      if (o === p || !o.alive) continue;
+      let ox = o.x, oy = o.y;
+      if (rt) {
+        const h = o.hist, i = h.findIndex(e => e[1] >= rt);
+        if (i > 0) { const [, t0, x0, y0] = h[i - 1], [, t1, x1, y1] = h[i], k = (rt - t0) / Math.max(1, t1 - t0); ox = x0 + (x1 - x0) * k; oy = y0 + (y1 - y0) * k; }
+        else if (i === 0) { ox = h[0][2]; oy = h[0][3]; }
+      }
+      // Distance along the ray to the circle around the other player.
+      const fx = ox - p.x, fy = oy - p.y, along = fx * Math.cos(ang) + fy * Math.sin(ang), off = Math.abs(-fx * Math.sin(ang) + fy * Math.cos(ang));
+      if (along > 0 && off < BR_R + 0.08 && along < hd) { hd = along; hitP = o; }
+    }
+    const ex = p.x + Math.cos(ang) * hd, ey = p.y + Math.sin(ang) * hd;
+    if (hitP) {
+      const dmg = Math.round(hd < 4 ? gun.dmg : hd > 16 ? gun.far : gun.dmg + (gun.far - gun.dmg) * (hd - 4) / 12);
+      hitP.hp = Math.max(0, hitP.hp - dmg);
+      this.event('hit', {pid: p.pid, to: hitP.pid, dmg, x: ex, y: ey, sx: p.x, sy: p.y});
+      if (!hitP.hp) this.kill(hitP, p);
+    } else {
+      if (wall.cell >= 0 && this.map.g[wall.cell] === 2) this.wear(wall.cell, 9);
+      this.event('shot', {pid: p.pid, x: ex, y: ey, sx: p.x, sy: p.y});
+    }
+  }
+  wear(cell, dmg) {
+    const hp = this.map.hp;
+    hp[cell] = Math.max(0, hp[cell] - dmg);
+    if (!hp[cell]) { this.map.g[cell] = 0; this.changed.push([cell % BR_W, Math.floor(cell / BR_W), 0]); }
+  }
+  kill(o, by) {
+    o.alive = false;
+    by.kills++;
+    this.event('kill', {pid: by.pid, to: o.pid, x: o.x, y: o.y});
+    this.endRound(by, 'kill');
+  }
+  // F: a breach charge on the brick wall right in front of the attacker; it goes off 2 s later.
+  place(p) {
+    if (!p.alive || p.side !== 'atk' || p.nade <= 0) return;
+    const w = brRay(this.map.g, p.x, p.y, p.a, 1.2);
+    if (w.cell < 0 || this.map.g[w.cell] !== 2 || this.charges.some(c => c.cell === w.cell)) return;
+    p.nade--;
+    this.charges.push({cell: w.cell, t: 2000, x: p.x + Math.cos(p.a) * (w.d - 0.05), y: p.y + Math.sin(p.a) * (w.d - 0.05), pid: p.pid});
+    this.event('charge', {pid: p.pid, cell: w.cell});
+  }
+  blow(c) {
+    const cx = c.cell % BR_W, cy = Math.floor(c.cell / BR_W);
+    // The brick cell and the brick right next to it along the wall go; anyone close gets hurt.
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = cx + dx, y = cy + dy, i = y * BR_W + x;
+      if (x >= 0 && y >= 0 && x < BR_W && y < BR_H && this.map.g[i] === 2 && (dx === 0 && dy === 0 || Math.random() < 0.5)) this.wear(i, 255);
+    }
+    this.event('boom', {x: c.x, y: c.y});
+    for (const o of this.players) {
+      if (!o.alive) continue;
+      const d = Math.hypot(o.x - c.x, o.y - c.y);
+      if (d < 2.5) {
+        o.hp = Math.max(0, o.hp - Math.round(70 * (1 - d / 2.5)));
+        if (!o.hp) { const by = this.players.find(q => q.pid === c.pid); if (by && by !== o) this.kill(o, by); else { o.alive = false; const other = this.players.find(q => q !== o); if (other) this.endRound(other, 'kill'); } }
+      }
+    }
+  }
+  full(p) {
+    if (!p.ws) return;
+    const g = [...this.map.g].map(v => v === 2 ? 2 : v);
+    try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, g: g.join('')})); } catch (e) {}
+  }
+  send(now) {
+    const r = v => Math.round(v * 1000) / 1000;
+    this.broadcast({...this.base(now), tk: this.tick, rd: this.rd, win: BR_WIN, rl: Math.max(0, Math.round(this.rl)), df: Math.round(this.defuse),
+      ch: this.charges.map(c => [r(c.x), r(c.y), Math.round(c.t)]), cells: this.changed.splice(0),
+      pl: this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r(p.x), y: r(p.y), a: r(p.a), vx: r(p.vx), vy: r(p.vy), k: p.k, ack: p.ack, fc: p.face || null}; })});
+  }
+}
+
+  return {Kick, Tron, Breach, Arena, br: {MAP: BR_MAP, W: BR_W, H: BR_H, R: BR_R, RUN: BR_RUN, WALK: BR_WALK, BOMB: BR_BOMB, DEFUSE: BR_DEFUSE, GUN: BR_GUN, move: brMove, ray: brRay}};
 })();
-const offlineDocs = {kick: {panel: true, offline: 'kick'}, tron: {panel: true, offline: 'tron'}};
+const offlineDocs = {pong: {panel: true, offline: 'pong'}, kick: {panel: true, offline: 'kick'}, tron: {panel: true, offline: 'tron'}, breach: {panel: true, offline: 'breach'}};
 const OFF_LEVEL_NAMES = {leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer', profi: 'Profi'};
 const OFF_BOTS = ['Bot Kevin', 'Bot Jana', 'Bot Ömer', 'Bot Lina', 'Bot Finn', 'Bot Mia'];
-let offSet = store.get('offSet', null) || {kick: {lvl: 'mittel', mode: 1, pu: true}, tron: {lvl: 'mittel', bots: 2, pu: true}};
+let offSet = Object.assign({pong: {lvl: 'mittel', pu: true}, kick: {lvl: 'mittel', mode: 1, pu: true}, tron: {lvl: 'mittel', bots: 2, pu: true}, breach: {lvl: 'mittel'}}, store.get('offSet', {}));
 let offWins = store.get('offWins', {});
 
 // The local room and a socket for the human player; bots sit in the room and get their inputs from a brain
 // that runs at the start of every game tick.
 function sgLocal(g) {
-  const o = g.offline, R = new SG_LOCAL[g.game === 'kick' ? 'Kick' : 'Tron']({});
+  const o = g.offline, R = new SG_LOCAL[{kick: 'Kick', tron: 'Tron', breach: 'Breach'}[g.game]]({});
   R.solo = true;
   const sock = {readyState: 0, onopen: null, onmessage: null, onclose: null,
     send(d) { if (sock.readyState === 1) R.onMessage(human, d); },
@@ -6763,20 +7515,115 @@ function sgLocal(g) {
     left: 0, away: false, pauses: 2};
   R.players.push(human);
   R.joined(human);
-  const n = g.game === 'kick' ? (o.mode === 2 ? 3 : 1) : o.bots, names = [...OFF_BOTS].sort(() => Math.random() - 0.5);
+  const n = g.game === 'kick' ? (o.mode === 2 ? 3 : 1) : g.game === 'breach' ? 1 : o.bots, names = [...OFF_BOTS].sort(() => Math.random() - 0.5);
   for (let i = 0; i < n; i++) {
     const b = {pid: 'bot' + i + '-' + me.id, name: names[i], ws: {send() {}, close() {}}, left: 0, away: false, pauses: 0, bot: true};
     R.players.push(b);
     R.joined(b);
   }
-  R.pu = o.pu;
-  R.think = g.game === 'kick' ? bzBrain(R, o.lvl) : nrBrain(R, o.lvl);
+  R.pu = !!o.pu;
+  R.think = g.game === 'kick' ? bzBrain(R, o.lvl) : g.game === 'breach' ? brBrain(R, o.lvl) : nrBrain(R, o.lvl);
   g.room = R;
   R.begin(Date.now());
   R.last = Date.now();
   R.timer = setInterval(() => R.loop(), R.tickMs);
   setTimeout(() => { if (sock.readyState) return; sock.readyState = 1; if (sock.onopen) sock.onopen(); R.full(human); }, 0);
   return sock;
+}
+
+// Offline Ping Pong: the game server's own Ping Pong runs in the page, the bot takes the right seat. The page
+// talks to it through a socket that looks like the real one, so everything else is the online game.
+function pgLocal(g) {
+  const o = g.offline, A = new SG_LOCAL.Arena({});
+  const sock = {readyState: 0, onopen: null, onmessage: null, onclose: null,
+    send(d) { if (sock.readyState === 1) A.onMessage(0, d); },
+    close() { sock.readyState = 3; clearInterval(A.timer); A.timer = 0; }};
+  A.seats = [{send: d => { if (sock.readyState === 1 && sock.onmessage) sock.onmessage({data: d}); }, close() {}}, {send() {}, close() {}}];
+  A.names = [me.name || 'Du', g.opName];
+  A.rtt = [0, 0];
+  A.votes = [!!o.pu, !!o.pu];
+  A.decide();
+  const think = pgBrain(A, o.lvl);
+  A.tickAt = Date.now();
+  A.timer = setInterval(() => { think(); A.tick(); }, 1000 / 120);
+  g.room = A;
+  setTimeout(() => { if (sock.readyState) return; sock.readyState = 1; if (sock.onopen) sock.onopen(); }, 0);
+  return sock;
+}
+function pgPause(g) {
+  if (!g || !g.offline || g.over) return;
+  g.pg.paused = !g.pg.paused;
+  g.pg.awayAt = 0;
+  renderPong(g);
+}
+document.addEventListener('keydown', e => {
+  const g = pgGame;
+  if (!g || !g.offline || g.over || e.code !== 'KeyP' || e.repeat || !pgUi(g).here() || (e.target.matches && e.target.matches('input, textarea'))) return;
+  e.preventDefault();
+  pgPause(g);
+});
+
+/* The Ping Pong bot: when the ball turns toward it, it reacts after a moment, works out where the ball will
+   arrive and goes there at its own top speed, a little off; the faster the ball, the more off. It looks again
+   now and then, so a curveball can still catch the lower levels out (the upper ones see the curve coming).
+   Better bots also hit the ball off-centre for angles and fire magnet shots into the far corner. */
+const PG_BOT = {
+  leicht: {react: 320, reaim: 450, speed: 430, e0: 18, ev: 34, curve: false, angle: 0, fire: [1300, 2300], smart: false},
+  mittel: {react: 200, reaim: 280, speed: 700, e0: 9, ev: 22, curve: false, angle: 0.25, fire: [900, 1600], smart: false},
+  schwer: {react: 120, reaim: 150, speed: 1050, e0: 4, ev: 13, curve: true, angle: 0.4, fire: [650, 1150], smart: true},
+  profi: {react: 60, reaim: 60, speed: 1500, e0: 2, ev: 7, curve: true, angle: 0.5, fire: [420, 800], smart: true}};
+function pgBrain(A, lvl) {
+  const L = PG_BOT[lvl] || PG_BOT.mittel, X = PG_W - PG_FACE, gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 2;
+  let y = PG_H / 2, dir = 0, reactAt = 0, aimAt = 0, target = PG_H / 2, off = 0, fireAt = 0, aimY = PG_H / 2, last = Date.now(), sent = -1;
+  // Where the ball crosses the bot's paddle line, walls and (if it sees it) the curve included.
+  const predict = curve => {
+    const b = A.b, dt = 1 / 240;
+    let px = b.x, py = b.y, vx = b.vx, vy = b.vy, sp = curve ? A.spin : 0, t = 0;
+    while (px < X && t < 4) {
+      const v0 = Math.hypot(vx, vy);
+      px += vx * dt; py += vy * dt; t += dt;
+      if (sp) { vy += sp * dt; const k = v0 / Math.hypot(vx, vy); vx *= k; vy *= k; }
+      if (py < PG_BR) { py = 2 * PG_BR - py; vy = Math.abs(vy); if (sp < 0) sp = -sp; }
+      if (py > PG_H - PG_BR) { py = 2 * (PG_H - PG_BR) - py; vy = -Math.abs(vy); if (sp > 0) sp = -sp; }
+    }
+    return py;
+  };
+  const send = m => A.onMessage(1, JSON.stringify(m));
+  return () => {
+    const now = Date.now(), dt = Math.min(0.05, (now - last) / 1000), half = A.ph[1] / 2;
+    last = now;
+    A.away[1] = A.away[0];
+    if (A.st === 'pause' || A.st === 'over') return;
+    if (A.stuck === 1) {
+      // Caught with the magnet: aim, then fire.
+      if (!fireAt) {
+        fireAt = now + L.fire[0] + Math.random() * (L.fire[1] - L.fire[0]);
+        aimY = L.smart ? (A.pad[0].y < PG_H / 2 ? PG_H - 25 : 25) : 30 + Math.random() * (PG_H - 60);
+      }
+      send({t: 'm', y: Math.round(aimY)});
+      if (now >= fireAt) { fireAt = 0; send({t: 'fire'}); }
+      return;
+    }
+    fireAt = 0;
+    if (A.st === 'play') {
+      const d = A.b.vx > 0 ? 1 : A.b.vx < 0 ? -1 : 0;
+      if (d !== dir) {
+        dir = d;
+        reactAt = now + L.react * (0.7 + 0.6 * Math.random());
+        aimAt = 0;
+        const v = Math.hypot(A.b.vx, A.b.vy);
+        off = d > 0 ? (Math.random() * 2 - 1) * L.angle * half + gauss() * (L.e0 + L.ev * v / 1000) : 0;
+      }
+      if (now >= reactAt && now >= aimAt) {
+        aimAt = now + L.reaim;
+        target = dir > 0 ? predict(L.curve) + off : PG_H / 2 + (A.b.y - PG_H / 2) * 0.3;
+      }
+    } else { dir = 0; target = PG_H / 2; }
+    const t = Math.max(half, Math.min(PG_H - half, target)), step = L.speed * (dir > 0 ? 1 : 0.4) * dt;
+    y += Math.max(-step, Math.min(step, t - y));
+    y = Math.max(half, Math.min(PG_H - half, y));
+    if (Math.abs(y - sent) > 0.4) { sent = y; send({t: 'm', y}); }
+  };
 }
 
 /* Fußball bots: they see the ball a few ticks late (less late the better they are), guess where it will be,
@@ -6951,33 +7798,47 @@ function nrBrain(R, lvl) {
 // The document: settings first (level, mode or number of bots, power-ups), then the game on the same board as
 // online. Settings and wins per level are remembered.
 function offShow(game) {
-  const doc = offlineDocs[game], g = sgGame;
-  const running = g && g.offline && g.game === game && !g.over && sgLive(g);
+  const doc = offlineDocs[game], pong = game === 'pong', g = pong ? pgGame : sgGame;
+  const running = g && g.offline && g.game === game && !g.over && (pong ? pgLive(g) : sgLive(g));
   $('osetup').hidden = !!running;
   $('oboard').hidden = !running;
-  if (running) { renderSg(g); return; }
+  if (running) { if (pong) renderPong(g); else renderSg(g); return; }
   const set = offSet[game], pick = (key, val) => { set[key] = val; store.set('offSet', offSet); offShow(game); };
   const opt = (key, val, label) => el('button', {class: 'vbtn' + (set[key] === val ? ' on' : ''), type: 'button', text: label, onclick: () => pick(key, val)});
   const wins = offWins[game] || {};
-  const blocked = mpRunning() && sgLive(mpGame) && SG_GAMES.includes(mpGame.game);
+  const blocked = offBlocked(game);
   $('osetup').replaceChildren(el('div', {class: 'osetbox'},
-    el('div', {class: 'upddlg-head', text: SG_TITLE[game] + ' gegen Bots'}),
+    el('div', {class: 'upddlg-head', text: pong ? '🏓 Ping Pong gegen einen Bot' : SG_TITLE[game] + (game === 'breach' ? ' gegen einen Bot' : ' gegen Bots')}),
     el('div', {class: 'olabel', text: 'Schwierigkeit'}),
     el('div', {class: 'orow'}, ...Object.entries(OFF_LEVEL_NAMES).map(([k, v]) => opt('lvl', k, v + (wins[k] ? ' · ' + wins[k] + ' 🏆' : '')))),
-    el('div', {class: 'olabel', text: game === 'kick' ? 'Modus' : 'Gegner'}),
-    game === 'kick'
-      ? el('div', {class: 'orow'}, opt('mode', 1, '1 gegen 1'), opt('mode', 2, '2 gegen 2 (du + Bot)'))
-      : el('div', {class: 'orow'}, opt('bots', 1, '1 Bot'), opt('bots', 2, '2 Bots'), opt('bots', 3, '3 Bots')),
-    el('div', {class: 'olabel', text: 'Power-ups'}),
-    el('div', {class: 'orow'}, opt('pu', true, '⚡ An'), opt('pu', false, 'Aus')),
+    ...(pong ? [el('p', {text: 'Das Ping Pong aus dem Chat, gegen einen Bot. Wer zuerst 7 Punkte hat, gewinnt (ab 6:6 braucht es 2 Punkte Vorsprung, höchstens bis 10).'}),
+      el('div', {class: 'olabel', text: 'Power-ups'}),
+      el('div', {class: 'orow'}, opt('pu', true, '⚡ An'), opt('pu', false, 'Aus'))]
+    : game === 'breach' ? [el('p', {text: 'Angreifer gegen Verteidiger, nach jeder Runde wird gewechselt, wer zuerst 4 Runden gewinnt, gewinnt. Ein Leben pro Runde. Angreifer: Verteidiger ausschalten oder die Bombe entschärfen (E 7 s halten). Verteidiger: überleben, bis die 2 Minuten um sind.'})] : [
+      el('div', {class: 'olabel', text: game === 'kick' ? 'Modus' : 'Gegner'}),
+      game === 'kick'
+        ? el('div', {class: 'orow'}, opt('mode', 1, '1 gegen 1'), opt('mode', 2, '2 gegen 2 (du + Bot)'))
+        : el('div', {class: 'orow'}, opt('bots', 1, '1 Bot'), opt('bots', 2, '2 Bots'), opt('bots', 3, '3 Bots')),
+      el('div', {class: 'olabel', text: 'Power-ups'}),
+      el('div', {class: 'orow'}, opt('pu', true, '⚡ An'), opt('pu', false, 'Aus'))]),
     el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Los geht\'s', disabled: blocked, onclick: () => offStart(game)}),
     blocked ? el('p', {text: 'Erst das laufende Online-Spiel im Chat beenden.'}) : null,
-    el('p', {class: 'sg-keys', text: '⌨ ' + SG_HINT[game] + ' · P = Pause · 🏆 = deine Siege'})));
+    el('p', {class: 'sg-keys', text: '⌨ ' + (pong ? 'Maus hoch und runter · mit dem Magneten klicken zum Schießen' : SG_HINT[game]) + ' · P = Pause · 🏆 = deine Siege'})));
   if (doc !== current) return;
 }
+// An online match of the same kind runs on the same board code, so only one of them at a time.
+function offBlocked(game) { return mpRunning() && (game === 'pong' ? mpGame.game === 'pong' : sgLive(mpGame) && SG_GAMES.includes(mpGame.game)); }
 function offStart(game) {
-  if (mpRunning() && sgLive(mpGame) && SG_GAMES.includes(mpGame.game)) return;
+  if (offBlocked(game)) return;
   offStop();
+  if (game === 'pong') {
+    const g = {gid: 'off' + Date.now().toString(36), game, offline: {...offSet.pong}, myMark: 1, over: false, winner: 0, opName: 'Bot'};
+    $('osetup').hidden = true;
+    $('oboard').hidden = false;
+    pgInit(g, '');
+    renderPong(g);
+    return;
+  }
   const g = {gid: 'off' + Date.now().toString(36), game, offline: {...offSet[game]}, myMark: 1, over: false, opName: 'Bots'};
   sgInit(g, '', false);
   $('osetup').hidden = true;
@@ -6985,6 +7846,15 @@ function offStart(game) {
   renderSg(g);
 }
 function offStop() {
+  const p = pgGame;
+  if (p && p.offline) {
+    p.over = true;
+    if (p.pg.ws) { const ws = p.pg.ws; p.pg.ws = null; ws.close(); }
+    pgGame = null;
+    const grid = $('ogrid');
+    grid.replaceChildren();
+    delete grid.dataset.gid;
+  }
   const g = sgGame;
   if (!g || !g.offline) return;
   g.over = true;
@@ -6996,6 +7866,427 @@ function offRecord(g, win) {
   const w = offWins[g.game] || (offWins[g.game] = {});
   w[g.offline.lvl] = (w[g.offline.lvl] || 0) + 1;
   store.set('offWins', offWins);
+}
+
+/* ⚔️ Breach: the page draws the house in first person by ray casting (one ray per screen column through the map
+   grid, like the shooters of the 90s), into a small picture that is scaled up with hard pixels. Its own player
+   moves at once with the game's own movement code (from the rooms copied into the page) and is corrected by the
+   server; the other player is drawn a moment in the past, and every shot says which moment that was, so the
+   server can judge it the way it looked. Without sound everything you would hear is shown: steps, shots and
+   explosions get arrows at the edge of the screen. */
+const BR = SG_LOCAL.br, BR_RW = 480, BR_RH = 270, BR_FOV = 75 * Math.PI / 180;
+const BR_PLANE = BR_RW / 2 / Math.tan(BR_FOV / 2);
+const BR_SIDE = {atk: 'Angriff', def: 'Verteidigung'}, BR_COL = {atk: '#ff9f43', def: '#4dabf7'};
+const BR_WHY = {kill: 'Ausgeschaltet', defuse: 'Bombe entschärft', time: 'Zeit abgelaufen'};
+// Textures, made once: 64×64 pixels as 32-bit colours (little endian ABGR).
+const brRGB = (r, g, b) => (255 << 24) | (Math.max(0, Math.min(255, b)) << 16) | (Math.max(0, Math.min(255, g)) << 8) | Math.max(0, Math.min(255, r));
+let BR_TEX = null;
+function brTextures() {
+  if (BR_TEX) return BR_TEX;
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const tex = f => { const t = new Uint32Array(64 * 64); for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) t[y * 64 + x] = f(x, y); return t; };
+  const concrete = tex((x, y) => { const n = rnd() * 22, seam = x % 32 === 0 || y % 32 === 0 ? -28 : 0; return brRGB(128 + n + seam, 130 + n + seam, 134 + n + seam); });
+  const brick = tex((x, y) => {
+    const row = Math.floor(y / 8), off = row % 2 ? 8 : 0, mortar = y % 8 === 7 || (x + off) % 16 === 15;
+    if (mortar) return brRGB(196, 186, 168);
+    const n = rnd() * 26, tone = ((Math.floor((x + off) / 16) * 7 + row * 3) % 5) * 6;
+    return brRGB(150 + n + tone, 66 + n * 0.6 + tone * 0.4, 48 + n * 0.5);
+  });
+  const wood = tex((x, y) => { const plank = Math.floor(x / 16), n = rnd() * 14, grain = Math.sin((y + plank * 13) * 0.35) * 6; return x % 16 === 0 ? brRGB(70, 46, 28) : brRGB(126 + n + grain, 86 + n + grain, 52 + n * 0.6); });
+  const grass = tex(() => { const n = rnd() * 30; return brRGB(58 + n * 0.6, 112 + n, 52 + n * 0.4); });
+  const ceil = tex((x, y) => { const n = rnd() * 10, seam = x % 32 === 0 || y % 32 === 0 ? -30 : 0; return brRGB(196 + n + seam, 196 + n + seam, 188 + n + seam); });
+  // The opponent: a little soldier, front view, 24×40, in two colours (attack orange, defence blue).
+  const soldier = col => {
+    const [r, g, b] = [parseInt(col.slice(1, 3), 16), parseInt(col.slice(3, 5), 16), parseInt(col.slice(5, 7), 16)];
+    const t = new Uint32Array(24 * 40), C = {
+      h: brRGB(r * 0.55, g * 0.55, b * 0.55), s: brRGB(232, 190, 150), v: brRGB(30, 34, 40), b: brRGB(r, g, b), d: brRGB(r * 0.7, g * 0.7, b * 0.7),
+      p: brRGB(52, 56, 64), k: brRGB(26, 26, 30), g: brRGB(70, 70, 76)};
+    const art = [
+      '.........hhhhhh.........', '........hhhhhhhh........', '........hhhhhhhh........', '........vvvvvvvv........', '........svvsvvss........',
+      '........ssssssss........', '.........ssssss.........', '......bbbbbbbbbbbb......', '.....bbbbbbbbbbbbbb.....', '....bbbdbbbbbbbbdbbb....',
+      '....bbbdbbbbbbbbdbbb....', '....bbbdbbbbbbbbdbbb....', '....bbbdbbkkkkbbdbbb....', '....ssbdbbkggkkbdbss....', '....ssbbbbkkkkkkkggggg..',
+      '.....bbbbbbbbbbbbbkk....', '.....bbbbbbbbbbbbbb.....', '.....kkkkkkkkkkkkkk.....', '.....pppppppppppppp.....', '.....pppppp..pppppp.....',
+      '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....pppppp..pppppp.....',
+      '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....pppppp..pppppp.....',
+      '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....pppppp..pppppp.....', '.....kkkkkk..kkkkkk.....',
+      '....kkkkkkk..kkkkkkk....', '........................', '........................', '........................', '........................'];
+    art.forEach((row, y) => [...row].forEach((c, x) => { t[y * 24 + x] = c === '.' ? 0 : C[c]; }));
+    return t;
+  };
+  BR_TEX = {concrete, brick, wood, grass, ceil, atk: soldier(BR_COL.atk), def: soldier(BR_COL.def)};
+  return BR_TEX;
+}
+// The map as the page knows it: floor, concrete, brick; which cells are outside (grass and sky).
+function brFull(g, m) {
+  const sg = g.sg;
+  sg.grid = Uint8Array.from(String(m.g || ''), c => +c);
+  sg.rd = m.rd;
+  sg.out = Uint8Array.from(BR.MAP.join(''), c => 'oa'.includes(c) ? 1 : 0);
+  sg.hist = [];
+  sg.me = null;
+}
+function brSnapshot(g, m) {
+  const sg = g.sg;
+  if (sg.grid) for (const [x, y, v] of m.cells || []) sg.grid[y * BR.W + x] = v;
+  if (m.rd !== sg.rd) { if (performance.now() - (sg.fullAsked || 0) > 1000) { sg.fullAsked = performance.now(); sgSend(g, {t: 'full'}); } return; }
+  const mine = m.pl.find(p => p.pid === me.id);
+  if (!mine) return;
+  sg.side = mine.side;
+  const p = {x: mine.x, y: mine.y, vx: 0, vy: 0};
+  if (m.st !== 'play' || !sg.me || !mine.al) {
+    sg.me = p; sg.hist = []; sg.vis = {x: 0, y: 0};
+    if (m.st === 'count' && (sg.ang === undefined || sg.rdSeen !== m.rd)) { sg.ang = mine.a; sg.rdSeen = m.rd; }
+    return;
+  }
+  // As in Fußball: start from the server's answer and replay the inputs it hasn't used yet.
+  sg.hist = sg.hist.filter(h => h[0] > mine.ack);
+  for (const [, k, a] of sg.hist) BR.move(p, k, a, sg.grid);
+  sg.vis.x += sg.me.x - p.x;
+  sg.vis.y += sg.me.y - p.y;
+  if (Math.hypot(sg.vis.x, sg.vis.y) > 1) sg.vis.x = sg.vis.y = 0;
+  sg.me = p;
+}
+// 60 times a second: the keys and view angle go to the server (with the moment the other player was drawn at,
+// for judging shots), and the own player moves at once.
+function brTicks(g, now) {
+  const sg = g.sg, s = sg.s;
+  if (!s || !sg.grid) { sg.simAt = now; return; }
+  if (sg.turn) sg.ang += sg.turn * 2.6 / 60 * Math.max(1, Math.min(6, (now - (sg.simAt || now)) / 16.7));
+  if (!sg.simAt) sg.simAt = now;
+  let n = Math.floor((now - sg.simAt) / (1000 / 60));
+  if (n > 6) { sg.simAt = now - 6 * 1000 / 60; n = 6; }
+  const mine = s.pl.find(p => p.pid === me.id), live = s.st === 'play' && mine && mine.al;
+  for (let i = 0; i < n; i++) {
+    sg.simAt += 1000 / 60;
+    let k = sg.keys | (sg.fire ? 32 : 0);
+    if (!live) k &= ~32;
+    sgSend(g, {t: 'in', k, a: Math.round(sg.ang * 1000) / 1000, i: ++sg.seq, rt: Math.round(pgMs() - sg.off - brDelay(sg))});
+    if (live && sg.me) { sg.hist.push([sg.seq, k, sg.ang]); BR.move(sg.me, k, sg.ang, sg.grid); }
+    if (live && (k & 32)) brShootFx(g);
+  }
+  if (sg.hist.length > 240) sg.hist.splice(0, sg.hist.length - 240);
+}
+const brDelay = sg => Math.max(30, Math.min(120, 16 + sg.jit));
+// Own shot, shown at once: muzzle flash, kick, and the gun's rhythm (the server decides what it hits).
+function brShootFx(g) {
+  const sg = g.sg, s = sg.s, mine = s.pl.find(p => p.pid === me.id), gun = BR.GUN[mine.side], now = performance.now();
+  if (mine.rl || mine.mag <= 0 || now - (sg.lastShot || 0) < 1000 / gun.rate - 4) return;
+  sg.lastShot = now;
+  sg.recoil = 1;
+}
+function brEvent(g, ev, s) {
+  const sg = g.sg, mine = ev.pid === me.id;
+  if (ev.k === 'shot' || ev.k === 'hit') {
+    (sg.impacts || (sg.impacts = [])).push({x: ev.x, y: ev.y, at: performance.now(), hit: ev.k === 'hit'});
+    if (!mine) (sg.cues || (sg.cues = [])).push({x: ev.sx, y: ev.sy, at: performance.now(), kind: 'shot'});
+    if (ev.k === 'hit' && mine) sg.hitAt = performance.now();
+    if (ev.k === 'hit' && ev.to === me.id) { sg.hurtAt = performance.now(); sg.shake = Math.max(sg.shake, 0.5); }
+  } else if (ev.k === 'boom') {
+    (sg.booms || (sg.booms = [])).push({x: ev.x, y: ev.y, at: performance.now()});
+    sg.cues = (sg.cues || []).concat({x: ev.x, y: ev.y, at: performance.now(), kind: 'boom'});
+    const m2 = s.pl.find(p => p.pid === me.id);
+    if (m2 && Math.hypot(m2.x - ev.x, m2.y - ev.y) < 8) sg.shake = 1.2;
+  } else if (ev.k === 'charge' && !mine) sgFloat(g, BR_RW / 2, 70, '💥 Sprengladung!', '#ff6b6b');
+  else if (ev.k === 'defusing') sgBanner(g, mine ? 'ENTSCHÄRFEN…' : 'BOMBE WIRD ENTSCHÄRFT!', mine ? 'Stillhalten und E halten' : 'Schnell zur Bombe!', '#ffd23f');
+  else if (ev.k === 'kill') {
+    if (mine) sgBanner(g, 'AUSGESCHALTET', ((s.pl.find(p => p.pid === ev.to) || {}).name || '') + ' ist raus', '#ffffff');
+    else if (ev.to === me.id) sg.deadAt = performance.now();
+  } else if (ev.k === 'round') {
+    const won = ev.pid === me.id;
+    sgBanner(g, won ? 'RUNDE GEWONNEN' : 'RUNDE VERLOREN', (BR_WHY[ev.why] || '') + ' · Stand ' + s.pl.map(p => p.sc).join(':'), won ? '#7bd88f' : '#ff6b6b');
+  } else if (ev.k === 'over') {
+    sgBanner(g, ev.pid === me.id ? 'SIEG!' : 'NIEDERLAGE', 'Endstand ' + s.pl.map(p => p.sc).join(':'), ev.pid === me.id ? '#ffd23f' : '#ffffff');
+  }
+}
+// The picture: walls, floor and ceiling by ray casting into a 480×270 buffer, then sprites (the other player,
+// the bomb, charges, hits) behind walls where they should be; then scaled up with hard pixels and the HUD drawn
+// on top at full resolution.
+function brDraw(g, cv, now, dt) {
+  const sg = g.sg, s = sg.s, ctx = cv.getContext('2d'), [vw, vh] = SG_VIEW.breach, k = cv.width / vw, T = brTextures();
+  if (!sg.rc) { sg.rc = document.createElement('canvas'); sg.rc.width = BR_RW; sg.rc.height = BR_RH; sg.img = sg.rc.getContext('2d').createImageData(BR_RW, BR_RH); sg.pix = new Uint32Array(sg.img.data.buffer); sg.zb = new Float32Array(BR_RW); }
+  const buf = sg.pix, zb = sg.zb, grid = sg.grid;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  if (!s || !grid || !sg.me) { sgDrawBanner(g, ctx, vw, vh, now); return; }
+  const fv = Math.exp(-dt / 0.08);
+  sg.vis.x *= fv; sg.vis.y *= fv;
+  const mine = s.pl.find(p => p.pid === me.id), moving = Math.hypot(...(sg.me ? [sg.me.vx, sg.me.vy] : [0, 0])) > 0.3;
+  sg.bob = (sg.bob || 0) + (moving ? dt * ((sg.keys & 16) ? 7 : 11) : 0);
+  const px = sg.me.x + sg.vis.x, py = sg.me.y + sg.vis.y, ang = sg.ang, ca = Math.cos(ang), sa = Math.sin(ang);
+  sg.shake = Math.max(0, (sg.shake || 0) - dt * 2.5);
+  const horizon = (BR_RH >> 1) + Math.round(Math.sin(sg.bob * 2) * (moving ? 1.5 : 0) + (sg.shake ? (Math.random() * 2 - 1) * 4 * sg.shake : 0));
+  // Floor and ceiling: per row the distance on the floor, per pixel the map cell (inside: planks and panels,
+  // outside: grass and sky), darker further away.
+  const dirL = [ca + sa * Math.tan(BR_FOV / 2), sa - ca * Math.tan(BR_FOV / 2)], dirR = [ca - sa * Math.tan(BR_FOV / 2), sa + ca * Math.tan(BR_FOV / 2)];
+  for (let y = 0; y < BR_RH; y++) {
+    const dy = y - horizon;
+    if (!dy) { for (let x = 0; x < BR_RW; x++) buf[y * BR_RW + x] = 0xff1a1410; continue; }
+    // A wall 1 unit high at distance d is BR_PLANE / d pixels tall, so the floor at distance d is BR_PLANE / (2 d) below the horizon.
+    const floor = dy > 0, rowDist = BR_PLANE / (2 * Math.abs(dy));
+    const fog = Math.max(0.18, 1 - rowDist / 14);
+    let fx = px + rowDist * dirL[0], fy = py + rowDist * dirL[1];
+    const stx = rowDist * (dirR[0] - dirL[0]) / BR_RW, sty = rowDist * (dirR[1] - dirL[1]) / BR_RW;
+    for (let x = 0; x < BR_RW; x++, fx += stx, fy += sty) {
+      const cx = fx | 0, cy = fy | 0, out = cx < 0 || cy < 0 || cx >= BR.W || cy >= BR.H || sg.out[cy * BR.W + cx];
+      let c;
+      if (!floor && out) { const t = Math.min(1, -dy / horizon); c = brRGB(70 + 90 * t, 120 + 80 * t, 190 + 50 * t); buf[y * BR_RW + x] = c; continue; }
+      const tex = floor ? (out ? T.grass : T.wood) : T.ceil, tx = ((fx - cx) * 64) & 63, ty = ((fy - cy) * 64) & 63;
+      c = tex[ty * 64 + tx];
+      const f = floor ? fog : fog * 0.8;
+      buf[y * BR_RW + x] = (255 << 24) | ((((c >> 16) & 255) * f) << 16) | ((((c >> 8) & 255) * f) << 8) | ((c & 255) * f);
+    }
+  }
+  // Walls: one ray per column.
+  for (let x = 0; x < BR_RW; x++) {
+    // Screen right is the view direction turned a quarter clockwise: (-sin, cos) on the map (y grows downward).
+    const camX = (x / BR_RW) * 2 - 1, rdx = ca - sa * Math.tan(BR_FOV / 2) * camX, rdy = sa + ca * Math.tan(BR_FOV / 2) * camX;
+    const ra = Math.atan2(rdy, rdx), hit = BR.ray(grid, px, py, ra, 30), perp = hit.d * Math.cos(ra - ang);
+    zb[x] = perp;
+    if (hit.cell < 0) continue;
+    const hx = px + Math.cos(ra) * hit.d, hy = py + Math.sin(ra) * hit.d, fracX = hx - Math.floor(hx), fracY = hy - Math.floor(hy);
+    const vertical = Math.abs(fracX - 0.5) > Math.abs(fracY - 0.5) && (fracX < 0.002 || fracX > 0.998);
+    const u = ((vertical ? fracY : fracX) * 64) & 63, tex = grid[hit.cell] === 2 ? T.brick : T.concrete;
+    const hgt = BR_PLANE / Math.max(0.05, perp), top = horizon - hgt / 2, y0 = Math.max(0, Math.ceil(top)), y1 = Math.min(BR_RH, Math.floor(horizon + hgt / 2));
+    const shade = Math.max(0.2, 1 - perp / 16) * (vertical ? 0.82 : 1);
+    for (let y = y0; y < y1; y++) {
+      const c = tex[(((y - top) / hgt * 64) & 63) * 64 + u];
+      buf[y * BR_RW + x] = (255 << 24) | ((((c >> 16) & 255) * shade) << 16) | ((((c >> 8) & 255) * shade) << 8) | ((c & 255) * shade);
+    }
+  }
+  // Sprites, far ones first: a sprite is a picture standing upright at (x, y), h units tall, ending at the floor.
+  const sprites = [];
+  const smp = sgSample(g);
+  const other = smp && smp.b.pl.find(p => p.pid !== me.id);
+  if (other && other.al) {
+    const oa = smp.a.pl.find(p => p.pid === other.pid) || other, f = smp.k;
+    sprites.push({x: oa.x + (other.x - oa.x) * f + other.vx * (smp.ex || 0) / 60, y: oa.y + (other.y - oa.y) * f + other.vy * (smp.ex || 0) / 60, tex: T[other.side], w: 24, h: 40, size: 0.95, pid: other.pid});
+  }
+  sprites.push({x: BR.BOMB[0], y: BR.BOMB[1], draw: 'bomb', size: 0.45});
+  for (const [cx, cy, t] of s.ch || []) sprites.push({x: cx, y: cy, draw: 'charge', size: 0.25, blink: Math.floor(t / 150) % 2});
+  sg.impacts = (sg.impacts || []).filter(i => now - i.at < 350);
+  for (const i of sg.impacts) sprites.push({x: i.x, y: i.y, draw: 'spark', size: 0.2, hit: i.hit, life: (now - i.at) / 350, z: 0.5});
+  sg.booms = (sg.booms || []).filter(b => now - b.at < 700);
+  for (const b of sg.booms) sprites.push({x: b.x, y: b.y, draw: 'boom', size: 1.6, life: (now - b.at) / 700, z: 0.5});
+  for (const sp of sprites) { const dx = sp.x - px, dy = sp.y - py; sp.depth = dx * ca + dy * sa; sp.lat = -dx * sa + dy * ca; }
+  sprites.sort((a, b) => b.depth - a.depth);
+  for (const sp of sprites) {
+    if (sp.depth < 0.15) continue;
+    const sx = BR_RW / 2 + sp.lat / sp.depth * BR_PLANE, scale = BR_PLANE / sp.depth, hgt = sp.size * scale, floorY = horizon + scale * 0.5;
+    const bottom = floorY, top = floorY - hgt;
+    if (sp.tex) {
+      const wpx = hgt * sp.w / sp.h, x0 = Math.round(sx - wpx / 2), x1 = Math.round(sx + wpx / 2);
+      for (let x = Math.max(0, x0); x < Math.min(BR_RW, x1); x++) {
+        if (zb[x] < sp.depth) continue;
+        const u = Math.floor((x - x0) / wpx * sp.w);
+        for (let y = Math.max(0, Math.round(top)); y < Math.min(BR_RH, Math.round(bottom)); y++) {
+          const c = sp.tex[Math.floor((y - top) / hgt * sp.h) * sp.w + u];
+          if (c) { const f = Math.max(0.35, 1 - sp.depth / 18); buf[y * BR_RW + x] = (255 << 24) | ((((c >> 16) & 255) * f) << 16) | ((((c >> 8) & 255) * f) << 8) | ((c & 255) * f); }
+        }
+      }
+      sp.screen = [sx, top, bottom];
+      continue;
+    }
+    // Small things as filled shapes: the bomb (a box with a light), charges (blinking red), sparks, explosions.
+    const r = hgt / 2, cy = sp.draw === 'bomb' ? floorY - r : horizon;
+    for (let x = Math.max(0, Math.round(sx - r)); x < Math.min(BR_RW, Math.round(sx + r)); x++) {
+      if (zb[x] < sp.depth) continue;
+      for (let y = Math.max(0, Math.round(cy - r)); y < Math.min(BR_RH, Math.round(cy + r)); y++) {
+        const nx = (x - sx) / r, ny = (y - cy) / r, d = nx * nx + ny * ny;
+        let c = 0;
+        if (sp.draw === 'bomb') c = Math.abs(nx) < 0.8 && ny > -0.6 ? (Math.abs(nx) < 0.25 && ny < -0.2 && ny > -0.5 ? (Math.floor(now / 400) % 2 ? brRGB(255, 60, 60) : brRGB(120, 20, 20)) : brRGB(60, 64, 72)) : 0;
+        else if (sp.draw === 'charge') c = d < 1 ? (sp.blink ? brRGB(255, 70, 50) : brRGB(90, 30, 25)) : 0;
+        else if (sp.draw === 'spark') c = d < 1 - sp.life ? (sp.hit ? brRGB(255, 80, 80) : brRGB(255, 230, 150)) : 0;
+        else if (sp.draw === 'boom') { const q = sp.life; c = d < q * 1.1 && d > q * q * 0.8 ? brRGB(255, 200 - 120 * q, 80 - 60 * q) : d < (1 - q) * 0.5 ? brRGB(255, 255, 220) : 0; }
+        if (c) buf[y * BR_RW + x] = c;
+      }
+    }
+  }
+  sg.rc.getContext('2d').putImageData(sg.img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sg.rc, 0, 0, cv.width, cv.height);
+  // Dead: the picture goes grey.
+  if (mine && !mine.al && s.st === 'play') { ctx.fillStyle = 'rgba(40,40,48,.55)'; ctx.fillRect(0, 0, cv.width, cv.height); }
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  const R = vw / BR_RW;
+  // The opponent's name over their head when you can see them.
+  const os = sprites.find(sp => sp.tex);
+  if (os && os.screen && os.depth > 0.3 && zb[Math.max(0, Math.min(BR_RW - 1, Math.round(os.screen[0])))] > os.depth) {
+    ctx.font = '700 12px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    const nm = (s.pl.find(p => p.pid === os.pid) || {}).name || '';
+    ctx.strokeText(nm, os.screen[0] * R, os.screen[1] * R - 6); ctx.fillStyle = BR_COL[other.side]; ctx.fillText(nm, os.screen[0] * R, os.screen[1] * R - 6);
+  }
+  brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving);
+  sgDrawFloats(g, ctx, now);
+  sgDrawBanner(g, ctx, vw, vh, now);
+}
+// Gun, crosshair, health, ammo, clock and score; and the arrows for everything one would otherwise hear.
+function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
+  const sg = g.sg, s = sg.s;
+  if (!mine) return;
+  sg.recoil = Math.max(0, (sg.recoil || 0) - dt * 9);
+  // The gun, low on the right, bobbing while walking and kicking back when it fires.
+  if (mine.al) {
+    const bx = vw * 0.66 + Math.cos(sg.bob) * (moving ? 6 : 0), by = vh - 6 + Math.abs(Math.sin(sg.bob)) * (moving ? 6 : 0) + sg.recoil * 10, side = mine.side, u = 6;
+    const box = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(bx + x * u), Math.round(by + y * u), w * u, h * u); };
+    if (now - (sg.lastShot || 0) < 50) {
+      ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(bx + 1 * u, by - 23 * u, 4 * u, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffb020'; ctx.beginPath(); ctx.arc(bx + 1 * u, by - 23 * u, 2.4 * u, 0, Math.PI * 2); ctx.fill();
+    }
+    box(-1, -21, 4, 4, '#2b2e35'); box(0, -21, 2, -1, '#15171b');
+    box(-2, -17, 6, 10, side === 'atk' ? '#4a4f59' : '#3d4350'); box(-1, -16, 4, 2, '#5c626e');
+    box(-3, -7, 8, 7, side === 'atk' ? '#363a42' : '#2f343e'); box(3, -10, 3, 6, '#23262c');
+    box(-6, -4, 4, 5, '#e2b48a'); box(5, -3, 4, 4, '#e2b48a');
+  }
+  // Crosshair, wider while moving or shooting; a hit marker when a shot landed.
+  const cx = vw / 2, cy = vh / 2, gap = 5 + (moving ? 5 : 0) + sg.recoil * 6;
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(cx + dx * gap, cy + dy * gap); ctx.lineTo(cx + dx * (gap + 7), cy + dy * (gap + 7)); }
+  ctx.stroke();
+  if (now - (sg.hitAt || 0) < 220) {
+    ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { ctx.moveTo(cx + dx * 5, cy + dy * 5); ctx.lineTo(cx + dx * 12, cy + dy * 12); }
+    ctx.stroke();
+  }
+  // Hurt: red at the edges.
+  const hurt = Math.max(0, 1 - (now - (sg.hurtAt || 0)) / 500);
+  if (hurt) { const gr = ctx.createRadialGradient(cx, cy, vh * 0.3, cx, cy, vw * 0.65); gr.addColorStop(0, 'rgba(255,0,0,0)'); gr.addColorStop(1, 'rgba(255,0,0,' + 0.55 * hurt + ')'); ctx.fillStyle = gr; ctx.fillRect(0, 0, vw, vh); }
+  // Things you would hear: arrows around the crosshair pointing where it came from. Running steps within 12 units
+  // (walking with Shift makes no "sound"), shots, explosions.
+  const arrow = (wx, wy, col, alpha, label) => {
+    const rel = Math.atan2(wy - py, wx - px) - ang, a = Math.atan2(Math.sin(rel), Math.cos(rel)), r = Math.min(vw, vh) * 0.32;
+    const ax = cx + Math.sin(a) * r, ay = cy - Math.cos(a) * r;
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(ax, ay); ctx.rotate(a);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(11, 6); ctx.lineTo(-11, 6); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.restore();
+    if (label) { ctx.globalAlpha = alpha; ctx.font = '700 11px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = col; ctx.fillText(label, ax, ay + 20); ctx.globalAlpha = 1; }
+  };
+  if (other && other.al && s.st === 'play') {
+    const d = Math.hypot(other.x - px, other.y - py), loud = Math.hypot(other.vx, other.vy) > BR.WALK + 0.3;
+    if (loud && d < 12) arrow(other.x, other.y, '#ffffff', Math.max(0.25, 1 - d / 12) * (0.6 + 0.4 * Math.abs(Math.sin(now / 160))), '👣');
+  }
+  sg.cues = (sg.cues || []).filter(c => now - c.at < 1500);
+  for (const c of sg.cues) arrow(c.x, c.y, c.kind === 'boom' ? '#ffb020' : '#ff4d4d', 1 - (now - c.at) / 1500, c.kind === 'boom' ? '💥' : '🔫');
+  // Health, ammo, charges at the bottom left; clock and score at the top.
+  const pill = (x, y, w, text, col) => { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(x, y, w, 26, 13); ctx.fill(); ctx.fillStyle = col; ctx.font = '700 14px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + 10, y + 13); };
+  pill(10, vh - 36, 86, '♥ ' + mine.hp, mine.hp > 40 ? '#7bd88f' : '#ff6b6b');
+  pill(102, vh - 36, 112, (mine.rl ? 'Lädt…' : '▮ ' + mine.mag + '/' + BR.GUN[mine.side].mag), mine.mag > 5 || mine.rl ? '#ffffff' : '#ff6b6b');
+  if (mine.side === 'atk') pill(220, vh - 36, 64, '💣 ' + mine.ch, '#ffb020');
+  pill(10, vh - 66, 104, (moving && !(sg.keys & 16) ? '👣 LAUT' : '🤫 leise'), moving && !(sg.keys & 16) ? '#ffb020' : '#9fe0b0');
+  const sec = Math.ceil(s.rl / 1000), clock = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+  ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(vw / 2 - 110, 4, 220, 34, 17); ctx.fill();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '800 15px "Segoe UI", system-ui, sans-serif';
+  ctx.fillStyle = BR_COL[mine.side]; ctx.fillText((mine.side === 'atk' ? '⚔ ' : '🛡 ') + BR_SIDE[mine.side], vw / 2 - 52, 21);
+  ctx.fillStyle = sec <= 20 && s.st === 'play' ? '#ff6b6b' : '#ffffff'; ctx.fillText(clock, vw / 2 + 10, 21);
+  ctx.fillStyle = '#ffffff'; ctx.fillText(s.pl.map(p => p.sc).join(' : '), vw / 2 + 72, 21);
+  // Defusing: a bar under the crosshair for both.
+  if (s.df > 0) {
+    const q = s.df / BR.DEFUSE;
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(cx - 90, cy + 40, 180, 14);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(cx - 88, cy + 42, 176 * q, 10);
+    ctx.font = '700 12px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#ffd23f'; ctx.fillText('Entschärfen ' + Math.round(q * 100) + ' %', cx, cy + 66);
+  } else if (mine.side === 'atk' && mine.al && Math.hypot(px - BR.BOMB[0], py - BR.BOMB[1]) < 1.3) {
+    ctx.font = '700 13px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#ffd23f'; ctx.fillText('E halten zum Entschärfen', cx, cy + 50);
+  }
+  // Without the mouse captured: how to start.
+  if (document.pointerLockElement !== g.el.canvas && mine.al && (s.st === 'play' || s.st === 'count')) {
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(cx - 150, vh - 76, 300, 30, 15); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font = '700 13px "Segoe UI", system-ui, sans-serif'; ctx.fillText('🖱 Ins Bild klicken: Maus steuert die Sicht', cx, vh - 61);
+  }
+}
+
+/* Breach bot (offline): it sees you only with a clear line and within its field of view, or hears you running
+   close by; it reacts after a moment, turns toward you at its own speed and aims with an error that shrinks
+   with the level. Attacking it walks the shortest way to the bomb and defuses; defending it holds a spot in
+   the bomb room, watches the doors and goes for the bomb when you defuse. */
+const BR_BOT = {
+  leicht: {react: 700, aim: 0.1, turn: 3, fov: 0.75, hear: 5, strafe: 0, stop: false},
+  mittel: {react: 450, aim: 0.055, turn: 5, fov: 0.95, hear: 8, strafe: 0.3, stop: false},
+  schwer: {react: 280, aim: 0.03, turn: 8, fov: 1.1, hear: 11, strafe: 0.6, stop: true},
+  profi: {react: 160, aim: 0.015, turn: 12, fov: 1.25, hear: 14, strafe: 1, stop: true}};
+function brBrain(R, lvl) {
+  const P = BR_BOT[lvl] || BR_BOT.mittel, W = BR.W, H = BR.H;
+  // Shortest way over the floor from (x, y) to a target cell: the next cell to go to.
+  const path = (g, sx, sy, tx, ty) => {
+    const from = new Int16Array(W * H).fill(-1), q = [sy * W + sx], start = sy * W + sx, goal = ty * W + tx;
+    from[start] = start;
+    for (let h = 0; h < q.length; h++) {
+      const c = q[h];
+      if (c === goal) break;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const n = c + dy * W + dx, nx = (c % W) + dx;
+        if (nx < 0 || nx >= W || n < 0 || n >= W * H || from[n] >= 0 || g[n]) continue;
+        from[n] = c;
+        q.push(n);
+      }
+    }
+    if (from[goal] < 0) return null;
+    const cells = [];
+    for (let c = goal; c !== start; c = from[c]) cells.unshift(c);
+    return cells;
+  };
+  const turnTo = (p, want, rate) => { let d = want - p.ba; d = Math.atan2(Math.sin(d), Math.cos(d)); p.ba += Math.max(-rate / 60, Math.min(rate / 60, d)); return Math.abs(d); };
+  return () => {
+    const now = Date.now();
+    for (const p of R.players) {
+      if (!p.bot) continue;
+      if (p.ba === undefined || R.st === 'count') { p.ba = p.a; p.route = null; p.seenAt = 0; }
+      const o = R.players.find(q => q !== p), g = R.map.g;
+      let k = 0, aimDiff = 9;
+      if (!p.alive || R.st !== 'play' || !o) { p.q.push([0, p.bseq = (p.bseq || 0) + 1, p.ba, 0]); continue; }
+      const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy), toO = Math.atan2(dy, dx);
+      const clear = o.alive && BR.ray(g, p.x, p.y, toO, d + 1).d >= d - 0.3;
+      const inView = Math.abs(Math.atan2(Math.sin(toO - p.ba), Math.cos(toO - p.ba))) < P.fov;
+      const heard = o.alive && Math.hypot(o.vx, o.vy) > BR.WALK + 0.3 && d < P.hear;
+      if (clear && (inView || heard)) {
+        if (!p.seenAt) { p.seenAt = now; p.err = (Math.random() * 2 - 1) * P.aim * 3; }
+        if (now - p.seenAt > P.react) {
+          // Aim: the error shrinks while the bot keeps you in sight.
+          p.err *= 0.97;
+          aimDiff = turnTo(p, toO + p.err + (Math.random() * 2 - 1) * P.aim * 0.3, P.turn);
+          if (aimDiff < 0.06 + 0.4 / Math.max(1, d)) k |= 32;
+          if (P.strafe && Math.random() < 0.02 * P.strafe) p.strafe = p.strafe === 4 ? 8 : 4;
+          if (!P.stop || !(k & 32)) k |= p.strafe || 0;
+        } else turnTo(p, toO, P.turn * 0.5);
+        p.lastSeen = [o.x, o.y];
+      } else {
+        p.seenAt = 0;
+        // Heard but not seen (a wall in between): turn that way.
+        if (heard) turnTo(p, toO, P.turn * 0.6);
+        let target = null;
+        if (p.side === 'atk') target = BR.BOMB;
+        else if (R.defuse > 0 || p.lastSeen) target = p.lastSeen && !R.defuse ? p.lastSeen : BR.BOMB;
+        else if (!p.post) { const posts = [[15.5, 5.2], [11.5, 6.5], [21.5, 5.5], [16.5, 7.5]]; p.post = posts[Math.floor(Math.random() * posts.length)]; }
+        if (!target && p.post) target = p.post;
+        const atTarget = target && Math.hypot(target[0] - p.x, target[1] - p.y) < (p.side === 'atk' ? 0.6 : 0.4);
+        if (p.side === 'def' && p.lastSeen && atTarget) p.lastSeen = null;
+        if (atTarget) {
+          if (p.side === 'atk') k |= 128;
+          else if (!heard) { p.sweep = (p.sweep || 0) + 1 / 60; turnTo(p, Math.atan2(BR.BOMB[1] - p.y, BR.BOMB[0] - p.x) + Math.PI + Math.sin(p.sweep * 0.8) * 1.4, P.turn * 0.4); }
+        } else if (target) {
+          if (!p.route || now - (p.routeAt || 0) > 500) { p.route = path(g, Math.floor(p.x), Math.floor(p.y), Math.floor(target[0]), Math.floor(target[1])); p.routeAt = now; }
+          const next = p.route && p.route[0];
+          if (next !== undefined) {
+            const nx = (next % W) + 0.5, ny = Math.floor(next / W) + 0.5;
+            if (Math.hypot(nx - p.x, ny - p.y) < 0.2 && p.route.length > 1) p.route.shift();
+            const cell = p.route[0], tx = p.route.length === 1 ? target[0] : (cell % W) + 0.5, ty = p.route.length === 1 ? target[1] : Math.floor(cell / W) + 0.5;
+            if (!heard) turnTo(p, Math.atan2(ty - p.y, tx - p.x), P.turn);
+            // Walk the way the body points; near the end, quietly.
+            const off = Math.atan2(Math.sin(Math.atan2(ty - p.y, tx - p.x) - p.ba), Math.cos(Math.atan2(ty - p.y, tx - p.x) - p.ba));
+            if (Math.abs(off) < 0.6) k |= 1;
+            if (P.stop && Math.hypot(target[0] - p.x, target[1] - p.y) < 3) k |= 16;
+          }
+        }
+        if (p.mag < BR.GUN[p.side].mag * 0.4 && !p.reload) k |= 64;
+      }
+      if (p.mag <= 0) k |= 64;
+      p.q.push([k, p.bseq = (p.bseq || 0) + 1, p.ba, 0]);
+    }
+  };
 }
 
 /* Malen & Raten */
@@ -7449,6 +8740,7 @@ function updateComposer() {
   $('cmpPong').hidden = conv === ALL || !OWN_BROKER.url;
   $('cmpUno').textContent = conv === ALL ? 'Uno-Tisch eröffnen (2–6)' : 'Uno';
   $('cmpKick').hidden = $('cmpTron').hidden = !OWN_BROKER.url;
+  $('cmpBreach').hidden = !BR_READY || !OWN_BROKER.url || conv === ALL;
   $('cmpKick').textContent = conv === ALL ? '⚽ Fußball-Tisch eröffnen (2–4)' : '⚽ Fußball';
   $('cmpTron').textContent = conv === ALL ? '🏍️ Neon-Rush-Tisch eröffnen (2–4)' : '🏍️ Neon Rush';
   if (cin.disabled) closePops();
@@ -7887,6 +9179,7 @@ $('cmpReact').addEventListener('click', () => { closePops(); inviteMp('react'); 
 $('cmpPong').addEventListener('click', () => { closePops(); inviteMp('pong'); });
 $('cmpKick').addEventListener('click', () => { closePops(); if (conv === ALL) sgOpenTable('kick'); else inviteMp('kick'); });
 $('cmpTron').addEventListener('click', () => { closePops(); if (conv === ALL) sgOpenTable('tron'); else inviteMp('tron'); });
+$('cmpBreach').addEventListener('click', () => { closePops(); if (conv !== ALL) inviteMp('breach'); });
 $('cmpUno').addEventListener('click', () => { closePops(); if (conv === ALL) openUnoTable(); else inviteMp('uno'); });
 
 // GIF search runs through the GIPHY API. GIPHY keys are meant to sit in client code; the only risk of a

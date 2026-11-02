@@ -20,6 +20,10 @@ class_name = "Kick"
 name = "TRON"
 class_name = "Tron"
 
+[[durable_objects.bindings]]
+name = "BREACH"
+class_name = "Breach"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Hub"]
@@ -31,3 +35,7 @@ new_sqlite_classes = ["Arena"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["Kick", "Tron"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["Breach"]
