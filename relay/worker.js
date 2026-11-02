@@ -1376,6 +1376,8 @@ export class Breach extends Room {
   }
   joined(p) { Object.assign(p, {sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
     mag: 30, reload: 0, cd: 0, nade: 2, hist: [], kills: 0}); }
+  // No power-ups in Breach, so nothing to vote on: the match starts right away.
+  vote(now) { this.begin(now); }
   extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, kills: p.kills}; }
   input(p, m) {
     if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i) && Number.isFinite(m.a)) {

@@ -731,9 +731,6 @@ const UI = '"Segoe UI", Tahoma, Arial, sans-serif';
 const canvas = $('c');
 const ctx = canvas.getContext('2d');
 const previewEl = $('preview'), stage = $('stage'), placeholder = $('placeholder');
-// ⚔️ Breach is still being built: hidden until its game server is live.
-const BR_READY = false;
-if (!BR_READY) document.querySelectorAll('#docs tr[data-offline="breach"]').forEach(r => r.remove());
 const rows = [...document.querySelectorAll('#docs tr[data-doc]')];
 const dpr = window.devicePixelRatio || 1;
 
@@ -2032,7 +2029,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5220,7 +5217,7 @@ document.addEventListener('keydown', e => {
     else if (!b) return;
     e.preventDefault();
     e.stopPropagation();
-    if (b) g.sg.keys |= b;
+    if (b) { g.sg.keys |= b; g.sg.tap = (g.sg.tap || 0) | b; }
     return;
   }
   const bit = SG_KEYS[e.key.toLowerCase()];
@@ -5360,7 +5357,7 @@ function sgFrame(g, ts) {
     score = sg.team === 0 ? 'Du spielst 🔴 Rot → nach rechts' : sg.team === 1 ? 'Du spielst 🔵 Blau ← nach links' : '';
   } else if (s && g.game === 'breach') score = 'Wer zuerst 4 Runden gewinnt';
   else if (s) score = 'Erster mit 3 Runden gewinnt';
-  if (sg.rtt) score += '     Ping ' + Math.round(sg.rtt) + ' ms';
+  if (sg.rtt && !g.offline) score += '     Ping ' + Math.round(sg.rtt) + ' ms';
   if (g.el.score.textContent !== score) g.el.score.textContent = score;
   let text = '';
   if (sg.conn === 'full') text = 'Da ist kein Platz mehr frei\n(oder das Spiel läuft schon).';
@@ -7302,6 +7299,8 @@ class Breach extends Room {
   }
   joined(p) { Object.assign(p, {sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
     mag: 30, reload: 0, cd: 0, nade: 2, hist: [], kills: 0}); }
+  // No power-ups in Breach, so nothing to vote on: the match starts right away.
+  vote(now) { this.begin(now); }
   extra(p) { return {sc: p.sc, side: p.side, hp: p.hp, al: p.alive, mag: p.mag, rl: p.reload > 0, ch: p.nade, kills: p.kills}; }
   input(p, m) {
     if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i) && Number.isFinite(m.a)) {
@@ -7959,7 +7958,9 @@ function brTicks(g, now) {
   const mine = s.pl.find(p => p.pid === me.id), live = s.st === 'play' && mine && mine.al;
   for (let i = 0; i < n; i++) {
     sg.simAt += 1000 / 60;
-    let k = sg.keys | (sg.fire ? 32 : 0);
+    // A key tapped between two ticks (R, a short step) still counts once.
+    let k = sg.keys | (sg.tap || 0) | (sg.fire ? 32 : 0);
+    sg.tap = 0;
     if (!live) k &= ~32;
     sgSend(g, {t: 'in', k, a: Math.round(sg.ang * 1000) / 1000, i: ++sg.seq, rt: Math.round(pgMs() - sg.off - brDelay(sg))});
     if (live && sg.me) { sg.hist.push([sg.seq, k, sg.ang]); BR.move(sg.me, k, sg.ang, sg.grid); }
@@ -8269,11 +8270,10 @@ function brBrain(R, lvl) {
           else if (!heard) { p.sweep = (p.sweep || 0) + 1 / 60; turnTo(p, Math.atan2(BR.BOMB[1] - p.y, BR.BOMB[0] - p.x) + Math.PI + Math.sin(p.sweep * 0.8) * 1.4, P.turn * 0.4); }
         } else if (target) {
           if (!p.route || now - (p.routeAt || 0) > 500) { p.route = path(g, Math.floor(p.x), Math.floor(p.y), Math.floor(target[0]), Math.floor(target[1])); p.routeAt = now; }
-          const next = p.route && p.route[0];
-          if (next !== undefined) {
-            const nx = (next % W) + 0.5, ny = Math.floor(next / W) + 0.5;
-            if (Math.hypot(nx - p.x, ny - p.y) < 0.2 && p.route.length > 1) p.route.shift();
-            const cell = p.route[0], tx = p.route.length === 1 ? target[0] : (cell % W) + 0.5, ty = p.route.length === 1 ? target[1] : Math.floor(cell / W) + 0.5;
+          if (p.route) {
+            // Already in the target's cell (empty route): straight to the target.
+            if (p.route.length > 1 && Math.hypot((p.route[0] % W) + 0.5 - p.x, Math.floor(p.route[0] / W) + 0.5 - p.y) < 0.2) p.route.shift();
+            const cell = p.route[0], last = p.route.length <= 1, tx = last ? target[0] : (cell % W) + 0.5, ty = last ? target[1] : Math.floor(cell / W) + 0.5;
             if (!heard) turnTo(p, Math.atan2(ty - p.y, tx - p.x), P.turn);
             // Walk the way the body points; near the end, quietly.
             const off = Math.atan2(Math.sin(Math.atan2(ty - p.y, tx - p.x) - p.ba), Math.cos(Math.atan2(ty - p.y, tx - p.x) - p.ba));
@@ -8740,7 +8740,7 @@ function updateComposer() {
   $('cmpPong').hidden = conv === ALL || !OWN_BROKER.url;
   $('cmpUno').textContent = conv === ALL ? 'Uno-Tisch eröffnen (2–6)' : 'Uno';
   $('cmpKick').hidden = $('cmpTron').hidden = !OWN_BROKER.url;
-  $('cmpBreach').hidden = !BR_READY || !OWN_BROKER.url || conv === ALL;
+  $('cmpBreach').hidden = !OWN_BROKER.url || conv === ALL;
   $('cmpKick').textContent = conv === ALL ? '⚽ Fußball-Tisch eröffnen (2–4)' : '⚽ Fußball';
   $('cmpTron').textContent = conv === ALL ? '🏍️ Neon-Rush-Tisch eröffnen (2–4)' : '🏍️ Neon Rush';
   if (cin.disabled) closePops();
