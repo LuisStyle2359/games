@@ -221,21 +221,28 @@ export class Arena {
     this.away = [false, false];
     this.pausedAt = 0;
     this.pausedSt = '';
+    this.tok = ['', ''];
+    this.evq = [];
   }
 
   async fetch(req) {
     const u = new URL(req.url), seat = Number(u.searchParams.get('seat')), key = u.searchParams.get('key') || '';
     if ((seat !== 1 && seat !== 2) || !/^[a-z0-9]{12,40}$/.test(key)) return new Response('bad request', {status: 400});
     if (this.key && this.key !== key) return new Response('forbidden', {status: 403});
+    // A seat belongs to the page that took it first (its token): the other player can't take it over.
+    const i0 = seat - 1, tok = (u.searchParams.get('tok') || '').slice(0, 64);
+    if (this.tok[i0] && this.tok[i0] !== tok) return new Response('taken', {status: 409});
+    this.tok[i0] = tok;
     this.key = key;
     const [client, server] = Object.values(new WebSocketPair());
     server.accept();
     const i = seat - 1, old = this.seats[i];
-    if (old) { this.seats[i] = null; try { old.close(1000, 'replaced'); } catch (e) {} }
+    // The page it replaces (another tab) is told not to reconnect.
+    if (old) { this.seats[i] = null; try { old.close(4001, 'replaced'); } catch (e) {} }
     this.seats[i] = server;
     this.away[i] = false;
     this.names[i] = (u.searchParams.get('name') || '').slice(0, 24);
-    server.addEventListener('message', e => this.onMessage(i, e.data));
+    server.addEventListener('message', e => { if (this.seats[i] === server) this.onMessage(i, e.data); });
     const gone = () => { if (this.seats[i] === server) { this.seats[i] = null; this.left[i] = Date.now(); } };
     server.addEventListener('close', gone);
     server.addEventListener('error', gone);
@@ -260,7 +267,7 @@ export class Arena {
     } else if (msg.t === 'vote' && this.st === 'vote' && typeof msg.v === 'boolean') {
       this.votes[i] = msg.v;
       if (this.votes[0] !== null && this.votes[1] !== null) this.decide();
-    } else if (msg.t === 'fire' && this.stuck === i) {
+    } else if (msg.t === 'fire' && this.stuck === i && this.st === 'play') {
       this.release(now);
     } else if (msg.t === 'god' && Number.isFinite(msg.ts) && typeof msg.sig === 'string') {
       this.adminGod(msg.ts, msg.sig);
@@ -303,7 +310,7 @@ export class Arena {
     this.until = Date.now() + 8000;
   }
 
-  event(k, i, kind) { this.ev = {n: this.ev.n + 1, k, i, kind}; }
+  event(k, i, kind) { this.ev = {n: this.ev.n + 1, k, i, kind}; this.evq.push(this.ev); if (this.evq.length > 8) this.evq.shift(); }
 
   tick() {
     const now = Date.now(), prevTick = this.tickAt;
@@ -313,7 +320,11 @@ export class Arena {
     } else if (this.st === 'vote') {
       if (now > this.until) this.decide();
     } else if (this.st !== 'wait') {
-      for (let i = 0; i < 2; i++) if (!this.seats[i] && now - this.left[i] > 10000) this.finish(2 - i);
+      for (let i = 0; i < 2 && this.st !== 'over'; i++) if (!this.seats[i] && now - this.left[i] > 10000) this.finish(2 - i);
+      // A dropped connection stops the game like both looking away: no power-up runs out meanwhile, and it goes
+      // on with a countdown once both are back.
+      const gone = !this.seats[0] || !this.seats[1];
+      if (this.st !== 'over' && gone && this.st !== 'pause' && this.st !== 'vote') this.pause(now);
       if (this.st !== 'over' && this.seats[0] && this.seats[1]) {
         if (this.st === 'pause') { if (!this.away[0] && !this.away[1]) this.resume(now); }
         else if (this.away[0] && this.away[1]) this.pause(now);
@@ -332,7 +343,8 @@ export class Arena {
 
   pause(now) {
     this.pausedSt = this.st === 'resume' ? 'play' : this.st;
-    this.pausedAt = now;
+    // Paused again during the countdown: the rest of that countdown isn't counted twice.
+    this.pausedAt = this.st === 'resume' ? this.until : now;
     this.st = 'pause';
   }
 
@@ -345,7 +357,7 @@ export class Arena {
     if (this.item) this.item.t += d;
     this.nextItem = sh(this.nextItem);
     this.stuckUntil = sh(this.stuckUntil);
-    for (const h of this.hist) for (const e of h) e[0] += d;
+    for (const h of this.hist) for (const e of h) if (e[0] <= this.pausedAt) e[0] += d;
     for (const p of this.pend) if (p) p.t += d;
     this.st = this.pausedSt === 'play' ? 'resume' : this.pausedSt;
     this.until = now + 3000;
@@ -355,7 +367,9 @@ export class Arena {
     for (let i = 0; i < 2; i++) {
       if (this.bigUntil[i] && now > this.bigUntil[i]) { this.bigUntil[i] = 0; this.ph[i] = PH; }
       if (this.miniUntil[i] && now > this.miniUntil[i]) { this.miniUntil[i] = 0; this.ph[i] = PH; }
-      if (this.god[i] && now > this.god[i]) { this.god[i] = 0; this.ph[i] = this.bigUntil[i] ? BIG : PH; this.event('godend', i); }
+      if (this.god[i] && now > this.god[i]) { this.god[i] = 0; this.event('godend', i); }
+      // Overlapping power-ups: the divine paddle beats mini, mini beats big.
+      this.ph[i] = this.god[i] ? GOD_PH : this.miniUntil[i] ? MINI : this.bigUntil[i] ? BIG : PH;
     }
     if (!this.pu && !(this.item && this.item.k === 'god')) return;
     if (!this.item && now > this.nextItem) {
@@ -585,7 +599,7 @@ export class Arena {
       votes: this.votes, pu: this.pu, coin: this.coin, item: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: Math.max(0, ITEM_LIFE - (now - this.item.t))},
       sh: this.shield, mg: this.magnet, gd: [Math.max(0, this.god[0] - now), Math.max(0, this.god[1] - now)],
       aw: this.away, cv: [Math.max(0, this.curve[0] - now), Math.max(0, this.curve[1] - now)], sp: r(this.spin * f * f), stuck: this.stuck, su: this.stuck >= 0 ? Math.max(0, this.stuckUntil - now) : 0,
-      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev});
+      aim: this.stuck >= 0 ? r(this.aim[this.stuck]) : 0, turbo: this.turbo, ev: this.ev, evs: this.evq});
     for (const ws of this.seats) if (ws) try { ws.send(s); } catch (e) {}
   }
 }
