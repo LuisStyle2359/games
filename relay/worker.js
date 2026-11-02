@@ -1496,7 +1496,7 @@ export class Breach extends Room {
     this.defuse = 0;
     this.rl = BR_ROUND;
   }
-  joined(p) { Object.assign(p, {sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
+  joined(p) { Object.assign(p, {st: {shots: 0, hits: 0, dmg: 0, defuses: 0, walls: 0, clutch: 0, fast: 0}, sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
     mag: 30, reload: 0, cd: 0, nade: 2, rf: 0, hist: [], kills: 0}); }
   // No power-ups in Breach, so nothing to vote on: the match starts right away.
   vote(now) { this.begin(now); }
@@ -1549,12 +1549,17 @@ export class Breach extends Room {
   finish(p) {
     this.st = 'over';
     this.w = p ? p.pid : null;
-    this.until = Date.now() + 10000;
-    this.event('over', {pid: this.w});
+    this.until = Date.now() + 12000;
+    // The match in numbers, for the end screen.
+    this.event('over', {pid: this.w, stats: this.players.map(q => ({pid: q.pid, name: q.name, sc: q.sc, kills: q.kills, ...q.st}))});
   }
   endRound(winner, why) {
     if (this.st !== 'play') return;
     winner.sc++;
+    if (why === 'defuse') winner.st.defuses++;
+    if (why === 'kill' && winner.alive && winner.hp <= 30) winner.st.clutch++;
+    const took = BR_ROUND - this.rl;
+    if (!winner.st.fast || took < winner.st.fast) winner.st.fast = Math.round(took);
     // Whoever lost gets a little more next round: one more charge (attack) or steel wall (defence).
     for (const q of this.players) q.lost = q !== winner ? 1 : 0;
     this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
@@ -1648,6 +1653,7 @@ export class Breach extends Room {
     const moving = Math.hypot(p.vx, p.vy) > 0.5, ang = a + (Math.random() * 2 - 1) * (gun.spread + (moving ? gun.spread * 2 : 0));
     const wall = brRay(this.map.g, p.x, p.y, ang);
     let hitP = null, hd = wall.d;
+    if (this.st === 'play') p.st.shots++;
     if (this.st === 'prep') {
       // Preparing: a shot can only take out the attacker's drone (a small target close to the floor).
       for (const o of this.players) {
@@ -1681,7 +1687,9 @@ export class Breach extends Room {
     const ex = p.x + Math.cos(ang) * hd, ey = p.y + Math.sin(ang) * hd;
     if (hitP) {
       const dmg = Math.round(hd < 4 ? gun.dmg : hd > 16 ? gun.far : gun.dmg + (gun.far - gun.dmg) * (hd - 4) / 12);
+      p.st.dmg += Math.min(dmg, hitP.hp);
       hitP.hp = Math.max(0, hitP.hp - dmg);
+      p.st.hits++;
       this.event('hit', {pid: p.pid, to: hitP.pid, dmg, x: ex, y: ey, sx: p.x, sy: p.y});
       if (!hitP.hp) this.kill(hitP, p);
     } else {
@@ -1724,7 +1732,11 @@ export class Breach extends Room {
     // The brick cell and the brick right next to it along the wall go; anyone close gets hurt.
     for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const x = cx + dx, y = cy + dy, i = y * BR_W + x;
-      if (x >= 0 && y >= 0 && x < BR_W && y < BR_H && this.map.g[i] === 2 && (dx === 0 && dy === 0 || Math.random() < 0.5)) this.wear(i, 255);
+      if (x >= 0 && y >= 0 && x < BR_W && y < BR_H && this.map.g[i] === 2 && (dx === 0 && dy === 0 || Math.random() < 0.5)) {
+        this.wear(i, 255);
+        const by = this.players.find(q => q.pid === c.pid);
+        if (by) by.st.walls++;
+      }
     }
     this.event('boom', {x: c.x, y: c.y});
     // Hurts anyone close; a wall in between (after the blast) takes half of it.

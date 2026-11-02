@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 56;
+const APP_VERSION = 57;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5446,6 +5446,8 @@ function sgFrame(g, ts) {
   if (sg.conn === 'full') text = 'Da ist kein Platz mehr frei\n(oder das Spiel läuft schon).';
   else if (!s && sg.conn === 'lost') text = 'Spielserver nicht erreichbar – neuer Versuch…';
   else if (!s) text = 'Verbinde mit dem Spielserver…';
+  // Breach shows its own end screen (the numbers of the match) in the picture.
+  else if (g.over && s.st === 'over' && g.game === 'breach' && g.sg.final) text = '';
   else if (g.over && s.st === 'over') text = g.winner ? '🏆 Gewonnen!' : g.game === 'kick' ? 'Verloren – ' + (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt' : ((s.pl.find(p => p.pid === s.w) || {}).name || 'Niemand') + ' gewinnt';
   else if (g.over) text = '';
   else if (sg.conn === 'lost') text = 'Verbindung weg – neuer Versuch…';
@@ -7512,7 +7514,7 @@ class Breach extends Room {
     this.defuse = 0;
     this.rl = BR_ROUND;
   }
-  joined(p) { Object.assign(p, {sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
+  joined(p) { Object.assign(p, {st: {shots: 0, hits: 0, dmg: 0, defuses: 0, walls: 0, clutch: 0, fast: 0}, sc: 0, side: 'atk', x: 1.5, y: 1.5, a: 0, vx: 0, vy: 0, hp: 100, alive: false, q: [], k: 0, ack: 0, owed: 0, started: false,
     mag: 30, reload: 0, cd: 0, nade: 2, rf: 0, hist: [], kills: 0}); }
   // No power-ups in Breach, so nothing to vote on: the match starts right away.
   vote(now) { this.begin(now); }
@@ -7565,12 +7567,17 @@ class Breach extends Room {
   finish(p) {
     this.st = 'over';
     this.w = p ? p.pid : null;
-    this.until = Date.now() + 10000;
-    this.event('over', {pid: this.w});
+    this.until = Date.now() + 12000;
+    // The match in numbers, for the end screen.
+    this.event('over', {pid: this.w, stats: this.players.map(q => ({pid: q.pid, name: q.name, sc: q.sc, kills: q.kills, ...q.st}))});
   }
   endRound(winner, why) {
     if (this.st !== 'play') return;
     winner.sc++;
+    if (why === 'defuse') winner.st.defuses++;
+    if (why === 'kill' && winner.alive && winner.hp <= 30) winner.st.clutch++;
+    const took = BR_ROUND - this.rl;
+    if (!winner.st.fast || took < winner.st.fast) winner.st.fast = Math.round(took);
     // Whoever lost gets a little more next round: one more charge (attack) or steel wall (defence).
     for (const q of this.players) q.lost = q !== winner ? 1 : 0;
     this.event('round', {pid: winner.pid, why, side: winner.side, hp: winner.alive ? winner.hp : 0});
@@ -7664,6 +7671,7 @@ class Breach extends Room {
     const moving = Math.hypot(p.vx, p.vy) > 0.5, ang = a + (Math.random() * 2 - 1) * (gun.spread + (moving ? gun.spread * 2 : 0));
     const wall = brRay(this.map.g, p.x, p.y, ang);
     let hitP = null, hd = wall.d;
+    if (this.st === 'play') p.st.shots++;
     if (this.st === 'prep') {
       // Preparing: a shot can only take out the attacker's drone (a small target close to the floor).
       for (const o of this.players) {
@@ -7697,7 +7705,9 @@ class Breach extends Room {
     const ex = p.x + Math.cos(ang) * hd, ey = p.y + Math.sin(ang) * hd;
     if (hitP) {
       const dmg = Math.round(hd < 4 ? gun.dmg : hd > 16 ? gun.far : gun.dmg + (gun.far - gun.dmg) * (hd - 4) / 12);
+      p.st.dmg += Math.min(dmg, hitP.hp);
       hitP.hp = Math.max(0, hitP.hp - dmg);
+      p.st.hits++;
       this.event('hit', {pid: p.pid, to: hitP.pid, dmg, x: ex, y: ey, sx: p.x, sy: p.y});
       if (!hitP.hp) this.kill(hitP, p);
     } else {
@@ -7740,7 +7750,11 @@ class Breach extends Room {
     // The brick cell and the brick right next to it along the wall go; anyone close gets hurt.
     for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const x = cx + dx, y = cy + dy, i = y * BR_W + x;
-      if (x >= 0 && y >= 0 && x < BR_W && y < BR_H && this.map.g[i] === 2 && (dx === 0 && dy === 0 || Math.random() < 0.5)) this.wear(i, 255);
+      if (x >= 0 && y >= 0 && x < BR_W && y < BR_H && this.map.g[i] === 2 && (dx === 0 && dy === 0 || Math.random() < 0.5)) {
+        this.wear(i, 255);
+        const by = this.players.find(q => q.pid === c.pid);
+        if (by) by.st.walls++;
+      }
     }
     this.event('boom', {x: c.x, y: c.y});
     // Hurts anyone close; a wall in between (after the blast) takes half of it.
@@ -8371,6 +8385,7 @@ function brEvent(g, ev, s) {
     sgBanner(g, won ? 'RUNDE GEWONNEN' : 'RUNDE VERLOREN', why + close + ' · Stand ' + s.pl.map(p => p.sc).join(':'), won ? '#7bd88f' : '#ff6b6b');
   } else if (ev.k === 'over') {
     sgBanner(g, ev.pid === me.id ? 'SIEG!' : 'NIEDERLAGE', 'Endstand ' + s.pl.map(p => p.sc).join(':'), ev.pid === me.id ? '#ffd23f' : '#ffffff');
+    if (Array.isArray(ev.stats)) sg.final = {stats: ev.stats, at: performance.now()};
   }
 }
 // The picture: walls, floor and ceiling by ray casting into a 480×270 buffer, then sprites (the other player,
@@ -8504,6 +8519,33 @@ function brDraw(g, cv, now, dt) {
   brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving);
   sgDrawFloats(g, ctx, now);
   sgDrawBanner(g, ctx, vw, vh, now);
+  if (s.st === 'over' && sg.final && now - sg.final.at > 1800) brStats(g, ctx, vw, vh);
+}
+// The end of a match: both players side by side, the better number marked, and a title for each.
+function brStats(g, ctx, vw, vh) {
+  const st = g.sg.final.stats.slice(0, 2);
+  if (st.length < 2) return;
+  const acc = p => p.shots ? Math.round(p.hits / p.shots * 100) : 0, sec = ms => ms ? (ms / 1000).toFixed(1) + ' s' : '–';
+  const rows = [['Runden', p => p.sc, 1], ['Kills', p => p.kills, 1], ['Schaden', p => p.dmg, 1], ['Trefferquote', p => acc(p), 1, v => v + ' %'],
+    ['Entschärft', p => p.defuses, 1], ['Wände gesprengt', p => p.walls, 1], ['Knapp gewonnen (≤30 ♥)', p => p.clutch, 1], ['Schnellste Runde', p => p.fast || Infinity, -1, v => v === Infinity ? '–' : sec(v)]];
+  // One title each: the first category a player is best in (ties go to nobody).
+  const titles = [['🎯 Scharfschütze', p => p.shots >= 10 ? acc(p) : -1], ['💥 Sprengmeister', p => p.walls], ['🧊 Eiskalt', p => p.clutch], ['⚡ Blitz', p => p.fast ? -p.fast : -Infinity], ['🔪 Jäger', p => p.kills]];
+  const title = i => { for (const [t, f] of titles) { const a = f(st[i]), b = f(st[1 - i]); if (a > b && a > 0 || (t === '⚡ Blitz' && a > b && a > -Infinity)) return t; } return '💪 Kämpfer'; };
+  const w = 420, h = 52 + rows.length * 20, x = (vw - w) / 2, y = vh - h - 12;
+  ctx.fillStyle = 'rgba(8,10,16,.88)'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.fill();
+  ctx.textBaseline = 'middle';
+  ctx.font = '800 13px "Segoe UI", system-ui, sans-serif';
+  [0, 1].forEach(i => { ctx.textAlign = 'center'; ctx.fillStyle = st[i].pid === me.id ? '#ffd23f' : '#ffffff'; ctx.fillText(st[i].name + (st[i].pid === me.id && st[i].name !== 'Du' ? ' (du)' : ''), x + (i ? 360 : 260), y + 16); ctx.font = '700 11px "Segoe UI", system-ui, sans-serif'; ctx.fillStyle = '#9fd3ff'; ctx.fillText(title(i), x + (i ? 360 : 260), y + 32); ctx.font = '800 13px "Segoe UI", system-ui, sans-serif'; });
+  ctx.font = '600 12px "Segoe UI", system-ui, sans-serif';
+  rows.forEach(([label, f, dir, fmt], r) => {
+    const yy = y + 52 + r * 20, a = f(st[0]), b = f(st[1]);
+    ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillText(label, x + 16, yy);
+    [a, b].forEach((v, i) => {
+      const best = dir > 0 ? v > (i ? a : b) : v < (i ? a : b);
+      ctx.textAlign = 'center'; ctx.fillStyle = best ? '#7bd88f' : '#ffffff';
+      ctx.fillText(fmt ? fmt(v) : String(v), x + (i ? 360 : 260), yy);
+    });
+  });
 }
 // Gun, crosshair, health, ammo, clock and score; and the arrows for everything one would otherwise hear.
 function brHud(g, ctx, vw, vh, now, dt, mine, px, py, ang, other, moving) {
