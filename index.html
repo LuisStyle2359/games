@@ -154,6 +154,19 @@ tbody tr.sel td { background: var(--select); }
 .vcard:hover .vtitle { color: var(--check); }
 .vmeta { color: var(--muted); font-size: 11px; }
 #chat { position: absolute; inset: 0; padding: 8px; outline: none; }
+#offline { position: absolute; inset: 0; padding: 8px; outline: none; }
+#offline[hidden] { display: none; }
+.opage { height: 100%; display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--grid-line); border-radius: 4px; overflow: hidden; }
+.opage .cmpboard { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.opage .cmpboard[hidden] { display: none; }
+.osetup { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; overflow-y: auto; background: linear-gradient(135deg, #1f3b2a, #0b1530); }
+.osetup[hidden] { display: none; }
+.osetbox { background: var(--paper); border: 1px solid #c8922a; border-radius: 6px; padding: 14px 18px; width: min(460px, 100%); display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+.osetbox p { margin: 0; font-size: 12px; color: var(--muted); }
+.olabel { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 4px; }
+.orow { display: flex; gap: 6px; flex-wrap: wrap; }
+.orow .vbtn { flex: 1; min-width: 90px; height: 32px; }
+.orow .vbtn.on { background: #fff3cd; border-color: #c8922a; font-weight: 700; box-shadow: inset 0 0 0 1px #c8922a; }
 .cpage { display: flex; width: 100%; height: 100%; background: var(--paper); border: 1px solid var(--page-grid-strong); }
 .clist { display: flex; flex-direction: column; flex: none; width: 210px; border-right: 1px solid var(--page-grid-strong); }
 .chead { display: flex; align-items: center; gap: 8px; height: 30px; flex: none; padding: 0 10px; background: var(--search-band); border-bottom: 1px solid var(--search-line); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -565,6 +578,8 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
           <tr data-doc="House Airway Bill" data-game="tetris"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-04</td><td>House Airway Bill - Original</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:32</td><td></td><td></td></tr>
           <tr data-doc="OLA"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-05</td><td>OLA</td><td></td><td></td><td>6</td><td>24.09.2026 14:48</td><td></td><td></td></tr>
           <tr data-doc="OLA" data-game="2048"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-06</td><td>OLA</td><td>generell</td><td class="flag">Q</td><td>4</td><td>08.10.2026 12:05</td><td></td><td></td></tr>
+          <tr data-doc="Packing List" data-offline="tron"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-12</td><td>Packing List</td><td>Routing</td><td></td><td>3</td><td>27.10.2026 09:41</td><td></td><td></td></tr>
+          <tr data-doc="Proof of Delivery" data-offline="kick"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-13</td><td>Proof of Delivery</td><td>POD</td><td></td><td>1</td><td>28.10.2026 15:06</td><td></td><td></td></tr>
           <tr data-doc="Shipment Alert" data-game="flappy"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-07</td><td>Shipment Alert</td><td>24.09.2026 10:29</td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:29</td><td></td><td></td></tr>
           <tr data-doc="T1 Document" data-game="wordle"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-08</td><td>T1 Document</td><td></td><td class="flag">Q</td><td>2</td><td>24.09.2026 10:33</td><td></td><td></td></tr>
           <tr data-doc="T1 Document" data-game="pongbot"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-09</td><td>T1 Document</td><td></td><td></td><td>2</td><td>03.10.2026 12:17</td><td></td><td></td></tr>
@@ -587,6 +602,12 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
             <button class="vbtn vtoggle" id="vColor" type="button" aria-pressed="false" title="In Farbe anzeigen">Color</button>
           </form>
           <div class="vbody" id="vbody"></div>
+        </div>
+      </div>
+      <div id="offline" tabindex="-1" hidden>
+        <div class="opage">
+          <div class="osetup" id="osetup"></div>
+          <div class="cmpboard drawing" id="oboard" hidden><div class="cmpstatus" id="ostatus"></div><div id="ogrid"></div><div class="cmpresult" id="oresult"></div></div>
         </div>
       </div>
       <div id="chat" tabindex="-1" hidden>
@@ -1832,6 +1853,7 @@ const chatEl = $('chat'), cpeople = $('cpeople'), cmsgs = $('cmsgs'), cin = $('c
 const ctitle = $('ctitle'), cnameform = $('cnameform'), cnamein = $('cnamein'), croomin = $('croomin'), cerr = $('cerr');
 const mailCount = $('mailCount');
 const chatDoc = {panel: true};
+const offlineEl = $('offline');
 const chatRow = rows.find(r => r.dataset.chat);
 const validId = id => typeof id === 'string' && /^[a-z0-9]{8,24}$/.test(id);
 const cleanName = s => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 24);
@@ -2005,7 +2027,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2527,7 +2549,7 @@ function renderMpBoard() {
   if (mpGame.game === 'react') { renderReact(); return; }
   if (mpGame.game === 'uno') { renderUno(); return; }
   if (mpGame.game === 'pong') { renderPong(); return; }
-  if (SG_GAMES.includes(mpGame.game)) { renderSg(); return; }
+  if (SG_GAMES.includes(mpGame.game)) { renderSg(mpGame); return; }
   const g = mpGame, myTurn = g.turn === g.myMark;
   const opLabel = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
   if (g.over) {
@@ -4993,12 +5015,24 @@ function sgInit(g, key, duo) {
   sgConnect(g);
 }
 function sgSend(g, m) { const ws = g.sg.ws; if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+// A game lives either on the chat board (online) or in its own document (offline against bots): where it draws,
+// and whether it is in sight right now.
+function sgUi(g) {
+  if (g.offline) {
+    const here = () => showing && current === offlineDocs[g.game];
+    return {grid: $('ogrid'), status: $('ostatus'), result: $('oresult'), here, shown: () => here() && document.visibilityState === 'visible'};
+  }
+  const here = () => conv === mpConv(g) && !$('cmpboard').hidden;
+  return {grid: $('cmpgrid'), status: $('cmpstatus'), result: $('cmpresult'), here, shown: () => here() && chatVisible()};
+}
+const sgLive = g => !!g && (g === mpGame || (!!g.offline && g === sgGame));
+function sgRedraw(g) { if (g.offline) { if (sgUi(g).here()) renderSg(g); } else if (conv === mpConv(g)) renderMpBoard(); }
 function sgConnect(g) {
   const sg = g.sg;
-  if (mpGame !== g || g.over || !OWN_BROKER.url || !g.key) { sg.conn = 'lost'; return; }
+  if (!sgLive(g) || g.over || (!g.offline && (!OWN_BROKER.url || !g.key))) { sg.conn = 'lost'; return; }
   let ws, opened = false;
   try {
-    ws = new WebSocket(OWN_BROKER.url.replace(/\/+$/, '') + '/' + g.game + '/' + g.gid + '?key=' + g.key + '&pid=' + encodeURIComponent(me.id) +
+    ws = g.offline ? sgLocal(g) : new WebSocket(OWN_BROKER.url.replace(/\/+$/, '') + '/' + g.game + '/' + g.gid + '?key=' + g.key + '&pid=' + encodeURIComponent(me.id) +
       '&name=' + encodeURIComponent(me.name) + (g.duo ? '&auto=2' : ''));
   } catch (e) { sg.conn = 'lost'; return; }
   sg.ws = ws;
@@ -5009,8 +5043,8 @@ function sgConnect(g) {
     sg.ws = null;
     sg.conn = 'lost';
     // Turned away before ever getting in: the table is full or already playing.
-    if (!opened && !sg.s && sg.tries >= 2) { sg.conn = 'full'; if (conv === mpConv(g)) renderMpBoard(); return; }
-    if (mpGame === g && !g.over && sg.tries++ < 30) setTimeout(() => sgConnect(g), 1000);
+    if (!opened && !sg.s && sg.tries >= 2) { sg.conn = 'full'; sgRedraw(g); return; }
+    if (sgLive(g) && !g.over && !g.offline && sg.tries++ < 30) setTimeout(() => sgConnect(g), 1000);
   };
 }
 const sgRosterKey = s => s.st + '|' + s.host + '|' + s.pb + '|' + JSON.stringify(s.vt || '') + '|' + s.pl.map(p => p.pid + ':' + p.name + ':' + p.team + ':' + p.on + ':' + p.ps).join(',');
@@ -5038,7 +5072,7 @@ function sgMessage(g, m) {
   else nrSnapshot(g, m);
   if (m.st === 'over' && !g.over) sgFinish(g, m);
   const rk = sgRosterKey(m);
-  if (rk !== sg.roster) { sg.roster = rk; if (conv === mpConv(g)) renderSgChrome(g); }
+  if (rk !== sg.roster) { sg.roster = rk; if (sgUi(g).here()) renderSgChrome(g); }
 }
 // Ball, players and bikes as the server had them a moment ago, between the two updates around that moment.
 function sgSample(g) {
@@ -5079,6 +5113,7 @@ function sgJoinTable(t) {
   renderMsgs();
 }
 function sgLeave(g) {
+  if (g.offline) { offStop(); offShow(g.game); return; }
   sgSend(g, {t: 'quit'});
   if (g.sg.ws) { const ws = g.sg.ws; g.sg.ws = null; setTimeout(() => { try { ws.close(); } catch (e) {} }, 200); }
   if (g.table && g.sg.s && g.sg.s.host === me.id && g.sg.s.st === 'lobby' && g.sg.s.pl.length <= 1) sgAnnounce(g, false);
@@ -5091,6 +5126,7 @@ function sgFinish(g, s) {
   g.over = true;
   const win = g.game === 'kick' ? s.w === g.sg.team : s.w === me.id;
   g.winner = win ? g.myMark : 0;
+  if (g.offline) { offRecord(g, win); sgRedraw(g); return; }
   let text;
   if (g.game === 'kick') text = SG_TITLE.kick + ': ' + (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt ' + s.sc[s.w] + ':' + s.sc[1 - s.w] + (win ? ' – du hast gewonnen! 🎉' : '');
   else { const w = s.pl.find(p => p.pid === s.w); text = SG_TITLE.tron + ': ' + (win ? 'Du hast gewonnen! 🎉' : (w ? w.name : 'Niemand') + ' hat gewonnen!'); }
@@ -5109,13 +5145,13 @@ setInterval(() => {
   const g = sgGame;
   if (!g) return;
   const sg = g.sg;
-  if (mpGame !== g) { if (sg.ws) { const ws = sg.ws; sg.ws = null; try { ws.close(); } catch (e) {} } sgGame = null; return; }
+  if (!sgLive(g)) { if (sg.ws) { const ws = sg.ws; sg.ws = null; try { ws.close(); } catch (e) {} } sgGame = null; return; }
   if (!sg.ws || sg.ws.readyState !== 1) return;
   const now = performance.now();
-  const away = !(chatVisible() && conv === mpConv(g) && !$('cmpboard').hidden);
+  const away = !sgUi(g).shown();
   if (away !== sg.away || now - (sg.awayAt || 0) > 2000) { sg.away = away; sg.awayAt = now; sgSend(g, {t: 'away', v: away}); }
   if (now - sg.pingAt > 2000) { sg.pingAt = now; sgSend(g, {t: 'ping', c: now}); }
-  if (g.table && sg.s && sg.s.host === me.id) {
+  if (g.table && !g.offline && sg.s && sg.s.host === me.id) {
     const open = sg.s.st === 'lobby' && !g.over;
     if (open ? now - (sg.annAt || 0) > 4000 : sg.annOpen) { sg.annAt = now; sg.annOpen = open; sgAnnounce(g, open); }
   }
@@ -5126,12 +5162,12 @@ setInterval(() => {
 
 const SG_KEYS = {arrowup: 1, w: 1, arrowdown: 2, s: 2, arrowleft: 4, a: 4, arrowright: 8, d: 8, ' ': 16, x: 16};
 function sgActive() {
-  const g = mpGame;
-  return !!g && SG_GAMES.includes(g.game) && !!g.sg && !g.over && conv === mpConv(g) && !$('cmpboard').hidden && chatVisible();
+  const g = sgGame;
+  return sgLive(g) && SG_GAMES.includes(g.game) && !!g.sg && !g.over && sgUi(g).shown();
 }
 document.addEventListener('keydown', e => {
   if (!sgActive() || e.ctrlKey || e.metaKey || e.altKey || (e.target.matches && e.target.matches('input, textarea'))) return;
-  const g = mpGame;
+  const g = sgGame;
   if (e.key.toLowerCase() === 'p' && !e.repeat && g.sg.s) {
     e.preventDefault();
     e.stopPropagation();
@@ -5147,7 +5183,7 @@ document.addEventListener('keydown', e => {
   else if (!e.repeat) { if (bit === 16) sgSend(g, {t: 'boost', v: true}); else nrTurn(g, {1: 0, 8: 1, 2: 2, 4: 3}[bit]); }
 }, true);
 document.addEventListener('keyup', e => {
-  const g = mpGame;
+  const g = sgGame;
   if (!g || !g.sg || !SG_GAMES.includes(g.game)) return;
   const bit = SG_KEYS[e.key.toLowerCase()];
   if (!bit) return;
@@ -5155,7 +5191,7 @@ document.addEventListener('keyup', e => {
   else if (bit === 16) sgSend(g, {t: 'boost', v: false});
 }, true);
 window.addEventListener('blur', () => {
-  const g = mpGame;
+  const g = sgGame;
   if (!g || !g.sg) return;
   g.sg.keys = 0;
   if (g.game === 'tron') sgSend(g, {t: 'boost', v: false});
@@ -5164,8 +5200,8 @@ window.addEventListener('blur', () => {
 // The board: a score line, the canvas with an overlay for countdowns and results, and the lobby on top.
 const SG_VIEW = {kick: [852, 472], tron: [800, 500]};
 const sgResize = new ResizeObserver(() => {
-  const st = $('sgstage'), cv = $('sgcanvas'), g = mpGame;
-  if (!st || !cv || !g || !SG_VIEW[g.game]) return;
+  const g = sgGame, st = g && g.el && g.el.stage, cv = g && g.el && g.el.canvas;
+  if (!st || !cv || !SG_VIEW[g.game]) return;
   const [vw, vh] = SG_VIEW[g.game];
   const w = Math.max(160, Math.min(st.clientWidth, st.clientHeight * vw / vh)), bw = Math.round(w * Math.min(2.5, window.devicePixelRatio || 1));
   cv.style.width = w + 'px';
@@ -5173,37 +5209,42 @@ const sgResize = new ResizeObserver(() => {
   if (cv.width !== bw) { cv.width = bw; cv.height = Math.round(bw * vh / vw); }
 });
 function buildSg(g) {
-  const grid = $('cmpgrid');
+  const grid = sgUi(g).grid, id = g.offline ? 'o' : '';
   grid.className = 'dr-wrap';
   grid.dataset.gid = g.gid;
   const [vw, vh] = SG_VIEW[g.game];
-  const cv = el('canvas', {class: 'dr-canvas sg-canvas sg-' + g.game, id: 'sgcanvas', width: vw, height: vh});
-  const stage = el('div', {class: 'dr-stage', id: 'sgstage'}, cv, el('div', {class: 'dr-over sg-over', id: 'sgover', hidden: true}),
-    el('div', {class: 'sg-lobby', id: 'sglobby', hidden: true}));
-  grid.replaceChildren(el('div', {class: 'rx-score sg-score', id: 'sgscore'}), stage);
+  const cv = el('canvas', {class: 'dr-canvas sg-canvas sg-' + g.game, id: id + 'sgcanvas', width: vw, height: vh});
+  const over = el('div', {class: 'dr-over sg-over', id: id + 'sgover', hidden: true}), lobby = el('div', {class: 'sg-lobby', id: id + 'sglobby', hidden: true});
+  const stage = el('div', {class: 'dr-stage', id: id + 'sgstage'}, cv, over, lobby), score = el('div', {class: 'rx-score sg-score', id: id + 'sgscore'});
+  grid.replaceChildren(score, stage);
+  g.el = {canvas: cv, over, lobby, stage, score};
   sgResize.disconnect();
   sgResize.observe(stage);
 }
-function renderSg() {
-  const g = mpGame;
+function renderSg(g = mpGame) {
   if (!g || !SG_GAMES.includes(g.game)) return;
-  if ($('cmpgrid').dataset.gid !== g.gid || !$('sgcanvas')) buildSg(g);
+  if (sgUi(g).grid.dataset.gid !== g.gid || !g.el) buildSg(g);
   renderSgChrome(g);
   if (!g.sg.raf) g.sg.raf = requestAnimationFrame(ts => sgFrame(g, ts));
 }
 function renderSgChrome(g) {
-  if (mpGame !== g || $('cmpgrid').dataset.gid !== g.gid) return;
-  const s = g.sg.s, lobby = $('sglobby');
-  $('cmpstatus').textContent = SG_TITLE[g.game] + (g.over ? '' : ' — ' + SG_HINT[g.game]);
-  const res = $('cmpresult');
+  const ui = sgUi(g);
+  if (!sgLive(g) || !g.el || ui.grid.dataset.gid !== g.gid) return;
+  const s = g.sg.s, lobby = g.el.lobby;
+  ui.status.textContent = SG_TITLE[g.game] + (g.offline ? ' gegen ' + (g.game === 'kick' && g.offline.mode === 2 ? '3 Bots' : g.game === 'kick' ? 'Bot' : g.offline.bots + (g.offline.bots === 1 ? ' Bot' : ' Bots')) + ' · ' + OFF_LEVEL_NAMES[g.offline.lvl] : '')
+    + (g.over ? '' : ' — ' + SG_HINT[g.game]);
+  const res = ui.result;
   res.hidden = false;
   const mine = s && s.pl.find(p => p.pid === me.id), left = mine ? mine.ps : 0;
-  res.replaceChildren(...(g.over
+  res.replaceChildren(...(g.over && g.offline
+    ? [el('button', {class: 'vbtn sg-start', type: 'button', text: '↻ Nochmal', onclick: () => offStart(g.game)}),
+      el('button', {class: 'vbtn', type: 'button', text: 'Einstellungen', onclick: () => { offStop(); offShow(g.game); }})]
+    : g.over
     ? [el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})]
     : [s && s.st === 'pause' && s.pb ? el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Weiter', onclick: () => sgSend(g, {t: 'resume'})})
-      : el('button', {class: 'vbtn', type: 'button', text: 'Pause (' + left + ')', title: 'Taste P · jeder hat 2 Pausen pro Spiel',
-        disabled: !s || s.st !== 'play' || !left, onclick: () => sgSend(g, {t: 'pause'})}),
-      el('button', {class: 'vbtn', text: 'Verlassen', onclick: () => sgLeave(g)})]));
+      : el('button', {class: 'vbtn', type: 'button', text: g.offline ? 'Pause' : 'Pause (' + left + ')', title: g.offline ? 'Taste P' : 'Taste P · jeder hat 2 Pausen pro Spiel',
+        disabled: !s || s.st !== 'play' || (!left && !g.offline), onclick: () => sgSend(g, {t: 'pause'})}),
+      el('button', {class: 'vbtn', text: g.offline ? 'Aufgeben' : 'Verlassen', onclick: () => sgLeave(g)})]));
   // Before the start everyone votes for or against power-ups.
   if (s && s.st === 'vote' && !g.over) {
     const vt = s.vt || {}, mineV = vt[me.id];
@@ -5214,7 +5255,7 @@ function renderSgChrome(g) {
         el('button', {class: 'vbtn sg-start' + (mineV === true ? ' on' : ''), type: 'button', text: '⚡ Mit Power-ups', disabled: mineV !== undefined, onclick: () => sgSend(g, {t: 'vote', v: true})}),
         el('button', {class: 'vbtn' + (mineV === false ? ' on' : ''), type: 'button', text: 'Ohne', disabled: mineV !== undefined, onclick: () => sgSend(g, {t: 'vote', v: false})})),
       el('div', {class: 'sg-riders'}, ...s.pl.map(p => el('div', {class: 'sg-pl'}, (p.pid in vt ? '✓ ' : '… ') + p.name + (p.pid === me.id ? ' (du)' : '') + (p.pid in vt ? ' hat abgestimmt' : '')))),
-      el('p', {id: 'sgvotet', text: ''}),
+      el('p', {class: 'sg-votet', text: ''}),
       el('p', {class: 'sg-keys', text: (g.game === 'kick' ? '⚡ Turbo · 💥 Hammerschuss · 🧲 Klebefuß · 🧱 Mauer · 🎈 Riese · 🐜 Zwerge · ❄️ Eis · 🌀 Kurvenball · ✨ Göttlich'
         : '🔥 Nitro · 👻 Geist · 💣 Bombe · ✂️ Lücke · 🐢 Bremse · 🔄 Verwirrung · 🛡️ Schild · ✨ Göttlich')})));
     return;
@@ -5248,8 +5289,8 @@ function renderSgChrome(g) {
 }
 function sgFrame(g, ts) {
   g.sg.raf = 0;
-  const cv = $('sgcanvas');
-  if (mpGame !== g || !cv || $('cmpboard').hidden) return;
+  const cv = g.el && g.el.canvas;
+  if (!sgLive(g) || !cv || !sgUi(g).here()) return;
   const sg = g.sg, now = ts || performance.now(), dt = Math.min(0.05, sg.frameAt ? (now - sg.frameAt) / 1000 : 0.016);
   sg.frameAt = now;
   if (g.game === 'kick') bzDraw(g, cv, now, dt);
@@ -5261,7 +5302,7 @@ function sgFrame(g, ts) {
     score = sg.team === 0 ? 'Du spielst 🔴 Rot → nach rechts' : sg.team === 1 ? 'Du spielst 🔵 Blau ← nach links' : '';
   } else if (s) score = 'Erster mit 3 Runden gewinnt';
   if (sg.rtt) score += '     Ping ' + Math.round(sg.rtt) + ' ms';
-  if ($('sgscore').textContent !== score) $('sgscore').textContent = score;
+  if (g.el.score.textContent !== score) g.el.score.textContent = score;
   let text = '';
   if (sg.conn === 'full') text = 'Da ist kein Platz mehr frei\n(oder das Spiel läuft schon).';
   else if (!s && sg.conn === 'lost') text = 'Spielserver nicht erreichbar – neuer Versuch…';
@@ -5273,8 +5314,9 @@ function sgFrame(g, ts) {
   else if (s.st === 'pause' && s.pb) text = (s.pb === me.id ? 'Du hast' : ((s.pl.find(p => p.pid === s.pb) || {}).name || 'Jemand') + ' hat') + ' pausiert\nspätestens in ' + Math.ceil(s.pz / 1000) + ' s geht\'s weiter';
   else if (s.st === 'pause') text = 'Pausiert\n' + (s.pl.some(p => p.aw && p.pid !== me.id) ? 'Warte auf ' + s.pl.filter(p => p.aw && p.pid !== me.id).map(p => p.name).join(', ') + '…' : 'Gleich geht\'s weiter…');
   else if (s.st === 'resume') text = 'Weiter in\n' + Math.max(1, Math.ceil(s.c / 1000));
-  if (s && s.st === 'vote' && $('sgvotet')) { const t = 'Noch ' + Math.ceil(s.c / 1000) + ' s – wer nicht abstimmt, zählt nicht mit.'; if ($('sgvotet').textContent !== t) $('sgvotet').textContent = t; }
-  const over = $('sgover');
+  const vt = s && s.st === 'vote' && g.el.lobby.querySelector('.sg-votet');
+  if (vt) { const t = 'Noch ' + Math.ceil(s.c / 1000) + ' s – wer nicht abstimmt, zählt nicht mit.'; if (vt.textContent !== t) vt.textContent = t; }
+  const over = g.el.over;
   if (over.textContent !== text) over.textContent = text;
   over.hidden = !text;
   sg.raf = requestAnimationFrame(t => sgFrame(g, t));
@@ -5861,7 +5903,7 @@ function nrDraw(g, cv, now, dt) {
   }
   const pl = s ? s.pl : [];
   sg.trails.forEach((t, i) => {
-    if (!t || !t.length) return;
+    if (!t || !t.length || !s) return;
     let p = pl[i] || {};
     const col = NR_COL[i] || '#fff', alive = p.al && s.st !== 'lobby';
     // Where the bike was at the drawing time: between the last cell it had reached and the next one.
@@ -5988,6 +6030,972 @@ function nrDraw(g, cv, now, dt) {
     });
   }
   sgDrawBanner(g, ctx, vw, vh, now);
+}
+
+/* Offline: Fußball and Neon Rush against bots, each in a document of its own. The page runs the game server's
+   own rooms (copied in when the page is built) and talks to them through a socket-like object, so a game plays
+   and looks exactly like online: same physics, power-ups, pause, prediction. */
+const SG_LOCAL = (() => {
+// Fußball and Neon Rush: game rooms for two to four players, run on the server like Ping Pong. Players join
+// with the room's key and their chat id; the first one in hosts. From a direct invitation (auto=2) the match
+// starts as soon as both are there; at a table in the group chat the host starts it. First everyone votes for
+// or against power-ups (the majority wins, a tie is a coin toss). Whoever drops out has 15 s to come back.
+// A match pauses when a player presses pause (twice per player, at most a minute each) or when every player
+// has the game out of sight; it goes on after a 3 s countdown. All game timers count game ticks, so a pause
+// takes nothing off them.
+class Room {
+  constructor(ctx, max, tickMs) {
+    this.ctx = ctx;
+    this.key = '';
+    this.players = [];
+    this.max = max;
+    this.tickMs = tickMs;
+    this.st = 'lobby';
+    this.until = 0;
+    this.auto = 0;
+    this.timer = 0;
+    this.ev = {n: 0};
+    this.w = null;
+    this.votes = {};
+    this.pu = false;
+    this.coin = false;
+    this.pausedBy = null;
+    this.pauseEnd = 0;
+    // Solo: the page runs this room itself against bots (no pause limit; only the human counts as away).
+    this.solo = false;
+    this.think = null;
+  }
+
+  async fetch(req) {
+    const u = new URL(req.url), key = u.searchParams.get('key') || '', pid = u.searchParams.get('pid') || '';
+    if (!/^[a-z0-9]{12,40}$/.test(key) || !/^[A-Za-z0-9_-]{4,40}$/.test(pid)) return new Response('bad request', {status: 400});
+    if (this.key && this.key !== key) return new Response('forbidden', {status: 403});
+    let p = this.players.find(x => x.pid === pid);
+    if (!p && (this.st !== 'lobby' || this.players.length >= this.max)) return new Response('full', {status: 409});
+    this.key = key;
+    const [client, server] = Object.values(new WebSocketPair());
+    server.accept();
+    if (!p) { p = {pid, ws: null, left: 0, away: false, pauses: 2}; this.players.push(p); this.joined(p); }
+    if (p.ws) try { p.ws.close(1000, 'replaced'); } catch (e) {}
+    p.ws = server;
+    p.name = (u.searchParams.get('name') || '').slice(0, 24) || 'Spieler';
+    p.left = 0;
+    p.away = false;
+    if (Number(u.searchParams.get('auto')) === 2) this.auto = 2;
+    server.addEventListener('message', e => this.onMessage(p, e.data));
+    const gone = () => {
+      if (p.ws !== server) return;
+      p.ws = null;
+      p.left = Date.now();
+      if (this.st === 'lobby' && !this.auto) this.remove(p);
+    };
+    server.addEventListener('close', gone);
+    server.addEventListener('error', gone);
+    this.full(p);
+    if (!this.timer) { this.last = Date.now(); this.timer = setInterval(() => this.loop(), this.tickMs); }
+    return new Response(null, {status: 101, webSocket: client});
+  }
+
+  remove(p) {
+    const i = this.players.indexOf(p);
+    if (i < 0) return;
+    this.players.splice(i, 1);
+    this.removed(p, i);
+  }
+
+  onMessage(p, data) {
+    let m;
+    try { m = JSON.parse(data); } catch (e) { return; }
+    const now = Date.now();
+    if (m.t === 'ping' && Number.isFinite(m.c)) { try { p.ws.send(JSON.stringify({t: 'pong', c: m.c})); } catch (e) {} }
+    else if (m.t === 'away' && typeof m.v === 'boolean') p.away = m.v;
+    else if (m.t === 'start' && this.st === 'lobby' && this.players[0] === p && this.players.length >= 2) this.vote(now);
+    else if (m.t === 'vote' && this.st === 'vote' && typeof m.v === 'boolean') {
+      this.votes[p.pid] = m.v;
+      if (this.players.filter(q => q.ws).every(q => q.pid in this.votes)) this.decide(now);
+    } else if (m.t === 'pause' && this.st === 'play' && (p.pauses > 0 || this.solo)) {
+      if (!this.solo) p.pauses--;
+      this.st = 'pause';
+      this.pausedBy = p.pid;
+      this.pauseEnd = now + (this.solo ? 864e5 : 60000);
+      this.event('pause', {pid: p.pid});
+    } else if (m.t === 'resume' && this.st === 'pause' && this.pausedBy) this.resume(now);
+    else if (m.t === 'quit') { if (this.st === 'lobby') { try { p.ws.close(1000, 'bye'); } catch (e) {} this.remove(p); } else this.drop(p); }
+    else this.input(p, m);
+  }
+
+  vote(now) {
+    this.st = 'vote';
+    this.until = now + 15000;
+    this.votes = {};
+  }
+  decide(now) {
+    const v = Object.values(this.votes), yes = v.filter(x => x).length, no = v.length - yes;
+    this.coin = yes === no && yes > 0;
+    this.pu = yes > no || (this.coin && Math.random() < 0.5);
+    this.event('vote', {pu: this.pu, coin: this.coin});
+    this.begin(now);
+  }
+  resume(now) {
+    this.st = 'resume';
+    this.until = now + 3000;
+    this.pausedBy = null;
+  }
+
+  event(k, extra) { this.ev = {n: this.ev.n + 1, k, ...extra}; }
+
+  loop() {
+    const now = Date.now();
+    if (this.st === 'over') {
+      if (now > this.until || !this.players.some(p => p.ws)) { clearInterval(this.timer); this.timer = 0; }
+    } else if (this.st === 'lobby') {
+      if (this.auto && this.players.length >= this.auto && this.players.every(p => p.ws)) this.vote(now);
+      if (!this.players.some(p => p.ws) && now - Math.max(0, ...this.players.map(p => p.left)) > 60000) { clearInterval(this.timer); this.timer = 0; }
+    } else {
+      for (const p of [...this.players]) if (!p.ws && now - p.left > 15000) this.drop(p);
+      const on = this.players.filter(p => p.ws && !p.bot);
+      if (this.st === 'vote') { if (now >= this.until) this.decide(now); }
+      else if (this.st === 'pause') {
+        // A pause someone pressed ends with "Weiter" or after a minute; one because nobody looks, when all are back.
+        if (this.pausedBy ? now >= this.pauseEnd : on.length && on.every(p => !p.away)) this.resume(now);
+      } else if (this.st === 'play' && on.length && on.every(p => p.away)) {
+        this.st = 'pause';
+        this.pausedBy = null;
+      } else if (this.st === 'resume' && now >= this.until) this.st = 'play';
+    }
+    this.advance(now);
+    this.last = now;
+    this.send(now);
+  }
+
+  // What every update carries besides the game itself.
+  base(now) {
+    return {t: 's', ts: now, st: this.st, c: Math.max(0, this.until - now), w: this.w, host: this.players[0] && this.players[0].pid, ev: this.ev,
+      vt: this.st === 'vote' ? this.votes : null, pu: this.pu, coin: this.coin, pb: this.st === 'pause' ? this.pausedBy : null,
+      pz: this.st === 'pause' && this.pausedBy ? Math.max(0, this.pauseEnd - now) : 0};
+  }
+  broadcast(obj) {
+    const s = JSON.stringify(obj);
+    for (const p of this.players) if (p.ws) try { p.ws.send(s); } catch (e) {}
+  }
+  roster() { return this.players.map(p => ({pid: p.pid, name: p.name, on: !!p.ws, aw: p.away, ps: p.pauses, ...this.extra(p)})); }
+  // Power-ups that haven't come for a while are more likely, as in Ping Pong: weight (items since + 1)².
+  pickItem(kinds) {
+    const since = this.since || (this.since = kinds.map(() => 0)), w = since.map(s => (s + 1) ** 2);
+    let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0;
+    while (i < w.length - 1 && r >= w[i]) r -= w[i++];
+    this.since = since.map((s, j) => j === i ? 0 : s + 1);
+    return kinds[i];
+  }
+  joined() {}
+  removed() {}
+  full() {}
+  extra() { return {}; }
+}
+
+// ⚽ Fußball: top-down football like Haxball. Round players, a ball and two goals; arrow keys or WASD to run,
+// Space or X to kick. Physics run 60 times a second in pixels per tick, with the classic Haxball constants:
+// players accelerate by 0.1 (0.07 while holding kick), everything slows by a fixed factor each tick, and a kick
+// adds 5 to the ball's speed. First to 3 goals or the lead after 3 minutes; a draw goes to a golden goal.
+const KW = 760, KH = 380, KM = 32, GOAL_H = 124, GOAL_D = 38, POST_R = 6, KPR = 15, KBR = 9, KCC = 70,
+  K_ACC = 0.1, K_ACC_KICK = 0.07, K_DAMP = 0.96, B_DAMP = 0.99, K_KICK = 5, K_REACH = 4, K_LIMIT = 3, K_TIME = 180000,
+  K_ITEM_R = 14, K_ITEMS = ['turbo', 'hammer', 'sticky', 'wall', 'giant', 'dwarf', 'ice', 'curve'], K_GOD = 0.025, K_WALL_X = 22;
+// Power-up durations in ticks (60 a second).
+const K_FX = {turbo: 480, giant: 480, dwarf: 480, ice: 360, curve: 600, god: 480, wall: 360, sticky: 900};
+class Kick extends Room {
+  constructor(ctx) {
+    super(ctx, 4, 1000 / 60);
+    this.sc = [0, 0];
+    this.b = {x: KW / 2, y: KH / 2, vx: 0, vy: 0};
+    this.tl = K_TIME;
+    this.ot = false;
+    this.ko = -1;
+    this.touch = null;
+    this.acc = 0;
+    this.tick = 0;
+    this.item = null;
+    this.nextItem = 540;
+    this.wall = [0, 0];
+    this.spin = 0;
+    this.hold = null;
+  }
+  joined(p) {
+    const n = [0, 1].map(t => this.players.filter(x => x !== p && x.team === t).length);
+    Object.assign(p, {team: n[0] <= n[1] ? 0 : 1, x: 0, y: 0, vx: 0, vy: 0, k: 0, q: [], ack: 0, armed: true, owed: 0, started: false, fx: kickFx(), fdx: 1, fdy: 0});
+  }
+  extra(p) { return {team: p.team}; }
+  input(p, m) {
+    if (m.t === 'team' && this.st === 'lobby' && (m.v === 0 || m.v === 1)) {
+      if (this.players.filter(x => x.team === m.v).length < 2) p.team = m.v;
+    } else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f) && this.st === 'play') {
+      // The owner's face-ball prank, passed on by its victim: the ball wears the face until the next goal.
+      this.face = m.f;
+    } else if (m.t === 'in' && Number.isInteger(m.k) && Number.isInteger(m.i)) {
+      p.q.push([m.k & 31, m.i]);
+      if (p.q.length > 12) p.q.splice(0, p.q.length - 12);
+    }
+  }
+  begin(now) {
+    // Teams that ended up uneven in the lobby get evened out.
+    for (;;) {
+      const n = [0, 1].map(t => this.players.filter(x => x.team === t).length);
+      if (Math.abs(n[0] - n[1]) < 2) break;
+      const from = n[0] > n[1] ? 0 : 1;
+      this.players.filter(x => x.team === from).pop().team = 1 - from;
+    }
+    if (!this.players.some(p => p.team === 0)) this.players[0].team = 0;
+    if (!this.players.some(p => p.team === 1)) this.players[this.players.length - 1].team = 1;
+    this.kickoff(Math.random() < 0.5 ? 0 : 1);
+    this.st = 'count';
+    this.until = now + 3000;
+  }
+  // Positions for a kickoff: each team in its own half, the ball on the spot. Power-ups end with a goal.
+  kickoff(team) {
+    Object.assign(this.b, {x: KW / 2, y: KH / 2, vx: 0, vy: 0});
+    for (const t of [0, 1]) {
+      const mates = this.players.filter(p => p.team === t);
+      mates.forEach((p, i) => Object.assign(p, {owed: 0, fx: kickFx(),
+        x: t === 0 ? KW / 2 - 150 : KW / 2 + 150,
+        y: mates.length === 1 ? KH / 2 : KH / 2 + (i ? 70 : -70), vx: 0, vy: 0}));
+    }
+    this.ko = team;
+    this.touch = null;
+    this.wall = [0, 0];
+    this.spin = 0;
+    this.hold = null;
+    this.item = null;
+    this.nextItem = Math.max(this.nextItem, 120);
+  }
+  drop(p) {
+    this.remove(p);
+    if (this.hold && this.hold.pid === p.pid) this.hold = null;
+    if (this.st === 'vote') { if (this.players.length < 2) this.st = 'lobby'; return; }
+    if (this.st === 'over' || this.st === 'lobby') return;
+    for (const t of [0, 1]) if (!this.players.some(x => x.team === t)) return this.finish(1 - t);
+  }
+  finish(team) {
+    this.st = 'over';
+    this.w = team;
+    this.until = Date.now() + 10000;
+    this.event('over', {team});
+  }
+  advance(now) {
+    if (this.st === 'count' && now >= this.until) this.st = 'play';
+    if (this.st === 'goal' && now >= this.until) {
+      if (this.sc[0] >= K_LIMIT || this.sc[1] >= K_LIMIT || this.ot) return this.finish(this.sc[0] > this.sc[1] ? 0 : 1);
+      this.kickoff(this.lastGoal === 0 ? 1 : 0);
+      this.st = 'play';
+    }
+    if (this.st !== 'play' && this.st !== 'goal') { this.acc = 0; return; }
+    // Fixed 60 Hz steps, however the timer fires.
+    this.acc += Math.min(100, now - this.last);
+    while (this.acc >= 1000 / 60) {
+      this.acc -= 1000 / 60;
+      this.step();
+      if (this.st === 'play' && !this.ot) {
+        this.tl -= 1000 / 60;
+        if (this.tl <= 0) {
+          this.tl = 0;
+          if (this.sc[0] !== this.sc[1]) return this.finish(this.sc[0] > this.sc[1] ? 0 : 1);
+          this.ot = true;
+          this.event('ot');
+        }
+      }
+    }
+  }
+  // A kick from player p, with the power-ups that change it.
+  kick(p, dx, dy) {
+    const b = this.b, f = (p.fx.god || p.fx.hammer > 0 ? 2 : 1);
+    if (!p.fx.god && p.fx.hammer > 0) p.fx.hammer--;
+    b.vx += dx * K_KICK * f;
+    b.vy += dy * K_KICK * f;
+    // Curveball: the shot bends to the side the kicker is moving, or to a random side from standing.
+    this.spin = 0;
+    if (p.fx.curve) {
+      const side = p.vx * -dy + p.vy * dx;
+      this.spin = (Math.abs(side) > 0.3 ? Math.sign(side) : Math.random() < 0.5 ? -1 : 1) * 0.016;
+    }
+    p.armed = false;
+    this.touch = p.pid;
+    this.event('kick', {pid: p.pid, hard: f > 1, curve: !!this.spin});
+  }
+  step() {
+    this.tick++;
+    if (this.think) this.think();
+    const b = this.b, cy = KH / 2, ps = this.players;
+    // Every input from a page is one movement step, exactly as that page already showed it, used one per tick
+    // (two while catching up) so others see the player move evenly. When inputs come late, the player runs on
+    // with the last one for up to 8 ticks, and that many late inputs are then skipped, so each input still
+    // counts exactly once.
+    for (const p of ps) {
+      for (const k in p.fx) if (k !== 'hammer' && p.fx[k] > 0) p.fx[k]--;
+      if (!p.q.length) {
+        if (p.started && p.owed < 8) { p.owed++; kickMove(p, p.k); kickBounds(p, this.ko); }
+        continue;
+      }
+      p.started = true;
+      while (p.owed > 0 && p.q.length > 1) { p.ack = p.q.shift()[1]; p.owed--; }
+      const steps = p.q.length > 4 ? 2 : 1;
+      for (let n = 0; n < steps && p.q.length; n++) {
+        const [k, i] = p.q.shift();
+        p.k = k;
+        p.ack = i;
+        kickMove(p, k);
+        kickBounds(p, this.ko);
+        const dx = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0), dy = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0);
+        if (dx || dy) { const l = Math.hypot(dx, dy); p.fdx = dx / l; p.fdy = dy / l; }
+        if (!(k & 16)) p.armed = true;
+        else if (p.armed && this.st === 'play') {
+          if (this.hold && this.hold.pid === p.pid) {
+            // A held ball leaves in the direction the player is running, a little harder than a normal kick.
+            this.hold = null;
+            p.fx.sticky = 0;
+            b.vx = p.vx + p.fdx * 1.6;
+            b.vy = p.vy + p.fdy * 1.6;
+            this.kick(p, p.fdx, p.fdy);
+          } else if (Math.hypot(b.x - p.x, b.y - p.y) < kickR(p) + KBR + K_REACH) {
+            const d = Math.hypot(b.x - p.x, b.y - p.y) || 1;
+            this.kick(p, (b.x - p.x) / d, (b.y - p.y) / d);
+          }
+        }
+      }
+    }
+    for (const t of [0, 1]) if (this.wall[t] > 0) this.wall[t]--;
+    if (this.hold) {
+      const h = ps.find(p => p.pid === this.hold.pid);
+      if (!h || --this.hold.t <= 0) { if (h) h.fx.sticky = 0; this.hold = null; }
+      else {
+        const r = kickR(h) + KBR + 0.5;
+        Object.assign(b, {x: h.x + h.fdx * r, y: h.y + h.fdy * r, vx: h.vx, vy: h.vy});
+      }
+    }
+    if (!this.hold) {
+      b.x += b.vx; b.y += b.vy;
+      b.vx *= B_DAMP; b.vy *= B_DAMP;
+      if (this.spin) {
+        const a = this.spin, c = Math.cos(a), s = Math.sin(a), vx = b.vx;
+        b.vx = vx * c - b.vy * s;
+        b.vy = vx * s + b.vy * c;
+        this.spin *= 0.985;
+        if (Math.abs(this.spin) < 0.002) this.spin = 0;
+      }
+    }
+    // Collisions: players with each other, players with the ball (players weigh twice as much, a giant more).
+    for (let i = 0; i < ps.length; i++) {
+      for (let j = i + 1; j < ps.length; j++) discHit(ps[i], ps[j], kickR(ps[i]), kickR(ps[j]), kickW(ps[i]), kickW(ps[j]), 0.25);
+      if (this.hold && this.hold.pid === ps[i].pid) continue;
+      if (discHit(ps[i], b, kickR(ps[i]), KBR, kickW(ps[i]), 1, 0.25)) {
+        this.touch = ps[i].pid;
+        this.spin = 0;
+        if (this.hold) { const h = ps.find(p => p.pid === this.hold.pid); if (h) h.fx.sticky = 0; this.hold = null; this.event('steal', {pid: ps[i].pid}); }
+        // Sticky foot: the ball stays at the foot for up to 2 s.
+        else if (ps[i].fx.sticky && this.st === 'play') { this.hold = {pid: ps[i].pid, t: 120}; this.event('stick', {pid: ps[i].pid}); }
+      }
+    }
+    for (const p of ps) {
+      kickBounds(p, this.ko);
+      for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(p, gx, cy + s * GOAL_H / 2, kickR(p));
+    }
+    for (const s of [-1, 1]) for (const gx of [0, KW]) postHit(b, gx, cy + s * GOAL_H / 2, KBR);
+    // The wall power-up: a barrier in front of the goal that only the ball bounces off.
+    for (const t of [0, 1]) if (this.wall[t] > 0 && wallHit(b, t === 0 ? K_WALL_X : KW - K_WALL_X)) { this.spin = 0; this.event('wallhit', {team: t}); }
+    ballBounds(b);
+    if (this.ko >= 0 && Math.hypot(b.vx, b.vy) > 0.01) this.ko = -1;
+    this.items();
+    if (this.st === 'play' && (b.x < -KBR || b.x > KW + KBR)) {
+      const team = b.x < 0 ? 1 : 0, scorer = ps.find(p => p.pid === this.touch);
+      this.sc[team]++;
+      this.lastGoal = team;
+      this.face = null;
+      this.hold = null;
+      this.spin = 0;
+      this.st = 'goal';
+      this.until = Date.now() + 2500;
+      this.event('goal', {team, by: scorer ? scorer.name : '', own: !!scorer && scorer.team !== team});
+    }
+  }
+  // Items appear one at a time on the pitch; a player runs over one, or the ball carries it to whoever last
+  // touched the ball. One left alone goes away after 12 s.
+  items() {
+    if (!this.pu || this.st !== 'play') return;
+    const b = this.b;
+    if (!this.item) {
+      if (--this.nextItem > 0 || this.ko >= 0) return;
+      let x, y, tries = 0;
+      do { x = 110 + Math.random() * (KW - 220); y = 40 + Math.random() * (KH - 80); }
+      while (++tries < 20 && (Math.hypot(x - b.x, y - b.y) < 80 || Math.hypot(x - KW / 2, y - KH / 2) < KCC));
+      this.item = {k: Math.random() < K_GOD ? 'god' : this.pickItem(K_ITEMS), x, y, life: 720};
+      this.event('spawn', {kind: this.item.k});
+      return;
+    }
+    const it = this.item;
+    let taker = this.players.find(p => Math.hypot(p.x - it.x, p.y - it.y) < kickR(p) + K_ITEM_R);
+    if (!taker && this.touch && Math.hypot(b.x - it.x, b.y - it.y) < KBR + K_ITEM_R) taker = this.players.find(p => p.pid === this.touch);
+    if (taker) {
+      this.give(taker, it.k);
+      this.item = null;
+      this.nextItem = 420 + Math.floor(Math.random() * 300);
+    } else if (--it.life <= 0) {
+      this.event('gone', {kind: it.k});
+      this.item = null;
+      this.nextItem = 120 + Math.floor(Math.random() * 120);
+    }
+  }
+  give(p, k) {
+    const foes = this.players.filter(q => q.team !== p.team);
+    if (k === 'turbo') p.fx.turbo = K_FX.turbo;
+    else if (k === 'hammer') p.fx.hammer = 3;
+    else if (k === 'sticky') p.fx.sticky = K_FX.sticky;
+    else if (k === 'wall') this.wall[p.team] = K_FX.wall;
+    else if (k === 'giant') { p.fx.giant = K_FX.giant; p.fx.dwarf = 0; }
+    else if (k === 'dwarf') for (const q of foes) { q.fx.dwarf = K_FX.dwarf; q.fx.giant = 0; }
+    else if (k === 'ice') for (const q of foes) q.fx.ice = K_FX.ice;
+    else if (k === 'curve') p.fx.curve = K_FX.curve;
+    else if (k === 'god') { p.fx.god = K_FX.god; this.wall[p.team] = Math.max(this.wall[p.team], K_FX.god); }
+    this.event('get', {pid: p.pid, kind: k, team: p.team});
+  }
+  full(p) { p.ws.send(JSON.stringify(this.state(Date.now()))); }
+  state(now) {
+    const r = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
+    return {...this.base(now), tl: Math.round(this.tl), ot: this.ot, sc: this.sc, ko: this.ko, tk: this.tick, lim: K_LIMIT, face: this.face || null,
+      b: [r(this.b.x), r(this.b.y), r(this.b.vx), r(this.b.vy)], it: this.item && {k: this.item.k, x: r(this.item.x), y: r(this.item.y), l: this.item.life},
+      wall: this.wall, spin: r2(this.spin * 100), hold: this.hold && this.hold.pid,
+      pl: this.roster().map((x, i) => { const p = this.players[i]; return {...x, x: r2(p.x), y: r2(p.y), vx: r2(p.vx), vy: r2(p.vy), k: p.k, a: p.ack, fx: p.fx, r: kickR(p)}; })};
+  }
+  send(now) { this.broadcast(this.state(now)); }
+}
+function kickFx() { return {turbo: 0, hammer: 0, sticky: 0, giant: 0, dwarf: 0, ice: 0, curve: 0, god: 0}; }
+function kickR(p) { return p.fx.giant ? 30 : p.fx.dwarf ? 8 : KPR; }
+function kickW(p) { return p.fx.giant ? 0.2 : p.fx.dwarf ? 0.9 : 0.5; }
+// One player's movement for one tick (the page runs the same for its own player, to show it without delay).
+// Turbo makes a player 1.5 times as fast; on ice they get going slowly and slide on.
+function kickMove(p, k) {
+  let dx = ((k & 8) ? 1 : 0) - ((k & 4) ? 1 : 0), dy = ((k & 2) ? 1 : 0) - ((k & 1) ? 1 : 0);
+  if (dx && dy) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }
+  const fx = p.fx, a = ((k & 16) ? K_ACC_KICK : K_ACC) * (fx.turbo || fx.god ? 1.5 : 1) * (fx.ice ? 0.5 : 1), damp = fx.ice ? 0.985 : K_DAMP;
+  p.vx += dx * a; p.vy += dy * a;
+  p.x += p.vx; p.y += p.vy;
+  p.vx *= damp; p.vy *= damp;
+}
+function kickBounds(p, ko) {
+  const r = kickR(p);
+  p.x = Math.max(-KM + r, Math.min(KW + KM - r, p.x));
+  p.y = Math.max(-KM + r, Math.min(KH + KM - r, p.y));
+  if (ko < 0) return;
+  // Kickoff: everyone stays in their own half, and the team without the kickoff out of the centre circle.
+  if (p.team === 0 && p.x > KW / 2 - r) { p.x = KW / 2 - r; p.vx = Math.min(0, p.vx); }
+  if (p.team === 1 && p.x < KW / 2 + r) { p.x = KW / 2 + r; p.vx = Math.max(0, p.vx); }
+  if (p.team !== ko) {
+    const dx = p.x - KW / 2, dy = p.y - KH / 2, d = Math.hypot(dx, dy) || 1;
+    if (d < KCC + r) { p.x = KW / 2 + dx / d * (KCC + r); p.y = KH / 2 + dy / d * (KCC + r); }
+  }
+}
+// The wall: a vertical bar at x, a little longer than the goal is high.
+function wallHit(b, x) {
+  const top = KH / 2 - GOAL_H / 2 - 26, bot = KH / 2 + GOAL_H / 2 + 26;
+  if (b.y < top - KBR || b.y > bot + KBR || Math.abs(b.x - x) >= KBR + 3) return false;
+  const s = b.x < x ? -1 : 1;
+  b.x = x + s * (KBR + 3);
+  if (b.vx * s < 0) b.vx = -b.vx * 0.8;
+  return true;
+}
+// The ball stays on the pitch except through the goal mouths; inside a goal the net stops it softly.
+function ballBounds(b) {
+  const cy = KH / 2, top = cy - GOAL_H / 2, bot = cy + GOAL_H / 2;
+  if (b.y < KBR) { b.y = KBR; b.vy = -b.vy * 0.5; }
+  if (b.y > KH - KBR) { b.y = KH - KBR; b.vy = -b.vy * 0.5; }
+  for (const side of [0, 1]) {
+    const inGoal = side === 0 ? b.x < 0 : b.x > KW, line = side === 0 ? 0 : KW, s = side === 0 ? 1 : -1;
+    if (inGoal) {
+      if (b.y < top + KBR) { b.y = top + KBR; b.vy = Math.abs(b.vy) * 0.1; }
+      if (b.y > bot - KBR) { b.y = bot - KBR; b.vy = -Math.abs(b.vy) * 0.1; }
+      const back = line - s * (GOAL_D - KBR);
+      if (side === 0 ? b.x < back : b.x > back) { b.x = back; b.vx = s * Math.abs(b.vx) * 0.1; }
+    } else if ((b.y < top || b.y > bot) && (side === 0 ? b.x < KBR : b.x > KW - KBR)) {
+      b.x = side === 0 ? KBR : KW - KBR;
+      b.vx = s * Math.abs(b.vx) * 0.5;
+    }
+  }
+}
+// Two discs that overlap are pushed apart by their weight, and bounce (bc = how much speed the bounce keeps).
+function discHit(a, b, ra, rb, ia, ib, bc) {
+  const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+  if (d >= ra + rb || d === 0) return false;
+  const nx = dx / d, ny = dy / d, over = ra + rb - d, im = ia + ib;
+  a.x -= nx * over * ia / im; a.y -= ny * over * ia / im;
+  b.x += nx * over * ib / im; b.y += ny * over * ib / im;
+  const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+  if (rv < 0) {
+    const j = -(1 + bc) * rv / im;
+    a.vx -= nx * j * ia; a.vy -= ny * j * ia;
+    b.vx += nx * j * ib; b.vy += ny * j * ib;
+  }
+  return true;
+}
+function postHit(o, px, py, r) {
+  const dx = o.x - px, dy = o.y - py, d = Math.hypot(dx, dy);
+  if (d >= r + POST_R || d === 0) return;
+  const nx = dx / d, ny = dy / d;
+  o.x = px + nx * (r + POST_R); o.y = py + ny * (r + POST_R);
+  const rv = o.vx * nx + o.vy * ny;
+  if (rv < 0) { o.vx -= 1.5 * rv * nx; o.vy -= 1.5 * rv * ny; }
+}
+
+// 🏍️ Neon Rush: light bikes on a grid. Every bike leaves a wall behind it; whoever drives into a wall, a trail
+// or another bike is out, the last one riding wins the round. First to 3 rounds. Arrow keys or WASD turn
+// (turns are queued, so a quick double turn works), Space boosts to double speed while the boost bar lasts.
+const TW = 80, TH = 50, T_HZ = 24, T_SPEED = 12, T_FUEL = 2000, T_WIN = 3;
+// Start lanes are offset, so nobody rides head-on into anybody else.
+const T_SPAWN = [[6, 15, 1], [73, 34, 3], [60, 4, 2], [19, 45, 0]], T_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+const T_ITEMS = ['nitro', 'ghost', 'bomb', 'gap', 'brake', 'confuse', 'shield'], T_GOD = 0.025;
+// Power-up durations in ticks (24 a second).
+const T_FX = {ghost: 72, gap: 72, brake: 96, confuse: 96, god: 120};
+class Tron extends Room {
+  constructor(ctx) {
+    super(ctx, 4, 1000 / T_HZ);
+    this.grid = new Uint8Array(TW * TH);
+    this.rd = 0;
+    this.tk = 0;
+    this.mv = [];
+    this.er = [];
+    this.ghosts = [];
+    this.items = [];
+    this.nextItem = 0;
+  }
+  joined(p) { Object.assign(p, {sc: 0, alive: false, x: 0, y: 0, d: 1, q: [], fuel: T_FUEL, boost: false, acc: 0, trail: [], fx: tronFx()}); }
+  extra(p) { return {sc: p.sc, al: p.alive, x: p.x, y: p.y, d: p.d, f: Math.round(p.fuel), bo: p.boost, fc: p.face || null, fx: p.fx, sp: tronSpeed(p)}; }
+  input(p, m) {
+    // A turn can name the move it is meant for (the page has already shown it there); it waits for that move.
+    if (m.t === 'turn' && Number.isInteger(m.d) && m.d >= 0 && m.d < 4 && p.q.length < 3) p.q.push({d: m.d, n: Number.isInteger(m.n) ? m.n : 0});
+    else if (m.t === 'boost' && typeof m.v === 'boolean') p.boost = m.v;
+    else if (m.t === 'face' && ['baby', 'gleg'].includes(m.f) && this.st === 'play') p.face = m.f;
+    else if (m.t === 'full') this.full(p);
+  }
+  begin(now) { this.round(now); }
+  round(now) {
+    this.rd++;
+    this.grid.fill(0);
+    this.ghosts = [];
+    this.items = [];
+    this.nextItem = 96 + Math.floor(Math.random() * 72);
+    this.players.forEach((p, i) => {
+      const [x, y, d] = T_SPAWN[i];
+      Object.assign(p, {alive: true, x, y, d, q: [], fuel: T_FUEL, acc: 0, trail: [[x, y, 1]], face: null, mc: 0, fx: tronFx()});
+      this.grid[y * TW + x] = i + 1;
+    });
+    this.st = 'count';
+    this.until = now + 3000;
+    for (const p of this.players) this.full(p);
+  }
+  drop(p) {
+    const i = this.players.indexOf(p);
+    this.remove(p);
+    if (i >= 0 && p.trail.length) this.ghosts.push(p.trail);
+    if (i >= 0) {
+      // The grid marks trails by seat; seats after the one that left move down by one.
+      for (let c = 0; c < this.grid.length; c++) {
+        const v = this.grid[c];
+        if (v === i + 1) this.grid[c] = 255;
+        else if (v > i + 1 && v !== 255) this.grid[c] = v - 1;
+      }
+    }
+    if (this.st === 'vote') { if (this.players.length < 2) this.st = 'lobby'; return; }
+    if (this.st === 'lobby' || this.st === 'over') return;
+    if (this.players.length < 2) return this.finish(this.players[0] || null);
+    this.checkRound(Date.now());
+    for (const q of this.players) this.full(q);
+  }
+  finish(p) {
+    this.st = 'over';
+    this.w = p ? p.pid : null;
+    this.until = Date.now() + 10000;
+    this.event('over', {pid: this.w});
+  }
+  checkRound(now) {
+    if (this.st !== 'play') return;
+    const alive = this.players.filter(p => p.alive);
+    if (alive.length > 1) return;
+    const win = alive[0] || null;
+    if (win) win.sc++;
+    this.event('round', {pid: win ? win.pid : null});
+    if (win && win.sc >= T_WIN) return this.finish(win);
+    this.st = 'roundover';
+    this.until = now + 2500;
+  }
+  free(x, y) { return x >= 0 && y >= 0 && x < TW && y < TH && !this.grid[y * TW + x]; }
+  // Whether a bike can move into cell (x, y): a ghost or a divine bike rides through trails, never off the grid.
+  open(p, x, y) { return x >= 0 && y >= 0 && x < TW && y < TH && (!this.grid[y * TW + x] || p.fx.ghost > 0 || p.fx.god > 0); }
+  advance(now) {
+    this.mv = [];
+    this.er = [];
+    if (this.st === 'count' && now >= this.until) this.st = 'play';
+    if (this.st === 'roundover' && now >= this.until) this.round(now);
+    if (this.st !== 'play') return;
+    this.tk++;
+    for (const p of this.players) for (const k in p.fx) if (k !== 'shield' && p.fx[k] > 0) p.fx[k]--;
+    if (this.think) this.think();
+    // Each bike moves 0, 1 or 2 cells this tick; moves happen in two rounds so bikes move at the same time.
+    const steps = this.players.map(p => {
+      if (!p.alive) return 0;
+      if (p.boost && p.fuel > 0) p.fuel = Math.max(0, p.fuel - 1000 / T_HZ);
+      p.acc += tronSpeed(p) / T_HZ;
+      const n = Math.min(3, Math.floor(p.acc));
+      p.acc -= n;
+      return n;
+    });
+    for (let r = 0; r < 3; r++) {
+      const target = new Map();
+      this.players.forEach((p, i) => {
+        if (!p.alive || steps[i] <= r) return;
+        while (p.q.length && !(p.q[0].n > p.mc + 1)) {
+          const d = p.q.shift().d;
+          if (d !== p.d && d !== (p.d + 2) % 4) { p.d = d; break; }
+        }
+        let nx = p.x + T_DIR[p.d][0], ny = p.y + T_DIR[p.d][1];
+        if (!this.open(p, nx, ny) || target.has(ny * TW + nx)) {
+          // A shield (or the divine power) steers away from the crash once: to the side with more room.
+          if (!((p.fx.shield || p.fx.god) && this.dodge(p, target))) {
+            this.crash(p, i);
+            const o = target.get(ny * TW + nx);
+            if (o && o.p.alive && this.open(p, nx, ny)) this.crash(o.p, o.i);
+            return;
+          }
+          if (!p.fx.god) { p.fx.shield = 0; this.event('shield', {pid: p.pid}); }
+          nx = p.x + T_DIR[p.d][0]; ny = p.y + T_DIR[p.d][1];
+        }
+        target.set(ny * TW + nx, {p, i, nx, ny});
+      });
+      for (const [c, {p, i, nx, ny}] of target) {
+        if (!p.alive) continue;
+        p.x = nx; p.y = ny;
+        p.mc++;
+        // A gap leaves no wall; a ghost going through someone's trail leaves that trail as it is.
+        const wall = !(p.fx.gap > 0) && !this.grid[c];
+        if (wall) this.grid[c] = i + 1;
+        p.trail.push([nx, ny, wall ? 1 : 0]);
+        this.mv.push([i, nx, ny, wall ? 1 : 0]);
+        this.pickup(p, i, nx, ny);
+      }
+    }
+    this.spawn();
+    this.checkRound(now);
+  }
+  dodge(p, target) {
+    const opts = [(p.d + 1) % 4, (p.d + 3) % 4].map(d => {
+      let n = 0, x = p.x, y = p.y;
+      while (n < 12) { x += T_DIR[d][0]; y += T_DIR[d][1]; if (!this.free(x, y) || target.has(y * TW + x)) break; n++; }
+      return {d, n};
+    }).sort((a, b) => b.n - a.n);
+    if (!opts[0].n) return false;
+    p.d = opts[0].d;
+    return true;
+  }
+  // Items: up to two on the grid at a time, gone after 12 s; a bike takes one by riding over it.
+  spawn() {
+    this.items = this.items.filter(it => --it.life > 0 || (this.event('gone', {kind: it.k}), false));
+    if (!this.pu || this.items.length >= 2 || --this.nextItem > 0) return;
+    for (let tries = 0; tries < 40; tries++) {
+      const x = 4 + Math.floor(Math.random() * (TW - 8)), y = 4 + Math.floor(Math.random() * (TH - 8));
+      if (!this.free(x, y) || this.players.some(p => p.alive && Math.abs(p.x - x) + Math.abs(p.y - y) < 8) || this.items.some(it => it.x === x && it.y === y)) continue;
+      this.items.push({k: Math.random() < T_GOD ? 'god' : this.pickItem(T_ITEMS), x, y, life: 288});
+      this.event('spawn', {kind: this.items[this.items.length - 1].k});
+      break;
+    }
+    this.nextItem = 120 + Math.floor(Math.random() * 96);
+  }
+  pickup(p, i, x, y) {
+    const k = this.items.findIndex(it => it.x === x && it.y === y);
+    if (k < 0) return;
+    const kind = this.items[k].k, foes = this.players.filter(q => q !== p && q.alive);
+    this.items.splice(k, 1);
+    if (kind === 'nitro') p.fuel = T_FUEL;
+    else if (kind === 'ghost') p.fx.ghost = T_FX.ghost;
+    else if (kind === 'gap') p.fx.gap = T_FX.gap;
+    else if (kind === 'shield') p.fx.shield = 1;
+    else if (kind === 'god') p.fx.god = T_FX.god;
+    else if (kind === 'brake') for (const q of foes) q.fx.brake = T_FX.brake;
+    else if (kind === 'confuse') for (const q of foes) q.fx.confuse = T_FX.confuse;
+    else if (kind === 'bomb') {
+      // Clears every trail cell within 6 cells, and the walls in them are gone for everyone.
+      for (let yy = y - 6; yy <= y + 6; yy++) for (let xx = x - 6; xx <= x + 6; xx++) {
+        if (xx < 0 || yy < 0 || xx >= TW || yy >= TH || (xx - x) ** 2 + (yy - y) ** 2 > 36 || (xx === x && yy === y) || !this.grid[yy * TW + xx]) continue;
+        this.grid[yy * TW + xx] = 0;
+        this.er.push([xx, yy]);
+      }
+      if (this.er.length) {
+        const gone = new Set(this.er.map(([a, b]) => a + ',' + b));
+        for (const t of [...this.players.map(q => q.trail), ...this.ghosts]) for (const c of t) if (c[2] && gone.has(c[0] + ',' + c[1])) c[2] = 0;
+      }
+    }
+    this.event('get', {pid: p.pid, kind, x, y});
+  }
+  crash(p, i) {
+    p.alive = false;
+    this.event('crash', {pid: p.pid, x: p.x, y: p.y});
+  }
+  full(p) { if (p.ws) try { p.ws.send(JSON.stringify({t: 'full', rd: this.rd, trails: this.players.map(q => q.trail), ghosts: this.ghosts})); } catch (e) {} }
+  send(now) {
+    this.broadcast({...this.base(now), tk: this.tk, rd: this.rd, win: T_WIN, pl: this.roster(), mv: this.mv, er: this.er,
+      its: this.items.map(it => [it.k, it.x, it.y, it.life])});
+  }
+}
+function tronFx() { return {ghost: 0, gap: 0, brake: 0, confuse: 0, shield: 0, god: 0}; }
+// Cells per second: boost and the divine power double it, the brake halves it.
+function tronSpeed(p) { return T_SPEED * ((p.boost && p.fuel > 0) || p.fx.god > 0 ? 2 : 1) * (p.fx.brake > 0 ? 0.5 : 1); }
+
+  return {Kick, Tron};
+})();
+const offlineDocs = {kick: {panel: true, offline: 'kick'}, tron: {panel: true, offline: 'tron'}};
+const OFF_LEVEL_NAMES = {leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer', profi: 'Profi'};
+const OFF_BOTS = ['Bot Kevin', 'Bot Jana', 'Bot Ömer', 'Bot Lina', 'Bot Finn', 'Bot Mia'];
+let offSet = store.get('offSet', null) || {kick: {lvl: 'mittel', mode: 1, pu: true}, tron: {lvl: 'mittel', bots: 2, pu: true}};
+let offWins = store.get('offWins', {});
+
+// The local room and a socket for the human player; bots sit in the room and get their inputs from a brain
+// that runs at the start of every game tick.
+function sgLocal(g) {
+  const o = g.offline, R = new SG_LOCAL[g.game === 'kick' ? 'Kick' : 'Tron']({});
+  R.solo = true;
+  const sock = {readyState: 0, onopen: null, onmessage: null, onclose: null,
+    send(d) { if (sock.readyState === 1) R.onMessage(human, d); },
+    close() { sock.readyState = 3; clearInterval(R.timer); R.timer = 0; }};
+  const human = {pid: me.id, name: me.name || 'Du', ws: {send: d => { if (sock.readyState === 1 && sock.onmessage) sock.onmessage({data: d}); }, close() {}},
+    left: 0, away: false, pauses: 2};
+  R.players.push(human);
+  R.joined(human);
+  const n = g.game === 'kick' ? (o.mode === 2 ? 3 : 1) : o.bots, names = [...OFF_BOTS].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < n; i++) {
+    const b = {pid: 'bot' + i + '-' + me.id, name: names[i], ws: {send() {}, close() {}}, left: 0, away: false, pauses: 0, bot: true};
+    R.players.push(b);
+    R.joined(b);
+  }
+  R.pu = o.pu;
+  R.think = g.game === 'kick' ? bzBrain(R, o.lvl) : nrBrain(R, o.lvl);
+  g.room = R;
+  R.begin(Date.now());
+  R.last = Date.now();
+  R.timer = setInterval(() => R.loop(), R.tickMs);
+  setTimeout(() => { if (sock.readyState) return; sock.readyState = 1; if (sock.onopen) sock.onopen(); R.full(human); }, 0);
+  return sock;
+}
+
+/* Fußball bots: they see the ball a few ticks late (less late the better they are), guess where it will be,
+   get behind it in line with the goal, and kick when it is lined up. In 2 v 2 the one closer to the ball
+   attacks, the other stays between the ball and its own goal. Lower levels run slower and aim worse. */
+const BZ_BOT = {
+  leicht: {react: 16, err: 0.55, look: 0, kick: 0.45, speed: 0.72, items: 0, lineUp: 0.6},
+  mittel: {react: 9, err: 0.28, look: 10, kick: 0.8, speed: 0.86, items: 0.35, lineUp: 0.75},
+  schwer: {react: 4, err: 0.12, look: 18, kick: 0.95, speed: 0.97, items: 0.7, lineUp: 0.82},
+  profi: {react: 1, err: 0.04, look: 18, kick: 1, speed: 1, items: 1, lineUp: 0.7}};
+function bzBrain(R, lvl) {
+  const P = BZ_BOT[lvl] || BZ_BOT.mittel, hist = [];
+  return () => {
+    const b = R.b;
+    hist.push([b.x, b.y, b.vx, b.vy]);
+    if (hist.length > 40) hist.shift();
+    const seen = hist[Math.max(0, hist.length - 1 - P.react)];
+    for (const p of R.players) if (p.bot) p.q.push([bzBotKeys(R, p, P, seen), p.bseq = (p.bseq || 0) + 1]);
+  };
+}
+// Keys that bring player p toward (tx, ty): it wants a speed toward the target (slowing near it) and presses
+// whichever keys change its speed that way.
+function bzSteer(p, tx, ty, P) {
+  const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), vmax = 2.45 * P.speed * (p.fx.turbo || p.fx.god ? 1.5 : 1);
+  const want = Math.min(vmax, d * 0.11), wx = d ? dx / d * want : 0, wy = d ? dy / d * want : 0;
+  let k = 0;
+  if (wx > p.vx + 0.12) k |= 8; else if (wx < p.vx - 0.12) k |= 4;
+  if (wy > p.vy + 0.12) k |= 2; else if (wy < p.vy - 0.12) k |= 1;
+  return k;
+}
+function bzBotKeys(R, p, P, seen) {
+  if (R.st !== 'play' && R.st !== 'goal') return 0;
+  const r = p.fx.giant ? 30 : p.fx.dwarf ? 8 : BZ_PR, cy = BZ_H / 2, ownX = p.team === 0 ? 0 : BZ_W, oppX = BZ_W - ownX;
+  const fade = (1 - 0.99 ** P.look) / 0.01;
+  const bx = Math.max(BZ_BR, Math.min(BZ_W - BZ_BR, seen[0] + seen[2] * fade)), by = Math.max(BZ_BR, Math.min(BZ_H - BZ_BR, seen[1] + seen[3] * fade));
+  let k = 0;
+  // Kickoff of the other team: wait at the own spot.
+  if (R.ko >= 0 && R.ko !== p.team) k = bzSteer(p, p.team === 0 ? BZ_W / 2 - 150 : BZ_W / 2 + 150, p.y, P);
+  else {
+    const dist = q => Math.hypot(q.x - bx, q.y - by), mates = R.players.filter(q => q.team === p.team);
+    // At the own kickoff one bot takes it: the one closest to the ball (not waiting for a human teammate);
+    // otherwise whoever is closer to the ball attacks.
+    const first = mates.filter(q => q.bot).reduce((a, q) => dist(q) < dist(a) - 0.5 ? q : a);
+    const attack = R.ko === p.team ? first === p : mates.every(q => q === p || dist(p) <= dist(q) + 25) || dist(p) < 70;
+    // An item worth the detour: decided once per item, more often the better the bot.
+    if (R.item !== p.seenItem) { p.seenItem = R.item; p.wantItem = !!R.item && Math.random() < P.items; }
+    const it = p.wantItem && R.item;
+    if (it && Math.hypot(it.x - p.x, it.y - p.y) < dist(p) + 60) k = bzSteer(p, it.x, it.y, P);
+    else if (!attack) k = bzSteer(p, ownX + (bx - ownX) * 0.35, cy + (by - cy) * 0.6, P);
+    else if (R.hold && R.hold.pid === p.pid) {
+      // Ball at the foot: carry it toward the goal, shoot from close.
+      k = bzSteer(p, oppX, cy, P);
+      if (Math.abs(p.x - oppX) < 240 && !(p.lastK & 16)) k |= 16;
+    } else {
+      if (!p.aimAt || R.tick - p.aimAt > 90) { p.aim = (Math.random() * 2 - 1) * P.err; p.aimAt = R.tick; }
+      let ux = oppX - bx, uy = cy + p.aim * 160 - by;
+      const ul = Math.hypot(ux, uy) || 1;
+      ux /= ul; uy /= ul;
+      // Stand behind the ball in line with the goal; from in front of it, go round.
+      // Close enough to touch it: the bot dribbles into the ball and kicks once it is lined up.
+      const back = r + BZ_BR - 1, relx = p.x - bx, rely = p.y - by;
+      let tx = bx - ux * back, ty = by - uy * back;
+      if (relx * ux + rely * uy > -2) {
+        const side = relx * -uy + rely * ux >= 0 ? 1 : -1;
+        tx = bx - ux * (back + 22) - uy * side * (back + 26);
+        ty = by - uy * (back + 22) + ux * side * (back + 26);
+      }
+      k = bzSteer(p, tx, ty, P);
+      const rb = R.b, dx = rb.x - p.x, dy = rb.y - p.y, d = Math.hypot(dx, dy) || 1;
+      if (d < r + BZ_BR + 4 && (dx * ux + dy * uy) / d > P.lineUp && !(p.lastK & 16) && Math.random() < P.kick) k |= 16;
+    }
+  }
+  p.lastK = k;
+  return k;
+}
+
+/* Neon Rush bots: before each move they weigh going straight, left or right by how much room is left that way
+   (a flood fill, deeper the better the bot), keep away from where other bikes are about to go, and on higher
+   levels go for items, use boost on long free lines and try to cut others off. Lower levels make mistakes. */
+const NR_BOT = {
+  leicht: {lim: 22, err: 0.05, head: false, items: 0, boost: 0, cut: 0},
+  mittel: {lim: 140, err: 0.015, head: true, items: 0.4, boost: 0.25, cut: 0},
+  schwer: {lim: 700, err: 0.004, head: true, items: 0.8, boost: 0.6, cut: 0.4},
+  profi: {lim: 2600, err: 0, head: true, items: 1, boost: 1, cut: 0.5, zone: true}};
+function nrBrain(R, lvl) {
+  const P = NR_BOT[lvl] || NR_BOT.mittel, W = NR_W, H = NR_H, seen = new Int32Array(W * H), stack = new Int32Array(W * H);
+  const dOp = new Int16Array(W * H), dMe = new Int16Array(W * H), opSeen = new Int32Array(W * H), queue = new Int32Array(W * H);
+  let stamp = 0;
+  // Breadth-first distances over free cells from some start cells (all at distance d0).
+  const bfs = (starts, d0, dist, mark, st) => {
+    let head = 0, tail = 0;
+    for (const c of starts) if (mark[c] !== st) { mark[c] = st; dist[c] = d0; queue[tail++] = c; }
+    while (head < tail) {
+      const c = queue[head++], x = c % W, y = (c / W) | 0;
+      for (const [dx, dy] of NR_DIR) {
+        const nx = x + dx, ny = y + dy, nc = ny * W + nx;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || R.grid[nc] || mark[nc] === st) continue;
+        mark[nc] = st;
+        dist[nc] = dist[c] + 1;
+        queue[tail++] = nc;
+      }
+    }
+    return tail;
+  };
+  // The Profi's "zone": how many cells this bike would reach before anyone else (a Voronoi count), the way strong
+  // Tron programs judge a move. Others' next cells count as reached a step ahead.
+  const zone = (p, foes, nx, ny) => {
+    const st1 = ++stamp, opStarts = [];
+    for (const q of foes) for (const [dx, dy] of NR_DIR) { const ox = q.x + dx, oy = q.y + dy; if (ox >= 0 && oy >= 0 && ox < W && oy < H && !R.grid[oy * W + ox]) opStarts.push(oy * W + ox); }
+    bfs(opStarts, 1, dOp, opSeen, st1);
+    const st2 = ++stamp;
+    const n = bfs([ny * W + nx], 1, dMe, seen, st2);
+    let mine = 0;
+    for (let i = 0; i < n; i++) { const c = queue[i]; if (opSeen[c] !== st1 || dMe[c] < dOp[c]) mine++; }
+    return mine;
+  };
+  const open = (p, x, y) => x >= 0 && y >= 0 && x < W && y < H && (!R.grid[y * W + x] || p.fx.ghost > 0 || p.fx.god > 0);
+  const flood = (sx, sy, lim) => {
+    stamp++;
+    let n = 0, top = 0;
+    stack[top++] = sy * W + sx;
+    seen[sy * W + sx] = stamp;
+    while (top && n < lim) {
+      const c = stack[--top], x = c % W, y = (c / W) | 0;
+      n++;
+      for (const [dx, dy] of NR_DIR) {
+        const nx = x + dx, ny = y + dy, nc = ny * W + nx;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || R.grid[nc] || seen[nc] === stamp) continue;
+        seen[nc] = stamp;
+        stack[top++] = nc;
+      }
+    }
+    return n;
+  };
+  const speed = p => 12 * ((p.boost && p.fuel > 0) || p.fx.god > 0 ? 2 : 1) * (p.fx.brake > 0 ? 0.5 : 1);
+  return () => {
+    if (R.st !== 'play') return;
+    for (const p of R.players) {
+      if (!p.bot || !p.alive || p.acc + speed(p) / 24 < 1) continue;
+      const foes = R.players.filter(q => q !== p && q.alive);
+      const opts = [p.d, (p.d + 1) % 4, (p.d + 3) % 4].map((d, j) => {
+        const nx = p.x + NR_DIR[d][0], ny = p.y + NR_DIR[d][1];
+        if (!open(p, nx, ny)) return {d, s: p.fx.shield ? -5000 : -1e9};
+        const room = flood(nx, ny, P.lim);
+        let s = (P.zone && foes.length ? zone(p, foes, nx, ny) + room * 0.1 : room) + (j === 0 ? 2 : 0);
+        if (P.head) for (const q of foes) if (Math.abs(q.x - nx) + Math.abs(q.y - ny) <= 1) s -= 400;
+        if (P.items && R.items.length) {
+          const it = R.items.reduce((a, c) => Math.abs(c.x - p.x) + Math.abs(c.y - p.y) < Math.abs(a.x - p.x) + Math.abs(a.y - p.y) ? c : a);
+          const d0 = Math.abs(it.x - p.x) + Math.abs(it.y - p.y);
+          if (d0 < 25 && Math.abs(it.x - nx) + Math.abs(it.y - ny) < d0) s += 30 * P.items;
+        }
+        if (P.cut && foes.length) {
+          const q = foes.reduce((a, c) => Math.abs(c.x - p.x) + Math.abs(c.y - p.y) < Math.abs(a.x - p.x) + Math.abs(a.y - p.y) ? c : a);
+          const tx = q.x + NR_DIR[q.d][0] * 4, ty = q.y + NR_DIR[q.d][1] * 4;
+          if (Math.abs(tx - nx) + Math.abs(ty - ny) < Math.abs(tx - p.x) + Math.abs(ty - p.y)) s += 15 * P.cut;
+        }
+        return {d, s};
+      });
+      let best = opts.reduce((a, c) => c.s > a.s ? c : a);
+      if (Math.random() < P.err) best = opts[Math.floor(Math.random() * 3)];
+      if (best.d !== p.d) p.q = [{d: best.d, n: 0}];
+      if (P.boost) {
+        let run = 0, x = p.x, y = p.y;
+        while (run < 16) { x += NR_DIR[best.d][0]; y += NR_DIR[best.d][1]; if (!open(p, x, y)) break; run++; }
+        if (run < 7 || p.fuel < 200) p.boost = false;
+        else if (run >= 14 && Math.random() < P.boost * 0.08) p.boost = true;
+      }
+    }
+  };
+}
+
+// The document: settings first (level, mode or number of bots, power-ups), then the game on the same board as
+// online. Settings and wins per level are remembered.
+function offShow(game) {
+  const doc = offlineDocs[game], g = sgGame;
+  const running = g && g.offline && g.game === game && !g.over && sgLive(g);
+  $('osetup').hidden = !!running;
+  $('oboard').hidden = !running;
+  if (running) { renderSg(g); return; }
+  const set = offSet[game], pick = (key, val) => { set[key] = val; store.set('offSet', offSet); offShow(game); };
+  const opt = (key, val, label) => el('button', {class: 'vbtn' + (set[key] === val ? ' on' : ''), type: 'button', text: label, onclick: () => pick(key, val)});
+  const wins = offWins[game] || {};
+  const blocked = mpRunning() && sgLive(mpGame) && SG_GAMES.includes(mpGame.game);
+  $('osetup').replaceChildren(el('div', {class: 'osetbox'},
+    el('div', {class: 'upddlg-head', text: SG_TITLE[game] + ' gegen Bots'}),
+    el('div', {class: 'olabel', text: 'Schwierigkeit'}),
+    el('div', {class: 'orow'}, ...Object.entries(OFF_LEVEL_NAMES).map(([k, v]) => opt('lvl', k, v + (wins[k] ? ' · ' + wins[k] + ' 🏆' : '')))),
+    el('div', {class: 'olabel', text: game === 'kick' ? 'Modus' : 'Gegner'}),
+    game === 'kick'
+      ? el('div', {class: 'orow'}, opt('mode', 1, '1 gegen 1'), opt('mode', 2, '2 gegen 2 (du + Bot)'))
+      : el('div', {class: 'orow'}, opt('bots', 1, '1 Bot'), opt('bots', 2, '2 Bots'), opt('bots', 3, '3 Bots')),
+    el('div', {class: 'olabel', text: 'Power-ups'}),
+    el('div', {class: 'orow'}, opt('pu', true, '⚡ An'), opt('pu', false, 'Aus')),
+    el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Los geht\'s', disabled: blocked, onclick: () => offStart(game)}),
+    blocked ? el('p', {text: 'Erst das laufende Online-Spiel im Chat beenden.'}) : null,
+    el('p', {class: 'sg-keys', text: '⌨ ' + SG_HINT[game] + ' · P = Pause · 🏆 = deine Siege'})));
+  if (doc !== current) return;
+}
+function offStart(game) {
+  if (mpRunning() && sgLive(mpGame) && SG_GAMES.includes(mpGame.game)) return;
+  offStop();
+  const g = {gid: 'off' + Date.now().toString(36), game, offline: {...offSet[game]}, myMark: 1, over: false, opName: 'Bots'};
+  sgInit(g, '', false);
+  $('osetup').hidden = true;
+  $('oboard').hidden = false;
+  renderSg(g);
+}
+function offStop() {
+  const g = sgGame;
+  if (!g || !g.offline) return;
+  g.over = true;
+  if (g.sg.ws) { const ws = g.sg.ws; g.sg.ws = null; ws.close(); }
+  sgGame = null;
+}
+function offRecord(g, win) {
+  if (!win) return;
+  const w = offWins[g.game] || (offWins[g.game] = {});
+  w[g.offline.lvl] = (w[g.offline.lvl] || 0) + 1;
+  store.set('offWins', offWins);
 }
 
 /* Malen & Raten */
@@ -7005,6 +8013,7 @@ let scale = 1, showing = false, selectedRow = rows.find(r => r.dataset.game === 
 
 function contentFor(row) {
   if (row.dataset.chat) return chatDoc;
+  if (row.dataset.offline) return offlineDocs[row.dataset.offline];
   if (row.dataset.video) return videoDoc;
   if (row.dataset.game) return games[row.dataset.game];
   if (!docs.has(row)) docs.set(row, makeDoc(rows.indexOf(row) + 1));
@@ -7062,9 +8071,11 @@ function showPreview(row) {
   stage.hidden = !!current.panel;
   videoEl.hidden = current !== videoDoc;
   chatEl.hidden = current !== chatDoc;
+  offlineEl.hidden = !current.offline;
   placeholder.hidden = true;
   if (current.video && !vbody.childElementCount) renderVideo();
   if (current === chatDoc) openChat();
+  if (current.offline) offShow(current.offline);
   fit();
 }
 
@@ -7076,6 +8087,7 @@ function hidePreview() {
   stage.hidden = true;
   videoEl.hidden = true;
   chatEl.hidden = true;
+  offlineEl.hidden = true;
   placeholder.hidden = false;
 }
 
