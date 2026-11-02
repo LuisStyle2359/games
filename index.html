@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5143,7 +5143,7 @@ function sgMessage(g, m) {
   const sg = g.sg;
   if (m.t === 'pong' && Number.isFinite(m.c)) { const r = performance.now() - m.c; sg.rtt = sg.rtt ? sg.rtt * 0.7 + r * 0.3 : r; return; }
   if (m.t === 'full') { if (g.game === 'tron') nrFull(g, m); else if (g.game === 'breach') brFull(g, m); return; }
-  if (m.t === 'replay') { if (g.game === 'breach' && Array.isArray(m.fr)) g.sg.replay = {...m, at: performance.now()}; return; }
+  if (m.t === 'replay') { if ((g.game === 'breach' || g.game === 'kick') && Array.isArray(m.fr)) g.sg.replay = {...m, at: performance.now()}; return; }
   if (m.t !== 's' || !Array.isArray(m.pl)) return;
   const prev = sg.s;
   sg.s = m;
@@ -5606,6 +5606,21 @@ function bzSnapshot(g, m) {
   if (Math.hypot(sg.vis.x, sg.vis.y) > 60) sg.vis.x = sg.vis.y = 0;
   sg.me = p;
 }
+// The goal replay: 1.5 s of positions (every 1/30 s), played at 0.6× from a second after the goal, as if they
+// were updates (so the usual drawing does it).
+function bzReplay(g, s, now) {
+  const rp = g.sg.replay;
+  if (!rp || s.st !== 'goal' || !rp.fr.length || now - rp.at > 5000) return null;
+  const t = now - rp.at - 1100;
+  if (t < 0) return null;
+  const pos = t / (1000 / 30 / 0.6), i = Math.floor(pos), n = rp.fr.length;
+  if (i >= n + 8) return null;
+  const at = j => {
+    const f = rp.fr[Math.min(n - 1, j)];
+    return {...s, b: [f[0], f[1], 0, 0], pl: s.pl.map(p => { const k = rp.pids.indexOf(p.pid); return k < 0 ? p : {...p, x: f[2 + k * 2], y: f[3 + k * 2], vx: 0, vy: 0, k: 0}; })};
+  };
+  return {a: at(i), b: at(i + 1), k: Math.min(1, pos - i), ex: 0};
+}
 function bzEvent(g, ev, s) {
   const sg = g.sg;
   if (ev.k === 'goal') {
@@ -5735,16 +5750,23 @@ function bzDraw(g, cv, now, dt) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(icon, s.it.x, s.it.y + 1);
   }
-  const smp = s && sgSample(g);
+  // After a goal: the last moments again, in slow motion.
+  const rpl = s && bzReplay(g, s, now);
+  const smp = rpl || (s && sgSample(g));
   if (smp) {
     const {a, b, k: f, ex} = smp, lerp = (x, y) => x + (y - x) * f;
+    if (rpl) {
+      ctx.font = '900 18px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(10, 10, 200, 28);
+      ctx.fillStyle = Math.floor(now / 400) % 2 ? '#ff4d4d' : '#ffffff'; ctx.fillText('⏪ WIEDERHOLUNG', 18, 14);
+    }
     // Going on at a speed that fades the way the server's does (factor d per tick).
     const ahead = (v, d) => ex ? v * (1 - d ** ex) / (1 - d) : 0;
     // Players: others from the updates, yourself where your keys already put you.
     const fv = Math.exp(-dt / 0.08);
     sg.vis.x *= fv; sg.vis.y *= fv;
     for (const pb of b.pl) {
-      const pa = a.pl.find(p => p.pid === pb.pid) || pb, mine = pb.pid === me.id && sg.me && (s.st === 'play' || s.st === 'goal');
+      const pa = a.pl.find(p => p.pid === pb.pid) || pb, mine = !rpl && pb.pid === me.id && sg.me && (s.st === 'play' || s.st === 'goal');
       const x = mine ? sg.me.x + sg.vis.x : lerp(pa.x, pb.x) + ahead(pb.vx, BZ_DAMP), y = mine ? sg.me.y + sg.vis.y : lerp(pa.y, pb.y) + ahead(pb.vy, BZ_DAMP);
       const kicking = mine ? (sg.keys & 16) : (pb.k & 16), R = pb.r || BZ_PR, fx = pb.fx || {};
       (sg.drawn || (sg.drawn = {}))[pb.pid] = [x, y];
@@ -6946,6 +6968,12 @@ class Kick extends Room {
     this.tick++;
     if (this.think) this.think();
     const b = this.b, cy = KH / 2, ps = this.players;
+    // The last 1.5 s (every second tick) for the goal replay.
+    if (this.st === 'play' && this.tick % 2 === 0) {
+      const rp = this.rp || (this.rp = []);
+      rp.push([Math.round(b.x), Math.round(b.y), ...ps.flatMap(p => [Math.round(p.x), Math.round(p.y)])]);
+      if (rp.length > 45) rp.shift();
+    }
     // Every input from a page is one movement step, exactly as that page already showed it, used one per tick
     // (two while catching up) so others see the player move evenly. When inputs come late, the player runs on
     // with the last one for up to 8 ticks, and that many late inputs are then skipped, so each input still
@@ -7047,7 +7075,10 @@ class Kick extends Room {
       this.hold = null;
       this.spin = 0;
       this.st = 'goal';
-      this.until = Date.now() + 2500;
+      // Long enough for the cheering and then the replay in slow motion.
+      this.until = Date.now() + 5000;
+      this.broadcast({t: 'replay', pids: ps.map(p => p.pid), fr: this.rp || []});
+      this.rp = [];
       // About 19 px are a metre; the speed of the last shot, in km/h.
       this.event('goal', {team, by: scorer ? scorer.name : '', own: !!scorer && scorer.team !== team, kmh: Math.round((this.shotV || 0) * 60 / 19 * 3.6)});
     }

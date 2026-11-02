@@ -927,6 +927,12 @@ export class Kick extends Room {
     this.tick++;
     if (this.think) this.think();
     const b = this.b, cy = KH / 2, ps = this.players;
+    // The last 1.5 s (every second tick) for the goal replay.
+    if (this.st === 'play' && this.tick % 2 === 0) {
+      const rp = this.rp || (this.rp = []);
+      rp.push([Math.round(b.x), Math.round(b.y), ...ps.flatMap(p => [Math.round(p.x), Math.round(p.y)])]);
+      if (rp.length > 45) rp.shift();
+    }
     // Every input from a page is one movement step, exactly as that page already showed it, used one per tick
     // (two while catching up) so others see the player move evenly. When inputs come late, the player runs on
     // with the last one for up to 8 ticks, and that many late inputs are then skipped, so each input still
@@ -1028,7 +1034,10 @@ export class Kick extends Room {
       this.hold = null;
       this.spin = 0;
       this.st = 'goal';
-      this.until = Date.now() + 2500;
+      // Long enough for the cheering and then the replay in slow motion.
+      this.until = Date.now() + 5000;
+      this.broadcast({t: 'replay', pids: ps.map(p => p.pid), fr: this.rp || []});
+      this.rp = [];
       // About 19 px are a metre; the speed of the last shot, in km/h.
       this.event('goal', {team, by: scorer ? scorer.name : '', own: !!scorer && scorer.team !== team, kmh: Math.round((this.shotV || 0) * 60 / 19 * 3.6)});
     }
