@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 68;
+const APP_VERSION = 69;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5382,6 +5382,7 @@ setInterval(() => {
   if (sg.s && sg.s.st === 'play' && !g.over) { const face = babyTake(); if (face) sgSend(g, {t: 'face', f: face}); }
   if (g.game === 'kick') bzTicks(g, now);
   else if (g.game === 'breach') brTicks(g, now);
+  else if (g.game === 'tron') nrAssistTick(g, now);
 }, 8);
 
 const SG_KEYS = {arrowup: 1, w: 1, arrowdown: 2, s: 2, arrowleft: 4, a: 4, arrowright: 8, d: 8, ' ': 16, x: 16};
@@ -6137,6 +6138,42 @@ function nrPredict(g, t, p, now) {
     cells.push([nx, ny]);
     x = nx; y = ny; at += cellMs; n++;
   }
+}
+// The owner's trick in Neon Rush (1 held, enabled once with #autopaddle): the Profi bot's judgement steers your
+// bike. For each cell the bike reaches it weighs straight, left and right from where the bike is predicted to be
+// (with the trail just driven counted as walls) and turns through the normal key path, so the turn is shown
+// and sent like a key press; it uses the boost on long free lines.
+function nrAssistTick(g, now) {
+  const sg = g.sg, s = sg.s;
+  if (!pgAssistOn || !pgAssistHeld || !s || s.st !== 'play' || !sg.grid) { if (sg.nrA && sg.nrA.boost) { sg.nrA.boost = false; sgSend(g, {t: 'boost', v: false}); } return; }
+  const mi = s.pl.findIndex(p => p.pid === me.id), mine = s.pl[mi], t = sg.trails[mi];
+  if (!mine || !mine.al || !t || !t.length) return;
+  const pr = nrPredict(g, t, mine, now);
+  if (!pr) return;
+  const a = sg.nrA || (sg.nrA = {start: now + 120 + Math.random() * 80, cell: '', boost: false});
+  if (now < a.start) return;
+  // A turn pressed now takes effect after the move already under way, so decide from the cell that move leads to.
+  const fx0 = pr.x + NR_DIR[pr.d][0], fy0 = pr.y + NR_DIR[pr.d][1];
+  const ahead = fx0 >= 0 && fy0 >= 0 && fx0 < NR_W && fy0 < NR_H && !sg.grid[fy0 * NR_W + fx0];
+  const hx = ahead ? fx0 : pr.x, hy = ahead ? fy0 : pr.y;
+  // Once per cell (a person also decides as the bike goes).
+  const key = pr.x + ',' + pr.y + ',' + t.length;
+  if (key === a.cell) return;
+  a.cell = key;
+  g.assisted = true;
+  if (!a.R) { a.R = {st: 'play', grid: new Uint8Array(NR_W * NR_H), players: [], items: []}; a.think = nrBrain(a.R, 'profi'); }
+  const R = a.R;
+  R.grid.set(sg.grid);
+  for (const [cx, cy] of pr.cells) R.grid[cy * NR_W + cx] = 1;
+  R.grid[pr.y * NR_W + pr.x] = 1;
+  R.grid[hy * NR_W + hx] = 1;
+  const self = {bot: true, alive: true, x: hx, y: hy, d: pr.d, acc: 1, fx: mine.fx || {}, fuel: mine.f || 0, boost: a.boost, q: []};
+  R.players = [self, ...s.pl.filter((p, i) => i !== mi && p.al).map(p => ({bot: false, alive: true, x: p.x, y: p.y, d: p.d, fx: p.fx || {}, acc: 0, fuel: 0}))];
+  R.items = (s.its || []).map(([, x, y]) => ({x, y}));
+  a.think();
+  // The bot's choice (already turned around when confused, as the server will turn it back).
+  if (self.q.length) nrTurn(g, self.q[0].d);
+  if (self.boost !== a.boost) { a.boost = self.boost; sgSend(g, {t: 'boost', v: a.boost}); }
 }
 function nrSnapshot(g, m) {
   const sg = g.sg, now = performance.now();
