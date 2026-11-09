@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 66;
+const APP_VERSION = 67;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5352,7 +5352,7 @@ function sgFinish(g, s) {
   let text;
   if (g.game === 'kick') text = SG_TITLE.kick + ': ' + (s.w === 0 ? 'Rot' : 'Blau') + ' gewinnt ' + s.sc[s.w] + ':' + s.sc[1 - s.w] + (win ? ' – du hast gewonnen! 🎉' : '');
   else { const w = s.pl.find(p => p.pid === s.w); text = SG_TITLE[g.game] + ': ' + (win ? 'Du hast gewonnen! 🎉' : (w ? w.name : 'Niemand') + ' hat gewonnen!'); }
-  if (win) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
+  if (win && !g.assisted) reportScore(g.game, ((lb[g.game] || {})[me.id] || {score: 0}).score + 1);
   addMsg(mpConv(g), {id: 'mp-' + g.gid, from: 'system', name: '', text, ts: Date.now()});
   if (conv === mpConv(g)) renderMpBoard();
 }
@@ -5710,12 +5710,49 @@ function bzTicks(g, now) {
   if (n > 6) { sg.simAt = now - 6 * BZ_TICK; n = 6; }
   for (let i = 0; i < n; i++) {
     sg.simAt += BZ_TICK;
-    const k = sg.keys;
+    // The owner's trick: while 1 is held, a bot plays for you.
+    const assist = pgAssistOn && pgAssistHeld && s.st === 'play';
+    if (assist) g.assisted = true;
+    const k = assist ? bzAssistKeys(g) : (sg.assist = null, sg.keys);
     sgSend(g, {t: 'in', k, i: ++sg.seq});
     sg.hist.push([sg.seq, k]);
     if (sg.me) { bzMove(sg.me, k); bzBounds(sg.me, s.ko); }
   }
   if (sg.hist.length > 240) sg.hist.splice(0, sg.hist.length - 240);
+}
+// The owner's trick in Fußball (enabled once with #autopaddle, then 1 held): the Profi bot's play, made to look
+// like a person: it starts a moment after the key goes down, sees the ball a few ticks late, aims a little off,
+// sometimes doesn't kick at once, and holds its keys for a few ticks instead of changing them every tick.
+const BZ_ASSIST = {react: 1, err: 0.04, look: 18, kick: 0.97, speed: 1, items: 0.6, lineUp: 0.7, hold: 0, holdR: 1, corner: 0.34};
+function bzAssistKeys(g) {
+  const sg = g.sg, s = sg.s, meP = sg.me;
+  if (!meP || !s) return sg.keys;
+  const a = sg.assist || (sg.assist = {hist: [], k: 0, hold: 0, start: performance.now() + 110 + Math.random() * 90});
+  a.hist.push([s.b[0], s.b[1], s.b[2], s.b[3]]);
+  if (a.hist.length > 40) a.hist.shift();
+  if (performance.now() < a.start) return sg.keys;
+  if (a.hold-- > 0) { const k = a.k; a.k &= ~16; return k; }
+  const self = {pid: me.id, team: meP.team, x: meP.x, y: meP.y, vx: meP.vx, vy: meP.vy, fx: meP.fx || {}, bot: true,
+    lastK: a.lastK, aim: a.aim, aimAt: a.aimAt, seenItem: a.seenItem, wantItem: a.wantItem};
+  const R = {st: s.st, ko: s.ko, tick: s.tk, b: {x: s.b[0], y: s.b[1], vx: s.b[2], vy: s.b[3]}, item: s.it, hold: s.hold ? {pid: s.hold} : null,
+    players: s.pl.map(p => p.pid === me.id ? self : {...p, fx: p.fx || {}, bot: false})};
+  // An item is decided once (not again with every update).
+  if (s.it && a.itemKey !== s.it.k + s.it.x) { a.itemKey = s.it.k + s.it.x; self.seenItem = undefined; } else self.seenItem = R.item;
+  const seen = a.hist[Math.max(0, a.hist.length - 1 - BZ_ASSIST.react)];
+  // Better than the bots: it shoots for the corner away from the opponent nearest to their goal (a little off,
+  // like a person), chosen anew every second or so.
+  if (!a.aimAt || s.tk - a.aimAt > 60) {
+    const oppX = meP.team === 0 ? BZ_W : 0, keeper = s.pl.filter(p => p.team !== meP.team).sort((p, q) => Math.abs(p.x - oppX) - Math.abs(q.x - oppX))[0];
+    const side = keeper ? (keeper.y > BZ_H / 2 ? -1 : 1) : (Math.random() < 0.5 ? -1 : 1);
+    a.aim = side * BZ_ASSIST.corner + (Math.random() * 2 - 1) * BZ_ASSIST.err;
+    a.aimAt = s.tk;
+  }
+  self.aim = a.aim; self.aimAt = s.tk;
+  const k = bzBotKeys(R, self, BZ_ASSIST, seen);
+  Object.assign(a, {lastK: self.lastK, seenItem: self.seenItem, wantItem: self.wantItem});
+  a.k = k;
+  a.hold = BZ_ASSIST.hold + Math.floor(Math.random() * BZ_ASSIST.holdR);
+  return k;
 }
 function bzSnapshot(g, m) {
   const sg = g.sg, mine = m.pl.find(p => p.pid === me.id);
@@ -8463,7 +8500,7 @@ function offStop() {
   sgGame = null;
 }
 function offRecord(g, win) {
-  if (!win) return;
+  if (!win || g.assisted) return;
   const w = offWins[g.game] || (offWins[g.game] = {});
   w[g.offline.lvl] = (w[g.offline.lvl] || 0) + 1;
   store.set('offWins', offWins);
