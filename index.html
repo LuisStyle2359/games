@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 67;
+const APP_VERSION = 68;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -8314,10 +8314,25 @@ function bzBotKeys(R, p, P, seen) {
       const back = r + BZ_BR - 1, relx = p.x - bx, rely = p.y - by;
       let tx = bx - ux * back, ty = by - uy * back;
       if (relx * ux + rely * uy > -2) {
-        const side = relx * -uy + rely * ux >= 0 ? 1 : -1;
-        tx = bx - ux * (back + 22) - uy * side * (back + 26);
-        ty = by - uy * (back + 22) + ux * side * (back + 26);
+        // Go round the ball on the nearer side, unless that way leads into a goal (then the other side).
+        const near = relx * -uy + rely * ux >= 0 ? 1 : -1;
+        const way = side => [bx - ux * (back + 22) - uy * side * (back + 26), by - uy * (back + 22) + ux * side * (back + 26)];
+        const ok = ([x, y]) => (x > r && x < BZ_W - r) || Math.abs(y - cy) > BZ_GH / 2 + r + 8;
+        [tx, ty] = ok(way(near)) || !ok(way(-near)) ? way(near) : way(-near);
       }
+      // Behind an end line only beside the goal, never in the net (a player gets stuck at the post there); and
+      // to get there from the pitch, first along the line to the right height, then out, so not through the post.
+      ty = Math.max(-BZ_M + r, Math.min(BZ_H + BZ_M - r, ty));
+      if (tx < r + 2 || tx > BZ_W - r - 2) {
+        const left = tx < BZ_W / 2, edge = left ? r + 2 : BZ_W - r - 2;
+        if (Math.abs(ty - cy) < BZ_GH / 2 + r + 8) tx = edge;
+        else {
+          tx = Math.max(-BZ_M + r, Math.min(BZ_W + BZ_M - r, tx));
+          const inside = left ? p.x > r : p.x < BZ_W - r;
+          if (inside && Math.abs(p.y - ty) > 8) tx = edge;
+        }
+      }
+      if (ty < r + 2 || ty > BZ_H - r - 2) ty = Math.max(-BZ_M + r, Math.min(BZ_H + BZ_M - r, ty));
       k = bzSteer(p, tx, ty, P);
       const rb = R.b, dx = rb.x - p.x, dy = rb.y - p.y, d = Math.hypot(dx, dy) || 1;
       if (d < r + BZ_BR + 4 && (dx * ux + dy * uy) / d > P.lineUp && !(p.lastK & 16) && Math.random() < P.kick) k |= 16;
