@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 69;
+const APP_VERSION = 70;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5724,7 +5724,10 @@ function bzTicks(g, now) {
 // The owner's trick in Fußball (enabled once with #autopaddle, then 1 held): the Profi bot's play, made to look
 // like a person: it starts a moment after the key goes down, sees the ball a few ticks late, aims a little off,
 // sometimes doesn't kick at once, and holds its keys for a few ticks instead of changing them every tick.
-const BZ_ASSIST = {react: 1, err: 0.04, look: 18, kick: 0.97, speed: 1, items: 0.6, lineUp: 0.7, hold: 0, holdR: 1, corner: 0.34};
+// Tuned in simulated matches against the Profi bot (it wins about 3 of 4 that are decided): steers harder,
+// takes tighter ways round the ball, shoots a bit earlier and lower into the far corner.
+const BZ_ASSIST = {react: 1, err: 0.04, look: 14, kick: 0.97, speed: 1, items: 0.3, lineUp: 0.65, hold: 0, holdR: 1, corner: 0.26,
+  gain: 0.198, backX: 0.3, ar1: 15.8, ar2: 17, kd: 4.1};
 function bzAssistKeys(g) {
   const sg = g.sg, s = sg.s, meP = sg.me;
   if (!meP || !s) return sg.keys;
@@ -8312,7 +8315,7 @@ function bzBrain(R, lvl) {
 // whichever keys change its speed that way.
 function bzSteer(p, tx, ty, P) {
   const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), vmax = 2.45 * P.speed * (p.fx.turbo || p.fx.god ? 1.5 : 1);
-  const want = Math.min(vmax, d * 0.11), wx = d ? dx / d * want : 0, wy = d ? dy / d * want : 0;
+  const want = Math.min(vmax, d * (P.gain ?? 0.11)), wx = d ? dx / d * want : 0, wy = d ? dy / d * want : 0;
   let k = 0;
   if (wx > p.vx + 0.12) k |= 8; else if (wx < p.vx - 0.12) k |= 4;
   if (wy > p.vy + 0.12) k |= 2; else if (wy < p.vy - 0.12) k |= 1;
@@ -8348,12 +8351,12 @@ function bzBotKeys(R, p, P, seen) {
       ux /= ul; uy /= ul;
       // Stand behind the ball in line with the goal; from in front of it, go round.
       // Close enough to touch it: the bot dribbles into the ball and kicks once it is lined up.
-      const back = r + BZ_BR - 1, relx = p.x - bx, rely = p.y - by;
+      const back = r + BZ_BR - 1 + (P.backX || 0), relx = p.x - bx, rely = p.y - by;
       let tx = bx - ux * back, ty = by - uy * back;
       if (relx * ux + rely * uy > -2) {
         // Go round the ball on the nearer side, unless that way leads into a goal (then the other side).
         const near = relx * -uy + rely * ux >= 0 ? 1 : -1;
-        const way = side => [bx - ux * (back + 22) - uy * side * (back + 26), by - uy * (back + 22) + ux * side * (back + 26)];
+        const way = side => [bx - ux * (back + (P.ar1 ?? 22)) - uy * side * (back + (P.ar2 ?? 26)), by - uy * (back + (P.ar1 ?? 22)) + ux * side * (back + (P.ar2 ?? 26))];
         const ok = ([x, y]) => (x > r && x < BZ_W - r) || Math.abs(y - cy) > BZ_GH / 2 + r + 8;
         [tx, ty] = ok(way(near)) || !ok(way(-near)) ? way(near) : way(-near);
       }
@@ -8372,7 +8375,7 @@ function bzBotKeys(R, p, P, seen) {
       if (ty < r + 2 || ty > BZ_H - r - 2) ty = Math.max(-BZ_M + r, Math.min(BZ_H + BZ_M - r, ty));
       k = bzSteer(p, tx, ty, P);
       const rb = R.b, dx = rb.x - p.x, dy = rb.y - p.y, d = Math.hypot(dx, dy) || 1;
-      if (d < r + BZ_BR + 4 && (dx * ux + dy * uy) / d > P.lineUp && !(p.lastK & 16) && Math.random() < P.kick) k |= 16;
+      if (d < r + BZ_BR + (P.kd ?? 4) && (dx * ux + dy * uy) / d > P.lineUp && !(p.lastK & 16) && Math.random() < P.kick) k |= 16;
     }
   }
   p.lastK = k;
