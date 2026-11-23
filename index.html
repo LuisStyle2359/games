@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 73;
+const APP_VERSION = 74;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5735,9 +5735,11 @@ function bzTicks(g, now) {
 //   there), while the own player is already shown where the next input takes it. So it plays the ball where it
 //   will be when the input arrives (rolled on with its slowing and bounces), and the others the same way.
 // - Saves: a shot coming at the own goal is cut off on its way, or at the line if that is too late.
+// - It guesses further ahead where the ball rolls (tuned on a recorded game against a person and checked against
+//   bots that react like people).
 // - Less readable: it picks the corner late (sometimes going for the other one first), and when someone stands in
 //   the shot it goes for the free corner or off the side wall instead.
-const BZ_ASSIST = {react: 1, err: 0.04, look: 14, kick: 0.97, speed: 1, items: 0.3, lineUp: 0.65, hold: 0, holdR: 1, corner: 0.26,
+const BZ_ASSIST = {react: 1, err: 0.04, look: 18, kick: 0.97, speed: 1, items: 0.3, lineUp: 0.65, hold: 0, holdR: 1, corner: 0.26,
   gain: 0.198, backX: 0.3, ar1: 15.8, ar2: 17, kd: 4.1, ping: 1, save: 1, mix: 1, feint: 0.12, saveD: 40, bankP: 20, bankX: 350};
 // One tick of a free ball: it slows, bends with spin, and bounces off the side walls and the end lines beside the goals.
 function bzBallStep(b) {
@@ -5795,7 +5797,7 @@ function bzAhead(s, n, hist) {
 const bzReach = (n, v0, vmax) => vmax * n - (vmax - v0) * 25 * (1 - 0.96 ** n);
 function bzAssistKeys(g) {
   // Offline (against the bots, no ping) it plays as before, which does better there.
-  const sg = g.sg, s = sg.s, meP = sg.me, P = g.offline ? {...BZ_ASSIST, ping: 0, save: 0, mix: 0} : BZ_ASSIST;
+  const sg = g.sg, s = sg.s, meP = sg.me, P = g.offline ? {...BZ_ASSIST, ping: 0, save: 0, mix: 0, look: 14} : BZ_ASSIST;
   if (!meP || !s) return sg.keys;
   const a = sg.assist || (sg.assist = {hist: [], k: 0, hold: 0, start: performance.now() + 110 + Math.random() * 90});
   // How many ticks the update is behind the moment the next input counts on the server: one for each input the

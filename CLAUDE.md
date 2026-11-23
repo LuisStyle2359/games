@@ -12,6 +12,8 @@ relay at the end (`bzRecTick` / `bzRecSend` in index.html, 30 slots used in turn
    `NODE_MODS=<that>/node_modules node tools/kickrec.mjs <out-dir>`). Columns are in `head.cols`;
    `bot` = 1 while the owner held 1 (the bot played), `lag` = unacknowledged inputs.
 2. Look at how goals against happened while the bot played, and how the human opponents move and shoot.
-3. Improve `bzAssistKeys` (and its helpers), check it with `tools/kicksim.mjs` (LIN/LOUT = ping in ticks,
-   LVL=human with OPP fitted to what the recordings show), compare against the previous version.
+3. Improve `bzAssistKeys` (and its helpers), check it with `tools/kickeval.sh '<overrides>'` (three opponents,
+   sum of goal differences; `{}` = as released) or `tools/kicksim.mjs` directly (LIN/LOUT = ping in ticks,
+   LVL=human with OPP fitted to what the recordings show). Compare against the previous version with R=400:
+   results are noisy, and tuning against only one bot overfits (v70's tuning lost to quicker opponents).
 4. Release: bump `APP_VERSION`, commit, push. Old recordings need no clearing, new games replace them.
