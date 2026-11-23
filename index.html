@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 72;
+const APP_VERSION = 73;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5270,6 +5270,10 @@ function sgMessage(g, m) {
   if (m.t !== 's' || !Array.isArray(m.pl)) return;
   const prev = sg.s;
   sg.s = m;
+  if (g.game === 'kick' && prev) {
+    if (m.st === 'over' && prev.st !== 'over') bzRecSend(g);
+    if (m.st === 'count' && prev.st !== 'count') sg.rec = null;
+  }
   if (Number.isFinite(m.ts)) {
     // As in Ping Pong: the smallest gap to the server clock is the offset, and others are drawn a little in
     // the past, between two real positions, by about as much as updates arrive late.
@@ -5338,6 +5342,7 @@ function sgJoinTable(t) {
 function sgLeave(g) {
   if (g.offline) { offStop(); offShow(g.game); return; }
   sgSend(g, {t: 'quit'});
+  if (g.game === 'kick') bzRecSend(g);
   if (g.sg.ws) { const ws = g.sg.ws; g.sg.ws = null; setTimeout(() => { try { ws.close(); } catch (e) {} }, 200); }
   if (g.table && g.sg.s && g.sg.s.host === me.id && g.sg.s.st === 'lobby' && g.sg.s.pl.length <= 1) sgAnnounce(g, false);
   g.over = true;
@@ -5716,6 +5721,7 @@ function bzTicks(g, now) {
     const assist = pgAssistOn && pgAssistHeld && s.st === 'play';
     if (assist) g.assisted = true;
     const k = assist ? bzAssistKeys(g) : (sg.assist = null, sg.keys);
+    bzRecTick(g, k, assist);
     sgSend(g, {t: 'in', k, i: ++sg.seq});
     sg.hist.push([sg.seq, k]);
     if (sg.me) { bzMove(sg.me, k); bzBounds(sg.me, s.ko); }
@@ -5882,6 +5888,49 @@ function bzAssistKeys(g) {
   a.k = k;
   a.hold = P.hold + Math.floor(Math.random() * P.holdR);
   return k;
+}
+// Recordings of the owner's online Fußball games, to make the bot better against people: every second tick the
+// ball, the players, the own keys and whether the bot was playing. At the end the game goes packed to our own
+// relay, kept there in 30 slots used in turn (no names in it).
+const BZ_REC_SLOTS = 30, BZ_REC_CHUNK = 15000;
+function bzRecTick(g, k, assist) {
+  const sg = g.sg, s = sg.s;
+  if (!pgAssistOn || g.offline || !s || !sg.me || !Array.isArray(s.pl)) return;
+  const r = sg.rec || (sg.rec = {at: Date.now(), ver: APP_VERSION, pids: s.pl.map(p => p.pid), fr: [], n: 0, bot: 0, sent: false});
+  if (r.sent || r.fr.length > 15000) return;
+  if (assist) r.bot++;
+  if (++r.n % 2) return;
+  const i = v => Math.round(v || 0), t = v => Math.round((v || 0) * 10), pl = r.pids.map(pid => s.pl.find(p => p.pid === pid));
+  r.fr.push([s.tk, s.sc[0], s.sc[1], s.st === 'goal' ? 2 : 1, assist ? 1 : 0, sg.hist.length, k, i(sg.me.x), i(sg.me.y),
+    i(s.b[0]), i(s.b[1]), t(s.b[2]), t(s.b[3]), s.hold ? r.pids.indexOf(s.hold) + 1 : 0,
+    ...pl.flatMap(p => p ? [i(p.x), i(p.y), t(p.vx), t(p.vy), p.k || 0] : [0, 0, 0, 0, -1])]);
+}
+async function bzRecSend(g) {
+  const sg = g.sg, r = sg.rec, s = sg.s;
+  if (!r || r.sent || r.fr.length < 300 || !s) return;
+  r.sent = true;
+  try {
+    // Each frame as the change from the one before (small numbers pack well).
+    const prev = [], d = r.fr.map(f => { const o = f.map((v, c) => v - (prev[c] || 0)); f.forEach((v, c) => { prev[c] = v; }); return o; });
+    const head = {v: 1, at: r.at, ver: r.ver, me: r.pids.indexOf(me.id), teams: r.pids.map(pid => (s.pl.find(p => p.pid === pid) || {}).team),
+      sc: s.sc, w: s.st === 'over' ? s.w : null, rtt: Math.round(sg.rtt || 0), bot: r.bot, ticks: r.n,
+      cols: 'tk sc0 sc1 st bot lag key meX meY bx by bvx10 bvy10 hold | per player: x y vx10 vy10 k'};
+    const packed = new Blob([JSON.stringify({head, d})]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const buf = new Uint8Array(await new Response(packed).arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 8192) bin += String.fromCharCode(...buf.subarray(i, i + 8192));
+    const b = btoa(bin), n = Math.ceil(b.length / BZ_REC_CHUNK);
+    if (n > 16) return;
+    const slot = (store.get('kickRecSlot', -1) + 1) % BZ_REC_SLOTS, id = Date.now().toString(36), base = ROOT + 'rec/kick/' + slot + '/';
+    store.set('kickRecSlot', slot);
+    const c = mqttClient(OWN_BROKER, {clientId: 'rec' + id + Math.random().toString(36).slice(2, 6), will: {topic: ROOT + 'rec/w', payload: ''},
+      onmessage() {}, onclose() {},
+      onopen() {
+        // The parts of this game, and nothing left over from a longer game that had this slot before.
+        for (let i = 0; i < 16; i++) c.pub(base + i, i < n ? JSON.stringify({id, i, n, d: b.slice(i * BZ_REC_CHUNK, (i + 1) * BZ_REC_CHUNK)}) : '', true);
+        setTimeout(() => c.close(), 3000);
+      }});
+  } catch (e) {}
 }
 function bzSnapshot(g, m) {
   const sg = g.sg, mine = m.pl.find(p => p.pid === me.id);
