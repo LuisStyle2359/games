@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 75;
+const APP_VERSION = 76;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2121,8 +2121,9 @@ function connectLink(kind) {
       } else setStatus(mq ? 'Online' : 'Offline');
       if (kind === 'pub' && !wasOpen) brokerIdx = (brokerIdx + 1) % BROKERS.length;
       const per = kind === 'pub' ? BROKERS.length : 1;
+      // Some networks block for a few seconds now and then: try again soon (at most 5 s apart).
       clearTimeout(retryTimers[kind]);
-      retryTimers[kind] = setTimeout(() => connectLink(kind), wasOpen ? 1000 : Math.min(20000, 500 * 2 ** Math.floor(retries[kind]++ / per)));
+      retryTimers[kind] = setTimeout(() => connectLink(kind), wasOpen ? 1000 : Math.min(5000, 500 * 2 ** Math.floor(retries[kind]++ / per)));
     }
   });
   links.set(kind, c);
@@ -2163,11 +2164,20 @@ const DIAG = {
   dropped: 'Verbindung getrennt'
 };
 
+// The warning only after 6 s without a connection (a short block is bridged by the retries); a click on it
+// tries again at once.
+let offSince = 0, diagTimer = 0;
 function setStatus(s) {
   cstat.textContent = s;
-  const d = $('cdiag');
-  d.hidden = !!mq || !diag.size;
-  d.textContent = 'Keine Verbindung. ' + [...diag].map(([h, r]) => h.replace(/:\d+$/, '') + ': ' + r).join(' · ');
+  const d = $('cdiag'), now = Date.now();
+  offSince = mq ? 0 : offSince || now;
+  const wait = mq ? 0 : 6000 - (now - offSince);
+  clearTimeout(diagTimer);
+  if (wait > 0) diagTimer = setTimeout(() => setStatus(cstat.textContent), wait + 50);
+  d.hidden = !!mq || !diag.size || wait > 0;
+  d.textContent = 'Keine Verbindung. ' + [...diag].map(([h, r]) => h.replace(/:\d+$/, '') + ': ' + r).join(' · ') + ' – klicken zum neu Verbinden';
+  d.style.cursor = 'pointer';
+  d.onclick = reconnectNow;
   updateComposer();
 }
 
