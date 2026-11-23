@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 71;
+const APP_VERSION = 72;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5723,40 +5723,164 @@ function bzTicks(g, now) {
   if (sg.hist.length > 240) sg.hist.splice(0, sg.hist.length - 240);
 }
 // The owner's trick in Fußball (enabled once with #autopaddle, then 1 held): the Profi bot's play, made to look
-// like a person: it starts a moment after the key goes down, sees the ball a few ticks late, aims a little off,
-// sometimes doesn't kick at once, and holds its keys for a few ticks instead of changing them every tick.
-// Tuned in simulated matches against the Profi bot (it wins about 3 of 4 that are decided): steers harder,
-// takes tighter ways round the ball, shoots a bit earlier and lower into the far corner.
+// like a person: it starts a moment after the key goes down, aims a little off and sometimes doesn't kick at once.
+// Against people online it has to do more than the bots do:
+// - Ping: an update shows the ball as it was about a ping ago (half on its way here, half for the input to get
+//   there), while the own player is already shown where the next input takes it. So it plays the ball where it
+//   will be when the input arrives (rolled on with its slowing and bounces), and the others the same way.
+// - Saves: a shot coming at the own goal is cut off on its way, or at the line if that is too late.
+// - Less readable: it picks the corner late (sometimes going for the other one first), and when someone stands in
+//   the shot it goes for the free corner or off the side wall instead.
 const BZ_ASSIST = {react: 1, err: 0.04, look: 14, kick: 0.97, speed: 1, items: 0.3, lineUp: 0.65, hold: 0, holdR: 1, corner: 0.26,
-  gain: 0.198, backX: 0.3, ar1: 15.8, ar2: 17, kd: 4.1};
+  gain: 0.198, backX: 0.3, ar1: 15.8, ar2: 17, kd: 4.1, ping: 1, save: 1, mix: 1, feint: 0.12, saveD: 40, bankP: 20, bankX: 350};
+// One tick of a free ball: it slows, bends with spin, and bounces off the side walls and the end lines beside the goals.
+function bzBallStep(b) {
+  b.x += b.vx; b.y += b.vy; b.vx *= 0.99; b.vy *= 0.99;
+  if (b.spin) {
+    const c = Math.cos(b.spin), s = Math.sin(b.spin), vx = b.vx;
+    b.vx = vx * c - b.vy * s; b.vy = vx * s + b.vy * c;
+    b.spin *= 0.985;
+    if (Math.abs(b.spin) < 0.002) b.spin = 0;
+  }
+  if (b.y < BZ_BR) { b.y = BZ_BR; b.vy = -b.vy * 0.5; }
+  if (b.y > BZ_H - BZ_BR) { b.y = BZ_H - BZ_BR; b.vy = -b.vy * 0.5; }
+  if (Math.abs(b.y - BZ_H / 2) > BZ_GH / 2) {
+    if (b.x < BZ_BR) { b.x = BZ_BR; b.vx = Math.abs(b.vx) * 0.5; }
+    if (b.x > BZ_W - BZ_BR) { b.x = BZ_W - BZ_BR; b.vx = -Math.abs(b.vx) * 0.5; }
+  }
+}
+// The ball and the players n ticks after update s. The own player replays the inputs the server hadn't seen yet
+// (touching and kicking the ball on the way, as the server will), the others keep pressing their last keys.
+function bzAhead(s, n, hist) {
+  const b = {x: s.b[0], y: s.b[1], vx: s.b[2], vy: s.b[3], spin: (s.spin || 0) / 100};
+  const pl = s.pl.map(p => ({...p, fx: {...p.fx}, r: p.r || BZ_PR})), mine = pl.find(p => p.pid === me.id);
+  const holder = s.hold && pl.find(p => p.pid === s.hold);
+  let lastK = mine ? mine.k || 0 : 0;
+  for (let i = 0; i < n; i++) {
+    for (const p of pl) {
+      const k = p === mine ? (i < hist.length ? hist[i][1] : lastK) : p.k || 0;
+      bzMove(p, k); bzBounds(p, s.ko);
+      if (p === mine) {
+        // A kick (the key just went down) with the ball in reach.
+        const dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy) || 1;
+        if ((k & 16) && !(lastK & 16) && !holder && s.st === 'play' && d < p.r + BZ_BR + 4) {
+          const f = p.fx.god || p.fx.hammer > 0 ? 2 : 1;
+          b.vx += dx / d * 5 * f; b.vy += dy / d * 5 * f; b.spin = 0;
+        }
+        lastK = k;
+      }
+    }
+    if (holder) { b.x += holder.vx; b.y += holder.vy; b.vx = holder.vx; b.vy = holder.vy; continue; }
+    bzBallStep(b);
+    // Players push the ball (they weigh twice as much, as on the server).
+    for (const p of pl) {
+      const dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy), w = p.fx.giant ? 0.2 : p.fx.dwarf ? 0.9 : 0.5;
+      if (!d || d >= p.r + BZ_BR) continue;
+      const nx = dx / d, ny = dy / d, over = p.r + BZ_BR - d, im = w + 1;
+      b.x += nx * over / im; b.y += ny * over / im;
+      const rv = (b.vx - p.vx) * nx + (b.vy - p.vy) * ny;
+      if (rv < 0) { const j = -1.25 * rv / im; b.vx += nx * j; b.vy += ny * j; }
+      b.spin = 0;
+    }
+  }
+  return {b, pl};
+}
+// How far a player gets toward a point in n ticks, starting with speed v0 that way (speed builds up slowly).
+const bzReach = (n, v0, vmax) => vmax * n - (vmax - v0) * 25 * (1 - 0.96 ** n);
 function bzAssistKeys(g) {
-  const sg = g.sg, s = sg.s, meP = sg.me;
+  // Offline (against the bots, no ping) it plays as before, which does better there.
+  const sg = g.sg, s = sg.s, meP = sg.me, P = g.offline ? {...BZ_ASSIST, ping: 0, save: 0, mix: 0} : BZ_ASSIST;
   if (!meP || !s) return sg.keys;
   const a = sg.assist || (sg.assist = {hist: [], k: 0, hold: 0, start: performance.now() + 110 + Math.random() * 90});
-  a.hist.push([s.b[0], s.b[1], s.b[2], s.b[3]]);
+  // How many ticks the update is behind the moment the next input counts on the server: one for each input the
+  // server hadn't seen yet when it sent the update (about a ping's worth).
+  const lag = P.ping ? Math.min(15, Math.round(sg.hist.length * (P.lagF ?? 1))) : 0;
+  const ah = bzAhead(s, lag, P.ping ? sg.hist : []), pb = ah.b;
+  a.hist.push([pb.x, pb.y, pb.vx, pb.vy]);
   if (a.hist.length > 40) a.hist.shift();
   if (performance.now() < a.start) return sg.keys;
   if (a.hold-- > 0) { const k = a.k; a.k &= ~16; return k; }
-  const self = {pid: me.id, team: meP.team, x: meP.x, y: meP.y, vx: meP.vx, vy: meP.vy, fx: meP.fx || {}, bot: true,
+  const team = meP.team, r = meP.r || BZ_PR, cy = BZ_H / 2, ownX = team === 0 ? 0 : BZ_W, oppX = BZ_W - ownX;
+  const self = {pid: me.id, team, x: meP.x, y: meP.y, vx: meP.vx, vy: meP.vy, fx: meP.fx || {}, bot: true,
     lastK: a.lastK, aim: a.aim, aimAt: a.aimAt, seenItem: a.seenItem, wantItem: a.wantItem};
-  const R = {st: s.st, ko: s.ko, tick: s.tk, b: {x: s.b[0], y: s.b[1], vx: s.b[2], vy: s.b[3]}, item: s.it, hold: s.hold ? {pid: s.hold} : null,
-    players: s.pl.map(p => p.pid === me.id ? self : {...p, fx: p.fx || {}, bot: false})};
+  const foes = ah.pl.filter(p => p.team !== team);
+  const R = {st: s.st, ko: s.ko, tick: s.tk, b: pb, item: s.it, hold: s.hold ? {pid: s.hold} : null,
+    players: ah.pl.map(p => p.pid === me.id ? self : {...p, bot: false})};
   // An item is decided once (not again with every update).
   if (s.it && a.itemKey !== s.it.k + s.it.x) { a.itemKey = s.it.k + s.it.x; self.seenItem = undefined; } else self.seenItem = R.item;
-  const seen = a.hist[Math.max(0, a.hist.length - 1 - BZ_ASSIST.react)];
-  // Better than the bots: it shoots for the corner away from the opponent nearest to their goal (a little off,
-  // like a person), chosen anew every second or so.
-  if (!a.aimAt || s.tk - a.aimAt > 60) {
-    const oppX = meP.team === 0 ? BZ_W : 0, keeper = s.pl.filter(p => p.team !== meP.team).sort((p, q) => Math.abs(p.x - oppX) - Math.abs(q.x - oppX))[0];
-    const side = keeper ? (keeper.y > BZ_H / 2 ? -1 : 1) : (Math.random() < 0.5 ? -1 : 1);
-    a.aim = side * BZ_ASSIST.corner + (Math.random() * 2 - 1) * BZ_ASSIST.err;
-    a.aimAt = s.tk;
+  const seen = a.hist[Math.max(0, a.hist.length - 1 - (lag ? 0 : P.react))];
+  const dBall = Math.hypot(pb.x - self.x, pb.y - self.y);
+  let k = -1;
+  // A shot at the own goal: where it crosses the line, and the first point on its way that can still be reached.
+  if (P.save && s.ko < 0 && !(s.hold && s.hold !== me.id) && dBall > P.saveD && (team === 0 ? pb.vx < -1 : pb.vx > 1)) {
+    const q = {...pb}, path = [];
+    let cross = null;
+    for (let t = 1; t <= 90 && Math.hypot(q.vx, q.vy) > 0.6; t++) {
+      bzBallStep(q);
+      path.push([q.x, q.y]);
+      if (team === 0 ? q.x < 0 : q.x > BZ_W) { if (Math.abs(q.y - cy) < BZ_GH / 2 + 2) cross = [q.x, q.y]; break; }
+    }
+    if (cross) {
+      const vmax = 2.45 * (self.fx.turbo || self.fx.god ? 1.5 : 1);
+      let tgt = [ownX + (team === 0 ? r + 1 : -r - 1), Math.max(cy - BZ_GH / 2 + 4, Math.min(cy + BZ_GH / 2 - 4, cross[1]))];
+      for (let t = 0; t < path.length; t++) {
+        const [x, y] = path[t], dx = x - self.x, dy = y - self.y, d = Math.hypot(dx, dy) || 1;
+        if (d - r - BZ_BR + 3 <= bzReach(t + 1, (self.vx * dx + self.vy * dy) / d, vmax)) { tgt = [x, y]; break; }
+      }
+      k = bzSteer(self, tgt[0], tgt[1], {...P, gain: 0.5});
+      // Close enough: clear it, as long as that sends it away from the own goal.
+      const dx = pb.x - self.x, dy = pb.y - self.y, d = Math.hypot(dx, dy) || 1;
+      if (d < r + BZ_BR + P.kd && (team === 0 ? dx : -dx) / d > 0.2 && !(a.lastK & 16)) k |= 16;
+      self.lastK = k;
+    }
   }
-  self.aim = a.aim; self.aimAt = s.tk;
-  const k = bzBotKeys(R, self, BZ_ASSIST, seen);
+  if (k < 0) {
+    // The aim: the corner away from the opponent nearest their goal, a little off like a person. Chosen anew every
+    // second or so, and close to the ball again if the keeper moved over; now and then it heads for the other
+    // corner first and switches at the last moment.
+    const keeper = foes.slice().sort((p, q) => Math.abs(p.x - oppX) - Math.abs(q.x - oppX))[0];
+    const kSide = keeper ? (keeper.y > cy ? -1 : 1) : (Math.random() < 0.5 ? -1 : 1);
+    if (!a.aimAt || s.tk - a.aimAt > 60 || (P.mix && dBall < 80 && a.side !== kSide && keeper && Math.abs(keeper.y - cy) > 10)) {
+      if (a.side !== kSide || !a.aimAt) a.feint = P.mix && dBall > 120 && Math.random() < P.feint;
+      a.side = kSide;
+      a.err = (Math.random() * 2 - 1) * P.err;
+      a.aimAt = s.tk;
+    }
+    let aim = (a.feint && dBall > 45 ? -a.side : a.side) * P.corner + a.err;
+    // Someone in the way of that shot (not the one fighting for the ball, that one it just plays past): the aim with
+    // the most room, the other corner, the middle or off a side wall (the ball keeps half its sideways speed in the
+    // bounce, so the mirror point is twice as far out). Kept for a moment, so it doesn't dither.
+    if (P.mix && dBall < 70) {
+      if (s.tk - (a.altAt || 0) > 20) {
+        const room = am => {
+          const ty = cy + am * 160, lx = oppX - pb.x, ly = ty - pb.y, L = Math.hypot(lx, ly) || 1;
+          let m = 60;
+          for (const f of foes) {
+            const u = ((f.x - pb.x) * lx + (f.y - pb.y) * ly) / L;
+            if (u > 45 && u < L) m = Math.min(m, Math.abs((f.x - pb.x) * ly - (f.y - pb.y) * lx) / L - (f.r || BZ_PR) - BZ_BR);
+          }
+          return m;
+        };
+        a.alt = null;
+        if (room(aim) < 4) {
+          const top = (BZ_BR - 2 * (cy - BZ_BR) - cy) / 160, bot = (BZ_H - BZ_BR + 2 * (BZ_H - BZ_BR - cy) - cy) / 160;
+          let bestV = room(aim) + P.bankP / 2;
+          const near = Math.abs(oppX - pb.x) < P.bankX;
+          for (const [am, pen] of [[-P.corner, 0], [P.corner, 0], [0, 4], ...(near ? [[top, P.bankP], [bot, P.bankP]] : [])]) {
+            const v = room(am) - pen;
+            if (v > bestV) { a.alt = am; bestV = v; }
+          }
+        }
+        a.altAt = s.tk;
+      }
+      if (a.alt !== null && a.alt !== undefined) aim = a.alt;
+    }
+    self.aim = aim; self.aimAt = s.tk;
+    k = bzBotKeys(R, self, P, seen);
+  }
   Object.assign(a, {lastK: self.lastK, seenItem: self.seenItem, wantItem: self.wantItem});
   a.k = k;
-  a.hold = BZ_ASSIST.hold + Math.floor(Math.random() * BZ_ASSIST.holdR);
+  a.hold = P.hold + Math.floor(Math.random() * P.holdR);
   return k;
 }
 function bzSnapshot(g, m) {
