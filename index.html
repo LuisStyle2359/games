@@ -2034,7 +2034,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 77;
+const APP_VERSION = 78;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -5751,7 +5751,7 @@ function bzTicks(g, now) {
 // - Less readable: it picks the corner late (sometimes going for the other one first), and when someone stands in
 //   the shot it goes for the free corner or off the side wall instead.
 const BZ_ASSIST = {react: 1, err: 0.04, look: 18, kick: 0.97, speed: 1, items: 0.3, lineUp: 0.65, hold: 0, holdR: 1, corner: 0.26,
-  gain: 0.198, backX: 0.3, ar1: 15.8, ar2: 17, kd: 4.1, ping: 1, save: 1, mix: 1, feint: 0.12, saveD: 40, bankP: 20, bankX: 350, def: 1, defD: 120, defM: 0, defA: 0.2, defX: 800, blockU: 45, khMin: 4, khMax: 10};
+  gain: 0.198, backX: 0.3, ar1: 15.8, ar2: 17, kd: 4.1, ping: 1, save: 1, mix: 1, feint: 0.12, saveD: 40, bankP: 20, bankX: 350, def: 1, defD: 120, defM: 0, defA: 0.2, defX: 800, blockU: 45, khMin: 4, khMax: 10, ham: 1, hamD: 400, hamM: -100, hamA: -0.3, clr: 1, clrX: 260, clrU: 90};
 // One tick of a free ball: it slows, bends with spin, and bounces off the side walls and the end lines beside the goals.
 function bzBallStep(b) {
   b.x += b.vx; b.y += b.vy; b.vx *= 0.99; b.vy *= 0.99;
@@ -5861,7 +5861,10 @@ function bzAssistKeys(g) {
     const gx = ownX - pb.x, gy = cy - pb.y, gl = Math.hypot(gx, gy) || 1;
     const facing = ((pb.x - f.x) * gx + (pb.y - f.y) * gy) / df / gl;
     const u = ((self.x - pb.x) * gx + (self.y - pb.y) * gy) / gl, off = Math.abs((self.x - pb.x) * gy - (self.y - pb.y) * gx) / gl;
-    if (df < P.defD && df + P.defM < dBall && facing > P.defA && gl < P.defX && !(u > 12 && off < r + 4)) {
+    // With the hammer (or divine) a shot from anywhere goes in: then it stays in the line from further off, and
+    // even when it is a little closer to the ball itself.
+    const hard = P.ham && f.fx && (f.fx.hammer > 0 || f.fx.god);
+    if (df < (hard ? P.hamD : P.defD) && df + (hard ? P.hamM : P.defM) < dBall && facing > (hard ? P.hamA : P.defA) && gl < P.defX && !(u > 12 && off < r + 4)) {
       const at = Math.max(45, Math.min(140, gl * 0.35));
       k = bzSteer(self, pb.x + gx / gl * at, pb.y + gy / gl * at, {...P, gain: 0.5});
       self.lastK = k;
@@ -5885,17 +5888,24 @@ function bzAssistKeys(g) {
     // bounce, so the mirror point is twice as far out). Kept for a moment, so it doesn't dither.
     if (P.mix && dBall < 70) {
       if (s.tk - (a.altAt || 0) > 20) {
+        // Near the own goal an opponent right in front of the ball counts too: a clearance into them comes straight
+        // back, so then the ball goes past them (to the side, or off the wall).
+        const own = P.clr && Math.abs(pb.x - ownX) < P.clrX, minU = own ? 5 : P.blockU;
         const room = am => {
           const ty = cy + am * 160, lx = oppX - pb.x, ly = ty - pb.y, L = Math.hypot(lx, ly) || 1;
           let m = 60;
           for (const f of foes) {
             const u = ((f.x - pb.x) * lx + (f.y - pb.y) * ly) / L;
-            if (u > P.blockU && u < L) m = Math.min(m, Math.abs((f.x - pb.x) * ly - (f.y - pb.y) * lx) / L - (f.r || BZ_PR) - BZ_BR);
+            if (u > minU && u < (own ? Math.min(L, P.clrU) : L)) m = Math.min(m, Math.abs((f.x - pb.x) * ly - (f.y - pb.y) * lx) / L - (f.r || BZ_PR) - BZ_BR);
           }
           return m;
         };
         a.alt = null;
-        if (room(aim) < 4) {
+        if (own && room(aim) < 4) {
+          const top = (BZ_BR - 2 * (cy - BZ_BR) - cy) / 160, bot = (BZ_H - BZ_BR + 2 * (BZ_H - BZ_BR - cy) - cy) / 160;
+          let bestV = room(aim);
+          for (const am of [-P.corner, P.corner, 0, top, bot, top / 2, bot / 2]) { const v = room(am); if (v > bestV) { a.alt = am; bestV = v; } }
+        } else if (room(aim) < 4) {
           const top = (BZ_BR - 2 * (cy - BZ_BR) - cy) / 160, bot = (BZ_H - BZ_BR + 2 * (BZ_H - BZ_BR - cy) - cy) / 160;
           let bestV = room(aim) + P.bankP / 2;
           const near = Math.abs(oppX - pb.x) < P.bankX;
