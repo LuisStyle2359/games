@@ -2051,7 +2051,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 82;
+const APP_VERSION = 83;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2873,7 +2873,6 @@ const GF_COURSES = {
   space: {name: '🌌 Weltall', holes: GF_SPACE, theme: 'space', fric: 0.986},
   mix: {name: '🎲 Zufall (9 gemischt)'}};
 for (const k of ['classic', 'desert', 'space']) for (const H of GF_COURSES[k].holes) { H.theme = GF_COURSES[k].theme; H.fric = GF_COURSES[k].fric; }
-const GF_MODES = {stroke: 'Zählspiel (wenigste Schläge)', match: 'Lochspiel (wer mehr Löcher gewinnt)'};
 // The holes of a course (the mix draws 9 from all of them, the same on both pages).
 function gfCourse(key, seed) {
   if (GF_COURSES[key] && GF_COURSES[key].holes) return GF_COURSES[key].holes;
@@ -3041,7 +3040,7 @@ function gfSim(H, mod, balls, a, p, ph) {
 let gfOff = null;
 function gfInit(g, opp, key) {
   const seed = g.gid, [course, mode] = String(key || '').split('|'), holes = gfCourse(GF_COURSES[course] ? course : 'classic', seed);
-  g.gf = {h: 0, t: 0, holes, course: GF_COURSES[course] ? course : 'classic', mode: GF_MODES[mode] ? mode : 'stroke', mods: gfMods(seed, holes), sc: [[], []], st: 'play', endT: 0,
+  g.gf = {h: 0, t: 0, holes, course: GF_COURSES[course] ? course : 'classic', mods: gfMods(seed, holes), sc: [[], []], st: 'play', endT: 0,
     q: [], opp, k: 0, turn: 1, anim: null, aim: 0, me: null, op: null, banner: null, drag: null, parts: [], botAt: 0};
   gfStartHole(g, 0);
   if (!gfLoopOn) { gfLoopOn = true; requestAnimationFrame(gfFrame); }
@@ -3230,19 +3229,11 @@ function gfFrame(now) {
   requestAnimationFrame(gfFrame);
 }
 const gfTotal = a => a.reduce((s, v) => s + (v || 0), 0);
-// Hole by hole: whoever needed fewer strokes wins the hole (a tie gives both half).
-function gfPoints(gf) {
-  let a = 0, b = 0;
-  gf.sc[0].forEach((v, i) => { const w = gf.sc[1][i]; if (v == null || w == null) return; if (v < w) a++; else if (w < v) b++; else { a += 0.5; b += 0.5; } });
-  return [a, b];
-}
 function gfFinish(g) {
   const gf = g.gf;
   gf.st = 'over';
   g.over = true;
-  const match = gf.mode === 'match' && gf.opp !== 'solo', [pa, pb] = gfPoints(gf);
-  // Fewer strokes wins, or in match play more holes won (lower is better either way).
-  const a = match ? -pa : gfTotal(gf.sc[0]), b = match ? -pb : gfTotal(gf.sc[1]);
+  const a = gfTotal(gf.sc[0]), b = gfTotal(gf.sc[1]);
   if (g.offline) {
     g.winner = gf.opp === 'solo' ? 1 : a < b ? 1 : a > b ? 2 : 0;
     if (gf.opp === 'solo') { const k = 'golfBest-' + gf.course, best = store.get(k, 0); if (gf.course !== 'mix' && (!best || a < best)) store.set(k, a); }
@@ -3612,14 +3603,14 @@ function renderGolf(g) {
   }
   const a = gfTotal(gf.sc[0]) + (gf.st === 'play' ? gf.me.s : 0), b = gfTotal(gf.sc[1]) + (gf.st === 'play' ? gf.op.s : 0);
   const solo = off && gf.opp === 'solo', opName = g.opName + (off || people.has(g.opponent) ? '' : ' (offline)');
-  const quit = g.over && gf.st !== 'over', match = gf.mode === 'match' && !solo, [pa, pb] = gfPoints(gf), pts = v => String(v).replace('.5', '½');
+  const quit = g.over && gf.st !== 'over';
   const course = GF_COURSES[gf.course].name.split(' (')[0];
   $(off ? 'ostatus' : 'cmpstatus').textContent = quit ? (g.winner === g.myMark ? '🏆 ' + g.opName + ' hat aufgegeben – du gewinnst!' : 'Aufgegeben – ' + g.opName + ' gewinnt.')
     : g.over
-    ? (solo ? '⛳ Fertig: ' + a + ' Schläge' : (g.winner === 0 ? 'Unentschieden! ' : g.winner === g.myMark ? '🏆 Du hast gewonnen! ' : g.opName + ' hat gewonnen! ') + (match ? pts(pa) + ' : ' + pts(pb) + ' Löcher' : a + ' : ' + b + ' Schläge'))
+    ? (solo ? '⛳ Fertig: ' + a + ' Schläge' : (g.winner === 0 ? 'Unentschieden! ' : g.winner === g.myMark ? '🏆 Du hast gewonnen! ' : g.opName + ' hat gewonnen! ') + a + ' : ' + b + ' Schläge')
     : '⛳ ' + course + (solo ? '' : ' vs ' + opName) + ' — Loch ' + (gf.h + 1) + '/' + gf.holes.length + ' · Par ' + gf.holes[gf.h].par
       + (solo || gf.st !== 'play' ? '' : gf.turn === g.myMark ? ' · ▶ Du bist dran' : ' · ' + g.opName + ' ist dran')
-      + (match ? ' · Löcher gewonnen: Du ' + pts(pa) + ' · ' + g.opName + ' ' + pts(pb) : ' · Schläge gesamt: Du ' + a + (solo ? '' : ' · ' + g.opName + ' ' + b));
+      + ' · Schläge gesamt: Du ' + a + (solo ? '' : ' · ' + g.opName + ' ' + b);
   const card = $(off ? 'gfcardO' : 'gfcard');
   if (card) {
     const row = (label, arr) => el('tr', {}, el('td', {text: label}), ...gf.holes.map((_, i) => el('td', {text: arr[i] == null ? '' : String(arr[i])})), el('td', {text: String(gfTotal(arr))}));
@@ -3888,7 +3879,6 @@ function gfOffShow() {
   $('oboard').hidden = true;
   const set = offSet.golf || (offSet.golf = {opp: 'mittel'}), wins = offWins.golf || {}, best = store.get('golfBest-' + (set.course || 'classic'), 0) || (set.course === 'classic' || !set.course ? store.get('golfBest', 0) : 0);
   set.course = GF_COURSES[set.course] ? set.course : 'classic';
-  set.mode = GF_MODES[set.mode] ? set.mode : 'stroke';
   const pick = (key, val, label) => el('button', {class: 'vbtn' + (set[key] === val ? ' on' : ''), type: 'button', text: label, onclick: () => { set[key] = val; store.set('offSet', offSet); gfOffShow(); }});
   const blocked = mpRunning() && mpGame.game === 'golf';
   $('osetup').replaceChildren(el('div', {class: 'osetbox'},
@@ -3898,9 +3888,8 @@ function gfOffShow() {
       text: v + (k === 'solo' ? (best ? ' · Rekord ' + best : '') : wins[k] ? ' · ' + wins[k] + ' 🏆' : ''), onclick: () => { set.opp = k; store.set('offSet', offSet); gfOffShow(); }}))),
     el('div', {class: 'olabel', text: 'Platz'}),
     el('div', {class: 'orow'}, ...Object.entries(GF_COURSES).map(([k, c]) => pick('course', k, c.name))),
-    ...(set.opp === 'solo' ? [] : [el('div', {class: 'olabel', text: 'Spielart'}), el('div', {class: 'orow'}, ...Object.entries(GF_MODES).map(([k, v]) => pick('mode', k, v)))]),
     el('p', {text: '🌿 Classic: Windmühle, Flipper, Teleporter, schwarzes Loch … · 🏜️ Wüste: Kakteen, Treibsand, Steppenläufer, Schlucht mit Sprungschanze · 🌌 Weltall: kaum Reibung, Wurmlöcher, Asteroiden, Schwerkraft-Lifts, Laserzäune. Dazu manchmal Chaos: Wind, Flummi-Wände, Mini- oder Riesenloch.'}),
-    el('p', {text: 'Wasser, Lava und Schluchten kosten einen Strafschlag. Zählspiel: weniger Schläge gewinnt. Lochspiel: wer mehr Löcher gewinnt.'}),
+    el('p', {text: 'Wasser, Lava und Schluchten kosten einen Strafschlag. Wer am Ende weniger Schläge hat, gewinnt.'}),
     el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Los geht\'s', disabled: blocked, onclick: gfOffStart}),
     blocked ? el('p', {text: 'Erst das laufende Minigolf im Chat beenden.'}) : null,
     el('p', {class: 'sg-keys', text: '🖱 Irgendwo drücken, nach hinten ziehen wie eine Schleuder und loslassen – je weiter, desto fester'})));
@@ -3908,7 +3897,7 @@ function gfOffShow() {
 function gfOffStart() {
   const set = offSet.golf || {}, opp = set.opp || 'mittel';
   const g = {gid: 'off' + Date.now().toString(36), game: 'golf', offline: {opp}, myMark: 1, over: false, opName: opp === 'solo' ? '' : 'Bot'};
-  gfInit(g, opp, (set.course || 'classic') + '|' + (set.mode || 'stroke'));
+  gfInit(g, opp, set.course || 'classic');
   gfOff = g;
   $('osetup').hidden = true;
   $('oboard').hidden = false;
@@ -3919,13 +3908,11 @@ function gfOffStart() {
 function gfInvitePicker() {
   const box = $('cmpGolfOpts'), set = offSet.golf || (offSet.golf = {opp: 'mittel'});
   set.course = GF_COURSES[set.course] ? set.course : 'classic';
-  set.mode = GF_MODES[set.mode] ? set.mode : 'stroke';
   const pick = (key, val, label) => el('button', {class: 'vbtn' + (set[key] === val ? ' on' : ''), type: 'button', text: label, style: 'width:100%',
     onclick: e => { e.stopPropagation(); set[key] = val; store.set('offSet', offSet); gfInvitePicker(); }});
   box.replaceChildren(
     ...Object.entries(GF_COURSES).map(([k, c]) => pick('course', k, c.name)),
-    ...Object.entries(GF_MODES).map(([k, v]) => pick('mode', k, v.split(' (')[0])),
-    el('button', {class: 'vbtn sg-start', type: 'button', text: '⛳ Einladen', style: 'width:100%', onclick: () => { closePops(); inviteMp('golf', set.course + '|' + set.mode); }}));
+    el('button', {class: 'vbtn sg-start', type: 'button', text: '⛳ Einladen', style: 'width:100%', onclick: () => { closePops(); inviteMp('golf', set.course); }}));
   box.hidden = false;
 }
 /* Schiffe versenken: 10 x 10, ships 5-4-3-3-2 that may not touch, a hit gives another shot. Over the chat like
