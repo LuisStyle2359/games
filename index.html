@@ -312,6 +312,12 @@ tbody tr.sel td { background: var(--select); }
 .dr-log { font-size: 11px; color: var(--muted); min-height: 14px; width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dr-log .ok { color: #27ae60; font-weight: 600; }
 .dr-log .near { color: #e67e22; font-weight: 600; }
+.sv-wrap { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; overflow: hidden; }
+.sv-cv { flex: none; display: block; border-radius: 10px; touch-action: none; cursor: crosshair; box-shadow: 0 4px 18px rgba(2,6,23,.45); }
+.sv-bar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center; min-height: 26px; }
+.sv-bar .vbtn.on { outline: 2px solid #facc15; }
+.sv-bar .sv-go:not(:disabled) { background: #16a34a; color: #fff; border-color: #15803d; font-weight: 700; }
+.sv-energy { font-size: 12px; opacity: .75; }
 .gf-wrap { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; overflow: hidden; }
 .gf-cv { flex: none; display: block; border-radius: 8px; touch-action: none; cursor: crosshair; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
 .gf-card table { border-collapse: collapse; font-size: 12px; }
@@ -579,6 +585,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
         <thead><tr><th>Doc Location</th><th>Name<span class="sort">▲</span></th><th>Label</th><th>Flags</th><th>Pages</th><th>Creation Date</th><th>References</th><th></th></tr></thead>
         <tbody>
           <tr data-doc="Audits/Assessments"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-01</td><td>Audits/Assessments</td><td>EuDeclarationAcceptance</td><td></td><td>1</td><td>22.09.2026 14:12</td><td></td><td></td></tr>
+          <tr data-doc="Bill of Lading" data-offline="sv"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-17</td><td>Bill of Lading</td><td>Ocean</td><td></td><td>2</td><td>01.11.2026 08:55</td><td></td><td></td></tr>
           <tr data-doc="Clearance Advice"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-02</td><td>Clearance Advice</td><td></td><td></td><td>2</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
           <tr data-doc="Commercial Invoice" data-game="snake"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-03</td><td>Commercial Invoice</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
           <tr data-doc="Correspondence" data-chat="1"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-11</td><td>Correspondence</td><td>Email</td><td></td><td>1</td><td>16.10.2026 08:47</td><td></td><td></td></tr>
@@ -646,7 +653,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
-            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button><button class="vbtn" id="cmpKick" type="button" style="width:100%">⚽ Fußball</button><button class="vbtn" id="cmpTron" type="button" style="width:100%">🏍️ Neon Rush</button><button class="vbtn" id="cmpBreach" type="button" style="width:100%">⚔️ Breach (1 gegen 1)</button><button class="vbtn" id="cmpGolf" type="button" style="width:100%">⛳ Crazy Minigolf</button></div>
+            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button><button class="vbtn" id="cmpKick" type="button" style="width:100%">⚽ Fußball</button><button class="vbtn" id="cmpTron" type="button" style="width:100%">🏍️ Neon Rush</button><button class="vbtn" id="cmpBreach" type="button" style="width:100%">⚔️ Breach (1 gegen 1)</button><button class="vbtn" id="cmpGolf" type="button" style="width:100%">⛳ Crazy Minigolf</button><button class="vbtn" id="cmpSv" type="button" style="width:100%">🚢 Schiffe versenken</button><button class="vbtn" id="cmpSvC" type="button" style="width:100%">💥 Schiffe versenken CRAZY</button></div>
             <div class="cpop" id="cflexpop" hidden role="dialog" aria-label="Score zeigen" style="padding:8px;gap:4px;flex-direction:column"></div>
             <div class="cimgbar" id="cimgbar" hidden><img id="cimgthumb" alt=""><span id="cimginfo">Bild senden?</span><button class="vbtn" id="cimgsend" type="button">Senden</button><button class="vbtn" id="cimgcancel" type="button">Abbrechen</button></div>
             <div class="cimgview" id="cimgview" hidden></div>
@@ -1881,8 +1888,8 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const MP_GAMES = ['ttt', 'c4', 'draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach', 'golf'];
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong gegen Bot', kick: 'Fußball', tron: 'Neon Rush', breach: 'Breach', golf: 'Crazy Minigolf'};
+const MP_GAMES = ['ttt', 'c4', 'draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach', 'golf', 'sv'];
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong gegen Bot', kick: 'Fußball', tron: 'Neon Rush', breach: 'Breach', golf: 'Crazy Minigolf', sv: 'Schiffe versenken'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -2041,7 +2048,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 79;
+const APP_VERSION = 80;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2493,7 +2500,7 @@ function toggleLb() {
   if (!p.hidden) renderLb();
 }
 function renderLb() {
-  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong', 'pongtop', 'kick', 'tron', 'breach', 'golf'];
+  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong', 'pongtop', 'kick', 'tron', 'breach', 'golf', 'sv'];
   const avail = allGames.filter(g => lb[g] && Object.keys(lb[g]).length);
   if (!avail.includes(lbGame)) lbGame = avail[0] || 'snake';
   $('clbtabs').replaceChildren(...avail.map(g =>
@@ -2504,7 +2511,7 @@ function renderLb() {
     .sort((a, b) => b.score - a.score);
   if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Punkte für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
   const medals = ['gold', 'silver', 'bronze'];
-  const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong', 'kick', 'tron', 'breach', 'golf'];
+  const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong', 'kick', 'tron', 'breach', 'golf', 'sv'];
   $('clbbody').replaceChildren(el('table', {class: 'clbtable'},
     el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : ['pongbot', 'pongtop'].includes(lbGame) ? 'Tempo' : 'Punkte'}))),
     el('tbody', {}, ...entries.map((e, i) => el('tr', {},
@@ -2558,6 +2565,7 @@ function startMp(gid, game, opponent, opName, myMark, key) {
   else if (game === 'uno') unoStartDuo(mpGame);
   else if (game === 'pong') pgInit(mpGame, key);
   else if (game === 'golf') gfInit(mpGame);
+  else if (game === 'sv') svInit(mpGame, key);
   else if (SG_GAMES.includes(game)) sgInit(mpGame, key, true);
   for (const i of mpInvites) if (i.mine && i.gid !== gid) mpDeadInvites.add(i.gid);
   mpInvites = mpInvites.filter(i => i.from !== opponent && !i.mine);
@@ -2577,13 +2585,14 @@ function syncMpView() {
 }
 function renderMpBoard() {
   if (!mpGame) return;
-  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach', 'golf'].includes(mpGame.game));
+  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach', 'golf', 'sv'].includes(mpGame.game));
   if (mpGame.game === 'draw') { renderDraw(); return; }
   if (mpGame.game === 'emoji') { renderEmoji(); return; }
   if (mpGame.game === 'react') { renderReact(); return; }
   if (mpGame.game === 'uno') { renderUno(); return; }
   if (mpGame.game === 'pong') { renderPong(); return; }
   if (mpGame.game === 'golf') { renderGolf(mpGame); return; }
+  if (mpGame.game === 'sv') { svRender(mpGame); return; }
   if (SG_GAMES.includes(mpGame.game)) { renderSg(mpGame); return; }
   const g = mpGame, myTurn = g.turn === g.myMark;
   const opLabel = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
@@ -2668,7 +2677,7 @@ const mpDeadInvites = new Set();
 // instead of waiting forever.
 setInterval(() => {
   const g = mpGame;
-  if (!g || g.over || !['ttt', 'c4', 'draw', 'emoji', 'react', 'golf'].includes(g.game)) return;
+  if (!g || g.over || !['ttt', 'c4', 'draw', 'emoji', 'react', 'golf', 'sv'].includes(g.game)) return;
   g.goneT = people.has(g.opponent) ? 0 : (g.goneT || 0) + 1;
   if (g.goneT < 24) return;
   mpGame = null;
@@ -2688,10 +2697,10 @@ setInterval(() => {
   mpOutbox = mpOutbox.filter(o => (people.has(o.to) ? ++o.tries : o.tries) <= 75 || (mpGame && !mpGame.over && o.p.gid === mpGame.gid));
   if (mq) for (const o of mpOutbox) sendMpMsg(o.to, o.p).catch(() => {});
 }, 4000);
-function inviteMp(game) {
+function inviteMp(game, mode) {
   if (conv === ALL || !people.has(conv) || !mq || mpRunning()) return;
   closePops();
-  const gid = me.id + Date.now().toString(36), key = ['pong', 'kick', 'tron', 'breach'].includes(game) ? pgKey() : undefined;
+  const gid = me.id + Date.now().toString(36), key = ['pong', 'kick', 'tron', 'breach'].includes(game) ? pgKey() : game === 'sv' ? (mode === 'crazy' ? 'crazy' : 'classic') : undefined;
   sendMpMsg(conv, {type: 'invite', game, gid, name: me.name, key}).catch(() => {});
   addMsg(conv, {id: 'inv-' + gid, from: 'system', name: '', text: GAME_NAMES[game] + ': Einladung an ' + nameOf(conv) + ' gesendet…', ts: Date.now()});
   if ((people.get(conv).v || 0) < APP_VERSION) addMsg(conv, {id: 'old-' + gid, from: 'system', name: '', text: 'Hinweis: ' + nameOf(conv) + ' hat noch eine ältere Version der Seite offen. Kommt die Einladung nicht an, muss ' + nameOf(conv) + ' die Seite mit Strg+F5 neu laden.', ts: Date.now()});
@@ -2766,6 +2775,8 @@ function handleMp(from, dm) {
     handleUno(from, gid, dm);
   } else if (DRAW_TYPES.has(dm.type)) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'draw' && !g.over) handleDraw(g, dm);
+  } else if (['svr', 'svs', 'sva', 'svx'].includes(dm.type)) {
+    svHandle(from, gid, dm);
   } else if (dm.type === 'gs') {
     if (g && g.gid === gid && g.opponent === from && g.game === 'golf' && !g.over && g.gf) gfRemoteShot(g, dm);
   } else if (dm.type === 'move') {
@@ -3317,6 +3328,714 @@ function gfOffStart() {
   $('osetup').hidden = true;
   $('oboard').hidden = false;
   renderGolf(g);
+}
+
+/* Schiffe versenken: 10 x 10, ships 5-4-3-3-2 that may not touch, a hit gives another shot. Over the chat like
+   4 Gewinnt: only your own page knows your fleet, so at the start each page sends a sealed fingerprint of its fleet
+   (a hash with a secret), every shot is answered by the page that was shot at, and at the end both fleets are shown
+   and each page checks that every answer it got was true ("geschummelt" if not). Crazy mode adds weapons paid for
+   with hits (radar, cluster bomb, torpedo) and a shield on one ship part. Offline the same against a bot; the Profi
+   bot weighs every cell by how many ways a ship could still lie there. */
+const SV_N = 10, SV_FLEET = [5, 4, 3, 3, 2], SV_W = 1000, SV_H = 560, SV_C = 38, SV_B = [[50, 95], [570, 95]];
+const SV_NAMES = {5: 'Flugzeugträger', 4: 'Schlachtschiff', 3: 'Kreuzer', 2: 'Zerstörer'};
+const SV_WEAP = {shot: {icon: '🎯', name: 'Schuss', cost: 0}, radar: {icon: '📡', name: 'Radar', cost: 2}, bomb: {icon: '💣', name: 'Streubombe', cost: 3}, torp: {icon: '🚀', name: 'Torpedo', cost: 3}};
+const svCells = s => Array.from({length: s.len}, (_, i) => [s.x + (s.dir ? 0 : i), s.y + (s.dir ? i : 0)]);
+const svKey = (x, y) => x + ',' + y;
+// Ships inside the board, not on top of each other and not touching (not even at a corner).
+function svValid(ships) {
+  const taken = new Map();
+  for (let i = 0; i < ships.length; i++) for (const [x, y] of svCells(ships[i])) {
+    if (x < 0 || y < 0 || x >= SV_N || y >= SV_N) return false;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const o = taken.get(svKey(x + dx, y + dy)); if (o !== undefined && o !== i) return false; }
+    taken.set(svKey(x, y), i);
+  }
+  return true;
+}
+function svRandomFleet(rnd = Math.random) {
+  for (;;) {
+    const ships = [];
+    let ok = true;
+    for (const len of SV_FLEET) {
+      let placed = false;
+      for (let tries = 0; tries < 200 && !placed; tries++) {
+        const dir = rnd() < 0.5 ? 0 : 1, s = {len, dir, x: Math.floor(rnd() * (SV_N - (dir ? 0 : len - 1))), y: Math.floor(rnd() * (SV_N - (dir ? len - 1 : 0)))};
+        if (svValid([...ships, s])) { ships.push(s); placed = true; }
+      }
+      if (!placed) { ok = false; break; }
+    }
+    if (ok) return ships;
+  }
+}
+// A fleet as it is being shot at: which parts are hit, the shield, and what was already shot.
+function svBoard(ships, shield) {
+  const at = new Map();
+  ships.forEach((s, i) => svCells(s).forEach(([x, y]) => at.set(svKey(x, y), i)));
+  return {ships: ships.map(s => ({...s, hit: 0})), at, shield: shield || null, shot: new Map()};
+}
+// What an attack does to a board (the page being shot at works this out; the end check runs it again).
+function svResolve(B, k, x, y) {
+  const out = {k, x, y, cells: [], sunk: [], radar: null, over: false};
+  const fire = (cx, cy) => {
+    if (cx < 0 || cy < 0 || cx >= SV_N || cy >= SV_N) return null;
+    const key = svKey(cx, cy);
+    if (B.shot.has(key)) { const r = B.shot.get(key); out.cells.push([cx, cy, r]); return r; }
+    let r = 'w';
+    if (B.at.has(key)) {
+      if (B.shield === key) { r = 'b'; B.shield = null; }
+      else {
+        r = 'h';
+        const s = B.ships[B.at.get(key)];
+        if (++s.hit === s.len) out.sunk.push({x: s.x, y: s.y, len: s.len, dir: s.dir});
+      }
+    }
+    // A blocked cell can be shot again (the shield is gone then).
+    if (r !== 'b') B.shot.set(key, r);
+    out.cells.push([cx, cy, r]);
+    return r;
+  };
+  if (k === 'radar') {
+    let n = 0;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const key = svKey(x + dx, y + dy); if (B.at.has(key) && B.shot.get(key) !== 'h') n++; }
+    out.radar = n;
+  } else if (k === 'bomb') for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) fire(x + dx, y + dy);
+  else if (k === 'torp') {
+    // Along the row from the left edge, until it hits something.
+    for (let cx = 0; cx < SV_N; cx++) {
+      const key = svKey(cx, y);
+      if (B.shot.get(key) === 'h') continue;
+      const r = fire(cx, y);
+      if (r === 'h' || r === 'b') break;
+    }
+  } else fire(x, y);
+  out.over = B.ships.every(s => s.hit === s.len);
+  return out;
+}
+const svHitAny = res => res.cells.some(c => c[2] === 'h');
+async function svHash(fleet, shield, salt) {
+  const buf = await crypto.subtle.digest('SHA-256', te.encode(JSON.stringify([fleet.map(s => [s.x, s.y, s.len, s.dir]), shield, salt])));
+  return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+}
+// The owner's look at the other fleet: every page also sends its fleet sealed to the owner's public key (ECDH), so
+// only the page with the owner's key can open it.
+async function svSealForOwner(obj) {
+  const E = {name: 'ECDH', namedCurve: 'P-256'};
+  const pub = await crypto.subtle.importKey('jwk', {kty: 'EC', crv: 'P-256', x: ADMIN_PUB.x, y: ADMIN_PUB.y}, E, false, []);
+  const eph = await crypto.subtle.generateKey(E, true, ['deriveBits']);
+  const key = await crypto.subtle.importKey('raw', await crypto.subtle.digest('SHA-256', await crypto.subtle.deriveBits({name: 'ECDH', public: pub}, eph.privateKey, 256)), 'AES-GCM', false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12)), ej = await crypto.subtle.exportKey('jwk', eph.publicKey);
+  return {x: ej.x, y: ej.y, iv: b64(iv), c: b64(await crypto.subtle.encrypt({name: 'AES-GCM', iv}, key, te.encode(JSON.stringify(obj))))};
+}
+async function svOpenAsOwner(blob) {
+  const d = store.get('adminKey', '');
+  if (!d || !blob || typeof blob.c !== 'string') return null;
+  try {
+    const E = {name: 'ECDH', namedCurve: 'P-256'};
+    const priv = await crypto.subtle.importKey('jwk', {kty: 'EC', crv: 'P-256', x: ADMIN_PUB.x, y: ADMIN_PUB.y, d}, E, false, ['deriveBits']);
+    const pub = await crypto.subtle.importKey('jwk', {kty: 'EC', crv: 'P-256', x: blob.x, y: blob.y}, E, false, []);
+    const key = await crypto.subtle.importKey('raw', await crypto.subtle.digest('SHA-256', await crypto.subtle.deriveBits({name: 'ECDH', public: pub}, priv, 256)), 'AES-GCM', false, ['decrypt']);
+    return JSON.parse(td.decode(await crypto.subtle.decrypt({name: 'AES-GCM', iv: unb64(blob.iv)}, key, unb64(blob.c))));
+  } catch (e) { return null; }
+}
+function svFleetOk(f) {
+  return Array.isArray(f) && f.length === SV_FLEET.length && f.every(s => s && Number.isInteger(s.x) && Number.isInteger(s.y) && (s.dir === 0 || s.dir === 1))
+    && JSON.stringify(f.map(s => s.len).sort()) === JSON.stringify(SV_FLEET.slice().sort()) && svValid(f);
+}
+
+let svOff = null, svLoopOn = false;
+function svInit(g, mode, bot) {
+  const rnd = gfRng(g.gid + 'sv');
+  g.sv = {mode: mode === 'crazy' ? 'crazy' : 'classic', phase: 'place', bot: bot || null,
+    first: rnd() < 0.5 ? 1 : 2, turn: 0, t: 0, energy: 0, foeEnergy: 0, weap: 'shot', pending: false,
+    place: SV_FLEET.map(len => ({len, dir: 0, x: -1, y: -1})), shield: null, shieldMode: false, drag: null, hover: null,
+    mine: null, foe: {shot: new Map(), known: new Map(), sunk: [], radar: []}, foeLeft: SV_FLEET.slice(), myLeft: SV_FLEET.slice(),
+    ready: false, theirReady: null, salt: '', log: [], peek: false, peekFleet: null, cheat: null, revealed: null,
+    anims: [], parts: [], shake: 0, msg: '', msgT: 0, inbox: []};
+  if (bot) { const f = svRandomFleet(); g.sv.botFleet = f; g.sv.botBoard = svBoard(f, g.sv.mode === 'crazy' ? (() => { const s = f[Math.floor(Math.random() * f.length)], c = svCells(s)[Math.floor(Math.random() * s.len)]; return svKey(c[0], c[1]); })() : null); g.sv.peekFleet = f; g.sv.botView = {shot: new Map(), sunk: [], left: SV_FLEET.slice()}; }
+  if (!svLoopOn) { svLoopOn = true; requestAnimationFrame(svFrame); }
+}
+const svMyTurn = g => g.sv.phase === 'play' && g.sv.turn === g.myMark && !g.sv.pending;
+// Ready with the fleet: seal it, send the fingerprint (and the owner's sealed copy).
+async function svReady(g) {
+  const sv = g.sv;
+  if (sv.ready || !sv.place.every(s => s.x >= 0) || !svValid(sv.place)) return;
+  sv.ready = true;
+  const fleet = sv.place.map(s => ({x: s.x, y: s.y, len: s.len, dir: s.dir}));
+  sv.mine = svBoard(fleet, sv.mode === 'crazy' ? sv.shield : null);
+  sv.fleet = fleet;
+  sv.salt = b64(crypto.getRandomValues(new Uint8Array(16)));
+  if (sv.bot) { sv.theirReady = {}; svStartPlay(g); return; }
+  const c = await svHash(fleet, sv.mine.shield, sv.salt), b = await svSealForOwner({fleet, shield: sv.mine.shield}).catch(() => null);
+  sendReliable(g.opponent, {type: 'svr', gid: g.gid, n: 1, c, b});
+  svStartPlay(g);
+  svRender(g);
+}
+function svStartPlay(g) {
+  const sv = g.sv;
+  if (!sv.ready || !sv.theirReady || sv.phase !== 'place') return;
+  sv.phase = 'play';
+  sv.turn = sv.first;
+  svSay(g, sv.turn === g.myMark ? 'Du fängst an – feuer!' : g.opName + ' fängt an…');
+  svRender(g);
+  svPump(g);
+}
+function svSay(g, s) { g.sv.msg = s; g.sv.msgT = 200; }
+// Fire at the other board.
+function svFire(g, x, y) {
+  const sv = g.sv, w = SV_WEAP[sv.weap] || SV_WEAP.shot;
+  if (!svMyTurn(g) || g.over) return;
+  if (sv.weap === 'shot' && sv.foe.known.has(svKey(x, y))) return;
+  if (w.cost > sv.energy) return;
+  sv.energy -= w.cost;
+  const k = sv.weap;
+  sv.weap = 'shot';
+  sv.pending = {t: sv.t, k, x, y};
+  svLaunch(g, 1, k, x, y);
+  if (sv.bot) setTimeout(() => svAnswered(g, {t: sv.t, ...svResolve(sv.botBoard, k, x, y)}), 650);
+  else sendReliable(g.opponent, {type: 'svs', gid: g.gid, n: 1000 + 2 * sv.t, t: sv.t, k, x, y});
+  svRender(g);
+}
+// The other side's answer to our shot.
+function svAnswered(g, a) {
+  const sv = g.sv, p = sv.pending;
+  if (!p || a.t !== p.t || g.over) return;
+  const res = {k: p.k, x: p.x, y: p.y, cells: Array.isArray(a.cells) ? a.cells.filter(c => Array.isArray(c) && c.length === 3).slice(0, 12) : [],
+    sunk: Array.isArray(a.sunk) ? a.sunk.slice(0, 5).filter(s => s && [s.x, s.y, s.len].every(Number.isInteger) && (s.dir === 0 || s.dir === 1)) : [], radar: Number.isInteger(a.radar) ? a.radar : null, over: !!a.over};
+  sv.log.push({t: p.t, k: p.k, x: p.x, y: p.y, res: JSON.stringify([res.cells, res.sunk.map(s => [s.x, s.y, s.len, s.dir]), res.radar, res.over])});
+  sv.pending = false;
+  sv.t++;
+  // Whose turn it is changes at once (so nobody can shoot twice); the board shows it when the missile lands.
+  const hits = res.cells.filter(c => c[2] === 'h').length;
+  for (const [cx, cy, r] of res.cells) if (r !== 'b') sv.foe.known.set(svKey(cx, cy), r);
+  if (sv.mode === 'crazy') sv.energy = Math.min(6, sv.energy + hits);
+  if (res.over) sv.phase = 'ending';
+  else if (!hits) sv.turn = 3 - g.myMark;
+  setTimeout(() => {
+    for (const [cx, cy, r] of res.cells) { sv.foe.shot.set(svKey(cx, cy), r === 'b' ? 'b' : r); svBoom(g, 1, cx, cy, r); }
+    for (const s of res.sunk) { sv.foe.sunk.push(s); const i = sv.foeLeft.indexOf(s.len); if (i >= 0) sv.foeLeft.splice(i, 1); sv.shake = 14; }
+    if (res.radar !== null) sv.foe.radar.push({x: res.x, y: res.y, n: res.radar, t: 0});
+    if (res.sunk.length) svSay(g, '💥 ' + SV_NAMES[res.sunk[0].len] + ' versenkt!');
+    else if (res.cells.some(c => c[2] === 'b')) svSay(g, '🛡️ Schild! Abgewehrt.');
+    else if (hits) svSay(g, '🔥 Treffer! Nochmal!');
+    else if (res.radar !== null) svSay(g, '📡 Radar: ' + res.radar + ' Schiffsteil' + (res.radar === 1 ? '' : 'e'));
+    else svSay(g, 'Wasser.');
+    if (res.over) { svEnd(g, g.myMark); return; }
+    svRender(g);
+    svPump(g);
+  }, 520);
+  svPump(g);
+}
+// Shots of the other side at us (they can come while an animation runs: kept in order).
+function svIncoming(g, m) {
+  const sv = g.sv;
+  if (!sv.mine || sv.phase !== 'play' || m.t !== sv.t || sv.turn === g.myMark) return false;
+  const k = SV_WEAP[m.k] ? m.k : 'shot', x = Math.max(0, Math.min(SV_N - 1, m.x | 0)), y = Math.max(0, Math.min(SV_N - 1, m.y | 0));
+  const res = svResolve(sv.mine, k, x, y);
+  if (!sv.bot) sendReliable(g.opponent, {type: 'sva', gid: g.gid, n: 1001 + 2 * sv.t, t: sv.t, cells: res.cells, sunk: res.sunk, radar: res.radar, over: res.over});
+  sv.t++;
+  if (res.over) sv.phase = 'ending';
+  else if (!svHitAny(res)) sv.turn = g.myMark;
+  svLaunch(g, 0, k, x, y);
+  setTimeout(() => {
+    for (const [cx, cy, r] of res.cells) svBoom(g, 0, cx, cy, r);
+    for (const s of res.sunk) { const i = sv.myLeft.indexOf(s.len); if (i >= 0) sv.myLeft.splice(i, 1); sv.shake = 14; }
+    if (res.radar !== null) sv.foe.radar.push({x, y, n: res.radar, t: 0, mine: true});
+    if (sv.mode === 'crazy') sv.foeEnergy = Math.min(6, sv.foeEnergy + res.cells.filter(c => c[2] === 'h').length);
+    svSay(g, res.sunk.length ? '😱 Dein ' + SV_NAMES[res.sunk[0].len] + ' ist versenkt!' : svHitAny(res) ? '🔥 ' + g.opName + ' trifft!' : k === 'radar' ? '📡 ' + g.opName + ' scannt…' : g.opName + ' trifft nur Wasser.');
+    if (res.over) { svEnd(g, 3 - g.myMark); return; }
+    svRender(g);
+    svPump(g);
+  }, 520);
+  return true;
+}
+function svPump(g) {
+  const sv = g.sv;
+  if (sv.bot) { if (sv.phase === 'play' && sv.turn !== g.myMark && !sv.botBusy) { sv.botBusy = true; setTimeout(() => { sv.botBusy = false; if (g.over || svOff !== g) return; svBotMove(g); }, 700 + Math.random() * 700); } return; }
+  for (let i = 0; i < sv.inbox.length; i++) if (svIncoming(g, sv.inbox[i])) { sv.inbox.splice(i, 1); return; }
+}
+function svEnd(g, winner) {
+  const sv = g.sv;
+  sv.phase = 'over';
+  g.over = true;
+  g.winner = winner;
+  svSay(g, winner === g.myMark ? '🏆 Gewonnen! Alle Schiffe versenkt!' : '💀 Deine Flotte ist versenkt.');
+  if (sv.bot) {
+    sv.revealed = sv.botFleet;
+    if (winner === g.myMark) { const o = offWins.sv = offWins.sv || {}; o[sv.bot] = (o[sv.bot] || 0) + 1; store.set('offWins', offWins); }
+    svRender(g);
+    return;
+  }
+  sendReliable(g.opponent, {type: 'svx', gid: g.gid, n: 9999, fleet: sv.fleet, shield: sv.mode === 'crazy' ? sv.shield : null, salt: sv.salt});
+  finishMp();
+  svRender(g);
+}
+// The end check: the other fleet, its fingerprint from the start, and every answer we got.
+async function svCheck(g, m) {
+  const sv = g.sv;
+  if (sv.revealed || !sv.theirReady) return;
+  const fleet = Array.isArray(m.fleet) ? m.fleet.map(s => ({x: s.x, y: s.y, len: s.len, dir: s.dir})) : null;
+  let why = '';
+  if (!svFleetOk(fleet)) why = 'ungültige Flotte';
+  else if (await svHash(fleet, m.shield || null, String(m.salt || '')) !== sv.theirReady.c) why = 'Flotte nachträglich geändert';
+  else {
+    const B = svBoard(fleet, sv.mode === 'crazy' ? m.shield || null : null);
+    for (const e of sv.log) {
+      const r = svResolve(B, e.k, e.x, e.y);
+      if (JSON.stringify([r.cells, r.sunk.map(s => [s.x, s.y, s.len, s.dir]), r.radar, r.over]) !== e.res) { why = 'falsche Antwort bei ' + 'ABCDEFGHIJ'[e.x] + (e.y + 1); break; }
+    }
+  }
+  sv.revealed = fleet;
+  if (why) {
+    sv.cheat = why;
+    addMsg(g.opponent, {id: 'svcheat-' + g.gid, from: 'system', name: '', text: '❌ Schiffe versenken: ' + g.opName + ' hat geschummelt (' + why + ')!', ts: Date.now()});
+  }
+  svRender(g);
+}
+function svHandle(from, gid, dm) {
+  const g = mpGame;
+  if (!g || g.gid !== gid || g.opponent !== from || g.game !== 'sv' || !g.sv) return;
+  const sv = g.sv;
+  if (dm.type === 'svr') {
+    if (sv.theirReady || typeof dm.c !== 'string') return;
+    sv.theirReady = {c: dm.c.slice(0, 64)};
+    svOpenAsOwner(dm.b).then(f => { if (f && svFleetOk(f.fleet)) sv.peekFleet = f.fleet; });
+    svStartPlay(g);
+    svRender(g);
+  } else if (dm.type === 'svs') {
+    if (g.over || !Number.isInteger(dm.t)) return;
+    if (!sv.inbox.some(m => m.t === dm.t)) sv.inbox.push(dm);
+    svPump(g);
+  } else if (dm.type === 'sva') {
+    if (Number.isInteger(dm.t)) svAnswered(g, dm);
+  } else if (dm.type === 'svx') svCheck(g, dm);
+}
+// The bot: hunts where most ship placements still fit (Profi), or more simply on lower levels.
+function svBotPick(view, left, lvl) {
+  const shot = view.shot, sunkAt = new Set(), near = new Set();
+  for (const s of view.sunk) for (const [x, y] of svCells(s)) { sunkAt.add(svKey(x, y)); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) near.add(svKey(x + dx, y + dy)); }
+  const open = [], hits = [];
+  for (let x = 0; x < SV_N; x++) for (let y = 0; y < SV_N; y++) {
+    const k = svKey(x, y), r = shot.get(k);
+    if ((r === 'h' || r === 'b') && !sunkAt.has(k)) hits.push([x, y]);
+    if (!shot.has(k) && !near.has(k)) open.push([x, y]);
+  }
+  if (!open.length) return [0, 0];
+  if (lvl === 'leicht' && (!hits.length || Math.random() < 0.4)) return open[Math.floor(Math.random() * open.length)];
+  const dens = new Map(), add = (k, v) => dens.set(k, (dens.get(k) || 0) + v);
+  for (const len of left) for (let dir = 0; dir < 2; dir++) for (let x = 0; x < SV_N - (dir ? 0 : len - 1); x++) for (let y = 0; y < SV_N - (dir ? len - 1 : 0); y++) {
+    const cells = svCells({x, y, len, dir});
+    if (cells.some(([cx, cy]) => { const k = svKey(cx, cy), r = shot.get(k); return r === 'w' || near.has(k); })) continue;
+    const covered = cells.filter(([cx, cy]) => { const r = shot.get(svKey(cx, cy)); return r === 'h' || r === 'b'; }).length;
+    if (hits.length && !covered) continue;
+    const w = 1 + covered * 30;
+    for (const [cx, cy] of cells) if (!shot.has(svKey(cx, cy))) add(svKey(cx, cy), w);
+  }
+  let best = null, bv = -1;
+  for (const [x, y] of open) {
+    let v = dens.get(svKey(x, y)) || 0;
+    if (lvl === 'mittel' && !hits.length) v = (x + y) % 2 ? v * 0.2 + Math.random() : v + Math.random() * 6;
+    else v += Math.random() * 0.5;
+    if (v > bv) { bv = v; best = [x, y]; }
+  }
+  return best;
+}
+function svBotMove(g) {
+  const sv = g.sv, view = sv.botView, lvl = sv.bot;
+  if (sv.phase !== 'play' || sv.turn === g.myMark || g.over) return;
+  let [x, y] = svBotPick(view, view.left, lvl), k = 'shot';
+  // In crazy mode the better bots throw a cluster bomb when they can and have nothing to chase.
+  const chasing = [...view.shot].some(([key, r]) => (r === 'h' || r === 'b') && !view.sunk.some(s => svCells(s).some(([a, b]) => svKey(a, b) === key)));
+  if (sv.mode === 'crazy' && lvl !== 'leicht' && sv.foeEnergy >= 3 && !chasing) { k = 'bomb'; sv.foeEnergy -= 3; }
+  const res = svResolve(sv.mine, k, x, y);
+  for (const [cx, cy, r] of res.cells) view.shot.set(svKey(cx, cy), r);
+  for (const s of res.sunk) { view.sunk.push(s); const i = view.left.indexOf(s.len); if (i >= 0) view.left.splice(i, 1); }
+  svShowIncoming(g, k, x, y, res);
+}
+function svShowIncoming(g, k, x, y, res) {
+  const sv = g.sv;
+  sv.t++;
+  if (res.over) sv.phase = 'ending';
+  else if (!svHitAny(res)) sv.turn = g.myMark;
+  svLaunch(g, 0, k, x, y);
+  setTimeout(() => {
+    for (const [cx, cy, r] of res.cells) svBoom(g, 0, cx, cy, r);
+    for (const s of res.sunk) { const i = sv.myLeft.indexOf(s.len); if (i >= 0) sv.myLeft.splice(i, 1); sv.shake = 14; }
+    if (sv.mode === 'crazy') sv.foeEnergy = Math.min(6, sv.foeEnergy + res.cells.filter(c => c[2] === 'h').length);
+    svSay(g, res.sunk.length ? '😱 Dein ' + SV_NAMES[res.sunk[0].len] + ' ist versenkt!' : svHitAny(res) ? '🔥 ' + g.opName + ' trifft!' : g.opName + ' trifft nur Wasser.');
+    if (res.over) { svEnd(g, 3 - g.myMark); return; }
+    svRender(g);
+    svPump(g);
+  }, 520);
+}
+
+/* The look: an animated sea, steel ships, missiles that fly in an arc, fire and smoke on hits, splashes on misses. */
+function svLaunch(g, board, k, x, y) {
+  const [ox, oy] = SV_B[board], tx = ox + (x + 0.5) * SV_C, ty = oy + (y + 0.5) * SV_C, from = SV_B[1 - board];
+  if (k === 'torp') g.sv.anims.push({k: 'torp', board, y, t: 0, dur: 30});
+  else if (k === 'radar') g.sv.anims.push({k: 'radar', x: tx, y: ty, t: 0, dur: 32});
+  else g.sv.anims.push({k: 'missile', sx: from[0] + 5 * SV_C, sy: from[1] + 10 * SV_C + 20, x: tx, y: ty, t: 0, dur: 31, big: k === 'bomb'});
+}
+function svBoom(g, board, x, y, r) {
+  const sv = g.sv, [ox, oy] = SV_B[board], cx = ox + (x + 0.5) * SV_C, cy = oy + (y + 0.5) * SV_C;
+  if (r === 'h') {
+    sv.parts.push({k: 'flash', x: cx, y: cy, t: 0, life: 16});
+    for (let i = 0; i < 22; i++) { const a = Math.random() * 6.28, v = 1 + Math.random() * 4; sv.parts.push({k: 'spark', x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1, t: 0, life: 30 + Math.random() * 20}); }
+    sv.shake = Math.max(sv.shake, 6);
+  } else if (r === 'b') {
+    sv.parts.push({k: 'shield', x: cx, y: cy, t: 0, life: 40});
+  } else {
+    for (let i = 0; i < 14; i++) { const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.6, v = 1.5 + Math.random() * 3; sv.parts.push({k: 'drop', x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 30}); }
+    sv.parts.push({k: 'ring', x: cx, y: cy, t: 0, life: 36});
+  }
+}
+let svLast = 0;
+function svGames() { return [mpGame && mpGame.game === 'sv' && mpGame.sv ? mpGame : null, svOff].filter(Boolean); }
+function svFrame(now) {
+  const list = svGames();
+  if (!list.length) { svLoopOn = false; return; }
+  const dt = Math.min(4, svLast ? (now - svLast) / (1000 / 60) : 1);
+  svLast = now;
+  for (const g of list) {
+    const sv = g.sv;
+    sv.time = (sv.time || 0) + dt;
+    for (const a of sv.anims) a.t += dt;
+    sv.anims = sv.anims.filter(a => a.t < a.dur);
+    for (const p of sv.parts) {
+      p.t += dt;
+      if (p.vx !== undefined) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.k === 'drop' ? 0.18 : p.k === 'smoke' ? -0.01 : 0.08) * dt; if (p.k !== 'smoke') { p.vx *= 0.97; } }
+    }
+    sv.parts = sv.parts.filter(p => p.t < p.life);
+    for (const r of sv.foe.radar) r.t += dt;
+    // Burning ship parts smoke.
+    if (Math.random() < 0.5 * dt) {
+      const burning = [...svBurning(g, 0), ...svBurning(g, 1)];
+      if (burning.length) { const [bx, by] = burning[Math.floor(Math.random() * burning.length)]; sv.parts.push({k: 'smoke', x: bx + (Math.random() - 0.5) * 10, y: by - 4, vx: (Math.random() - 0.5) * 0.3 + 0.15, vy: -0.4 - Math.random() * 0.4, t: 0, life: 70 + Math.random() * 40, r: 4 + Math.random() * 4}); }
+    }
+    if (sv.shake > 0) sv.shake = Math.max(0, sv.shake - 0.6 * dt);
+    if (sv.msgT > 0) sv.msgT -= dt;
+    svDraw(g);
+  }
+  requestAnimationFrame(svFrame);
+}
+function svBurning(g, board) {
+  const sv = g.sv, [ox, oy] = SV_B[board], out = [];
+  const shots = board === 1 ? sv.foe.shot : sv.mine ? sv.mine.shot : new Map();
+  for (const [k, r] of shots) if (r === 'h') { const [x, y] = k.split(',').map(Number); out.push([ox + (x + 0.5) * SV_C, oy + (y + 0.5) * SV_C]); }
+  return out;
+}
+function svShip(c, s, x0, y0, style) {
+  const L = s.len * SV_C, Wd = SV_C - 9, x = x0 + s.x * SV_C, y = y0 + s.y * SV_C;
+  c.save();
+  c.translate(x + (s.dir ? SV_C / 2 : 0), y + (s.dir ? 0 : SV_C / 2));
+  if (s.dir) c.rotate(Math.PI / 2);
+  c.translate(0, s.dir ? 0 : 0);
+  const hw = Wd / 2;
+  // Hull with a pointed bow.
+  c.beginPath();
+  c.moveTo(5, -hw + 3); c.lineTo(L - 16, -hw); c.quadraticCurveTo(L - 2, 0, L - 16, hw); c.lineTo(5, hw - 3); c.quadraticCurveTo(1, 0, 5, -hw + 3);
+  c.closePath();
+  if (style === 'ghost-bad') { c.fillStyle = 'rgba(239,68,68,.45)'; c.fill(); c.restore(); return; }
+  if (style === 'ghost') { c.fillStyle = 'rgba(148,163,184,.55)'; c.fill(); c.restore(); return; }
+  if (style === 'peek') { c.fillStyle = 'rgba(239,68,68,.35)'; c.fill(); c.strokeStyle = 'rgba(239,68,68,.95)'; c.lineWidth = 2.5; c.stroke(); c.restore(); return; }
+  const gr = c.createLinearGradient(0, -hw, 0, hw);
+  if (style === 'sunk') { gr.addColorStop(0, '#3f3f46'); gr.addColorStop(1, '#18181b'); }
+  else { gr.addColorStop(0, '#cbd5e1'); gr.addColorStop(0.5, '#94a3b8'); gr.addColorStop(1, '#475569'); }
+  c.fillStyle = gr; c.fill();
+  c.strokeStyle = style === 'sunk' ? '#ef4444' : '#1e293b'; c.lineWidth = style === 'sunk' ? 2 : 1.5; c.stroke();
+  // Deck: a stripe, a bridge and turrets.
+  c.fillStyle = style === 'sunk' ? '#27272a' : '#64748b';
+  c.fillRect(10, -3, L - 30, 6);
+  c.fillStyle = style === 'sunk' ? '#3f3f46' : '#e2e8f0';
+  c.fillRect(L * 0.38, -hw + 4, Math.min(22, L * 0.18), Wd - 8);
+  for (let i = 0; i < s.len - 1; i++) {
+    const tx = 18 + i * SV_C + (i >= Math.floor(s.len / 2) ? 10 : 0);
+    if (tx > L - 22) break;
+    c.fillStyle = style === 'sunk' ? '#52525b' : '#334155';
+    c.beginPath(); c.arc(tx, 0, 4.5, 0, 7); c.fill();
+    c.fillRect(tx, -1.2, 9, 2.4);
+  }
+  c.restore();
+}
+function svDrawBoard(c, g, board) {
+  const sv = g.sv, [ox, oy] = SV_B[board], S = SV_N * SV_C, t = sv.time || 0;
+  // The sea.
+  const gr = c.createLinearGradient(ox, oy, ox + S, oy + S);
+  gr.addColorStop(0, '#0c4a6e'); gr.addColorStop(1, '#082f49');
+  c.fillStyle = gr; c.fillRect(ox, oy, S, S);
+  c.save(); c.beginPath(); c.rect(ox, oy, S, S); c.clip();
+  c.strokeStyle = 'rgba(125,211,252,.12)'; c.lineWidth = 2;
+  for (let i = -2; i < 14; i++) {
+    c.beginPath();
+    for (let xx = 0; xx <= S; xx += 10) c.lineTo(ox + xx, oy + i * 32 + Math.sin((xx + t * 1.3 + i * 40) / 30) * 5 + (t * 0.25 % 32));
+    c.stroke();
+  }
+  c.restore();
+  c.strokeStyle = 'rgba(56,189,248,.25)'; c.lineWidth = 1;
+  for (let i = 0; i <= SV_N; i++) {
+    c.beginPath(); c.moveTo(ox + i * SV_C, oy); c.lineTo(ox + i * SV_C, oy + S); c.stroke();
+    c.beginPath(); c.moveTo(ox, oy + i * SV_C); c.lineTo(ox + S, oy + i * SV_C); c.stroke();
+  }
+  c.fillStyle = 'rgba(186,230,253,.75)'; c.font = '600 12px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (let i = 0; i < SV_N; i++) { c.fillText('ABCDEFGHIJ'[i], ox + (i + 0.5) * SV_C, oy - 10); c.fillText(String(i + 1), ox - 14, oy + (i + 0.5) * SV_C); }
+  // Our turn on the other board: it glows.
+  const aimHere = board === 1 && svMyTurn(g);
+  c.strokeStyle = aimHere ? 'rgba(250,204,21,' + (0.55 + Math.sin(t / 8) * 0.3) + ')' : 'rgba(56,189,248,.5)';
+  c.lineWidth = aimHere ? 3 : 1.5; c.strokeRect(ox - 1, oy - 1, S + 2, S + 2);
+  const shots = board === 1 ? sv.foe.shot : sv.mine ? sv.mine.shot : new Map();
+  if (board === 0) {
+    const ships = sv.phase === 'place' ? sv.place.filter(s => s.x >= 0 && s !== (sv.drag && sv.drag.ship)) : sv.mine ? sv.mine.ships : [];
+    for (const s of ships) svShip(c, s, ox, oy, s.hit === s.len ? 'sunk' : '');
+    const sh = sv.phase === 'place' ? sv.shield : sv.mine && sv.mine.shield;
+    if (sh && sv.mode === 'crazy') { const [x, y] = sh.split(',').map(Number); c.strokeStyle = 'rgba(52,211,153,' + (0.6 + Math.sin(t / 10) * 0.3) + ')'; c.lineWidth = 3; c.beginPath(); c.arc(ox + (x + 0.5) * SV_C, oy + (y + 0.5) * SV_C, SV_C * 0.42, 0, 7); c.stroke(); }
+  } else {
+    for (const s of sv.foe.sunk) svShip(c, s, ox, oy, 'sunk');
+    if (sv.revealed) for (const s of sv.revealed) if (!sv.foe.sunk.some(q => q.x === s.x && q.y === s.y)) svShip(c, s, ox, oy, '');
+    // The owner's look (1 toggles it): their ships in red.
+    if (sv.peek && sv.peekFleet && !sv.revealed) for (const s of sv.peekFleet) svShip(c, s, ox, oy, 'peek');
+  }
+  for (const [k, r] of shots) {
+    const [x, y] = k.split(',').map(Number), cx = ox + (x + 0.5) * SV_C, cy = oy + (y + 0.5) * SV_C;
+    if (r === 'w') { c.fillStyle = 'rgba(224,242,254,.75)'; c.beginPath(); c.arc(cx, cy, 4, 0, 7); c.fill(); c.strokeStyle = 'rgba(224,242,254,.25)'; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, 9 + Math.sin(t / 12 + x + y) * 1.5, 0, 7); c.stroke(); }
+    else if (r === 'h') {
+      // Fire.
+      for (let i = 0; i < 3; i++) {
+        const f = Math.sin(t / 4 + i * 2 + x * 3 + y) * 2, rr = 9 - i * 2.5 + f * 0.6;
+        c.fillStyle = ['rgba(239,68,68,.85)', 'rgba(249,115,22,.9)', 'rgba(253,224,71,.95)'][i];
+        c.beginPath(); c.ellipse(cx, cy + 2 - i * 3, rr, rr * 1.25, 0, 0, 7); c.fill();
+      }
+      c.strokeStyle = 'rgba(0,0,0,.6)'; c.lineWidth = 2; c.beginPath(); c.moveTo(cx - 7, cy - 7); c.lineTo(cx + 7, cy + 7); c.moveTo(cx + 7, cy - 7); c.lineTo(cx - 7, cy + 7); c.stroke();
+    } else if (r === 'b') { c.strokeStyle = 'rgba(52,211,153,.9)'; c.lineWidth = 2.5; c.beginPath(); c.arc(cx, cy, 11, 0, 7); c.stroke(); c.fillStyle = 'rgba(52,211,153,.9)'; c.font = '14px sans-serif'; c.fillText('🛡', cx, cy + 1); }
+  }
+  for (const r of sv.foe.radar) if ((board === 0) === !!r.mine) {
+    const cx = ox + (r.x + 0.5) * SV_C, cy = oy + (r.y + 0.5) * SV_C;
+    c.fillStyle = 'rgba(74,222,128,.12)'; c.fillRect(cx - 1.5 * SV_C, cy - 1.5 * SV_C, 3 * SV_C, 3 * SV_C);
+    c.strokeStyle = 'rgba(74,222,128,.7)'; c.lineWidth = 1.5; c.setLineDash([4, 4]); c.strokeRect(cx - 1.5 * SV_C, cy - 1.5 * SV_C, 3 * SV_C, 3 * SV_C); c.setLineDash([]);
+    c.fillStyle = '#4ade80'; c.font = '800 16px "Segoe UI", system-ui, sans-serif'; c.fillText(String(r.n), cx, cy);
+  }
+  // Aim: what the chosen weapon would hit.
+  if (aimHere && sv.hover && sv.hover.board === 1) {
+    const {x, y} = sv.hover, w = sv.weap, cells = w === 'bomb' ? [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [x + dx, y + dy]) : w === 'radar' ? [] : w === 'torp' ? Array.from({length: SV_N}, (_, i) => [i, y]) : [[x, y]];
+    c.fillStyle = 'rgba(250,204,21,.18)';
+    for (const [cx, cy] of cells) if (cx >= 0 && cy >= 0 && cx < SV_N && cy < SV_N) c.fillRect(ox + cx * SV_C + 1, oy + cy * SV_C + 1, SV_C - 2, SV_C - 2);
+    if (w === 'radar') { c.strokeStyle = 'rgba(74,222,128,.8)'; c.lineWidth = 2; c.strokeRect(ox + (x - 1) * SV_C, oy + (y - 1) * SV_C, 3 * SV_C, 3 * SV_C); }
+    const cx = ox + (x + 0.5) * SV_C, cy = oy + (y + 0.5) * SV_C, rr = 12 + Math.sin(t / 6) * 2;
+    c.strokeStyle = '#facc15'; c.lineWidth = 2;
+    c.beginPath(); c.arc(cx, cy, rr, 0, 7); c.stroke();
+    c.beginPath(); c.moveTo(cx - rr - 5, cy); c.lineTo(cx - rr + 5, cy); c.moveTo(cx + rr - 5, cy); c.lineTo(cx + rr + 5, cy); c.moveTo(cx, cy - rr - 5); c.lineTo(cx, cy - rr + 5); c.moveTo(cx, cy + rr - 5); c.lineTo(cx, cy + rr + 5); c.stroke();
+  }
+}
+function svDraw(g) {
+  const off = !!g.offline, grid = $(off ? 'ogrid' : 'cmpgrid'), cv = grid && grid.querySelector('canvas.sv-cv');
+  if (!cv || !cv.isConnected || grid.dataset.gid !== g.gid || !cv.offsetParent) return;
+  const bar = grid.querySelector('.sv-bar'), room = grid.clientHeight - (bar ? bar.offsetHeight : 0) - 8;
+  const cw = Math.max(320, Math.floor(Math.min(grid.clientWidth - 4, 1200, room * SV_W / SV_H))), ch = Math.round(cw * SV_H / SV_W), dpr = window.devicePixelRatio || 1;
+  if (cv.style.width !== cw + 'px') cv.style.width = cw + 'px';
+  if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); cv.style.height = ch + 'px'; }
+  const c = cv.getContext('2d'), sc = cw / SV_W * dpr, sv = g.sv, t = sv.time || 0;
+  const sk = sv.shake ? [(Math.random() - 0.5) * sv.shake, (Math.random() - 0.5) * sv.shake] : [0, 0];
+  c.setTransform(sc, 0, 0, sc, sk[0] * sc, sk[1] * sc);
+  const bg = c.createLinearGradient(0, 0, 0, SV_H);
+  bg.addColorStop(0, '#020617'); bg.addColorStop(1, '#0f172a');
+  c.fillStyle = bg; c.fillRect(-20, -20, SV_W + 40, SV_H + 40);
+  const head = (s, x, on) => { c.font = '800 17px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'alphabetic'; c.fillStyle = on ? '#facc15' : '#7dd3fc'; c.fillText(s, x, 60); };
+  head('⚓ DEINE FLOTTE', SV_B[0][0], sv.phase === 'play' && sv.turn !== g.myMark);
+  svDrawBoard(c, g, 0);
+  if (sv.phase === 'place') {
+    // The dock: ships still to place, and help.
+    c.fillStyle = '#7dd3fc'; c.font = '800 17px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'left'; c.fillText('🚢 FLOTTE AUFSTELLEN', SV_B[1][0], 60);
+    c.fillStyle = 'rgba(15,23,42,.9)'; c.fillRect(SV_B[1][0], SV_B[1][1], 380, 380);
+    c.strokeStyle = 'rgba(56,189,248,.35)'; c.strokeRect(SV_B[1][0], SV_B[1][1], 380, 380);
+    svDockPos(g).forEach(({s, x, y}) => { if (s.x < 0 && s !== (sv.drag && sv.drag.ship)) svShip(c, {...s, x: 0, y: 0, dir: 0}, x, y, ''); });
+    c.fillStyle = '#cbd5e1'; c.font = '13px "Segoe UI", system-ui, sans-serif';
+    const tips = ['Schiffe auf dein Meer ziehen.', 'R oder Rechtsklick dreht das Schiff.', 'Schiffe dürfen sich nicht berühren.', sv.mode === 'crazy' ? '🛡️ Schild: Knopf unten, dann ein Schiffsteil anklicken.' : '', sv.ready ? '⏳ Warte auf ' + g.opName + '…' : ''].filter(Boolean);
+    tips.forEach((s, i) => c.fillText(s, SV_B[1][0] + 16, SV_B[1][1] + 300 + i * 18 - (tips.length - 3) * 18));
+  } else {
+    head('🎯 ' + (g.opName || 'GEGNER').toUpperCase(), SV_B[1][0], svMyTurn(g));
+    svDrawBoard(c, g, 1);
+  }
+  // Ships still afloat on each side.
+  const fleetRow = (left, x0) => { let x = x0; const rem = left.slice(); SV_FLEET.forEach(len => { const i = rem.indexOf(len), alive = i >= 0; if (alive) rem.splice(i, 1); c.fillStyle = alive ? '#94a3b8' : 'rgba(239,68,68,.45)'; c.fillRect(x, 500, len * 13, 9); if (!alive) { c.strokeStyle = '#ef4444'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 2, 504.5); c.lineTo(x + len * 13 + 2, 504.5); c.stroke(); } x += len * 13 + 10; }); };
+  if (sv.phase !== 'place') { fleetRow(sv.myLeft, SV_B[0][0]); fleetRow(sv.foeLeft, SV_B[1][0]); }
+  if (sv.mode === 'crazy' && sv.phase !== 'place') {
+    const bolt = (n, x) => { c.font = '13px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'left'; c.fillStyle = '#facc15'; c.textBaseline = 'middle'; c.fillText('⚡'.repeat(n) + '·'.repeat(6 - n), x, 505); };
+    bolt(sv.foeEnergy, SV_B[0][0] + 290); bolt(sv.energy, SV_B[1][0] + 290);
+  }
+  // Dragged ship.
+  if (sv.drag && sv.drag.ship && sv.drag.at) {
+    const s = {...sv.drag.ship, ...sv.drag.at}, ok = sv.drag.cell && svValid([...sv.place.filter(q => q.x >= 0 && q !== sv.drag.ship), s]);
+    if (sv.drag.cell) svShip(c, s, SV_B[0][0], SV_B[0][1], ok ? 'ghost' : 'ghost-bad');
+    else svShip(c, {...s, x: 0, y: 0}, sv.drag.px - SV_C / 2, sv.drag.py - SV_C / 2, '');
+  }
+  for (const a of sv.anims) {
+    const k = a.t / a.dur;
+    if (a.k === 'missile') {
+      const x = a.sx + (a.x - a.sx) * k, y = a.sy + (a.y - a.sy) * k - Math.sin(k * Math.PI) * 160;
+      const x2 = a.sx + (a.x - a.sx) * (k - 0.04), y2 = a.sy + (a.y - a.sy) * (k - 0.04) - Math.sin((k - 0.04) * Math.PI) * 160;
+      c.strokeStyle = 'rgba(253,186,116,.6)'; c.lineWidth = 3; c.beginPath(); c.moveTo(x2, y2); c.lineTo(x, y); c.stroke();
+      c.save(); c.translate(x, y); c.rotate(Math.atan2(y - y2, x - x2));
+      c.fillStyle = a.big ? '#f87171' : '#e2e8f0'; c.beginPath(); c.moveTo(9, 0); c.lineTo(-7, -4); c.lineTo(-7, 4); c.closePath(); c.fill();
+      c.fillStyle = '#fb923c'; c.beginPath(); c.arc(-9, 0, 3 + Math.random() * 2, 0, 7); c.fill();
+      c.restore();
+      sv.parts.push({k: 'smoke', x: x2, y: y2, vx: 0, vy: -0.1, t: 0, life: 26, r: 3});
+    } else if (a.k === 'torp') {
+      const [ox, oy] = SV_B[a.board], yy = oy + (a.y + 0.5) * SV_C, xx = ox + k * SV_N * SV_C;
+      c.strokeStyle = 'rgba(224,242,254,.7)'; c.lineWidth = 3; c.beginPath(); c.moveTo(ox, yy); c.lineTo(xx, yy); c.stroke();
+      c.fillStyle = '#f1f5f9'; c.beginPath(); c.ellipse(xx, yy, 9, 4, 0, 0, 7); c.fill();
+    } else if (a.k === 'radar') {
+      c.strokeStyle = 'rgba(74,222,128,' + (1 - k) + ')'; c.lineWidth = 3; c.beginPath(); c.arc(a.x, a.y, 10 + k * 60, 0, 7); c.stroke();
+      c.save(); c.translate(a.x, a.y); c.rotate(k * 12); c.fillStyle = 'rgba(74,222,128,.25)'; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 60, 0, 0.8); c.closePath(); c.fill(); c.restore();
+    }
+  }
+  for (const p of sv.parts) {
+    const k = 1 - p.t / p.life;
+    if (p.k === 'spark') { c.fillStyle = 'rgba(253,' + Math.floor(150 + 100 * k) + ',80,' + k + ')'; c.fillRect(p.x - 2, p.y - 2, 4, 4); }
+    else if (p.k === 'drop') { c.fillStyle = 'rgba(224,242,254,' + k + ')'; c.beginPath(); c.arc(p.x, p.y, 2.2, 0, 7); c.fill(); }
+    else if (p.k === 'ring') { c.strokeStyle = 'rgba(224,242,254,' + k * 0.8 + ')'; c.lineWidth = 2; c.beginPath(); c.arc(p.x, p.y, 4 + (1 - k) * 22, 0, 7); c.stroke(); }
+    else if (p.k === 'flash') { const gr = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 50 * k + 10); gr.addColorStop(0, 'rgba(255,255,220,' + k + ')'); gr.addColorStop(0.4, 'rgba(251,146,60,' + k * 0.8 + ')'); gr.addColorStop(1, 'rgba(239,68,68,0)'); c.fillStyle = gr; c.beginPath(); c.arc(p.x, p.y, 50 * k + 10, 0, 7); c.fill(); }
+    else if (p.k === 'smoke') { c.fillStyle = 'rgba(100,116,139,' + k * 0.45 + ')'; c.beginPath(); c.arc(p.x, p.y, p.r + (1 - k) * 8, 0, 7); c.fill(); }
+    else if (p.k === 'shield') { c.strokeStyle = 'rgba(52,211,153,' + k + ')'; c.lineWidth = 4; c.beginPath(); c.arc(p.x, p.y, 12 + (1 - k) * 18, 0, 7); c.stroke(); }
+  }
+  // The big message.
+  if (sv.msgT > 0 && sv.msg) {
+    const a = Math.min(1, sv.msgT / 30);
+    c.globalAlpha = a; c.font = '900 26px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.lineWidth = 6; c.strokeStyle = 'rgba(2,6,23,.85)'; c.strokeText(sv.msg, SV_W / 2, 540); c.fillStyle = '#fff'; c.fillText(sv.msg, SV_W / 2, 540); c.globalAlpha = 1;
+  }
+  if (sv.phase === 'play') {
+    c.font = '800 15px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = svMyTurn(g) ? '#facc15' : '#94a3b8';
+    c.fillText(svMyTurn(g) ? '▶ DU BIST DRAN' : sv.pending ? '…' : '⏳ ' + g.opName + ' zielt…', SV_W / 2, 30);
+  }
+  if (sv.peek && !sv.peekFleet && sv.phase === 'play') { c.fillStyle = 'rgba(239,68,68,.8)'; c.font = '11px sans-serif'; c.textAlign = 'right'; c.fillText('…', SV_W - 12, 20); }
+}
+// Where the ships still to place sit in the dock.
+function svDockPos(g) {
+  const sv = g.sv, [ox, oy] = SV_B[1];
+  return sv.place.map((s, i) => ({s, x: ox + 20, y: oy + 18 + i * 52}));
+}
+function svCellAt(px, py, board) {
+  const [ox, oy] = SV_B[board], x = Math.floor((px - ox) / SV_C), y = Math.floor((py - oy) / SV_C);
+  return x >= 0 && y >= 0 && x < SV_N && y < SV_N ? {x, y, board} : null;
+}
+function svPointer(g, cv, e, kind) {
+  const sv = g.sv, rc = cv.getBoundingClientRect(), k = SV_W / rc.width, px = (e.clientX - rc.left) * k, py = (e.clientY - rc.top) * k;
+  const h0 = svCellAt(px, py, 0), h1 = sv.phase === 'place' ? null : svCellAt(px, py, 1);
+  sv.hover = h1 || h0;
+  if (sv.phase === 'place' && !sv.ready) {
+    if (kind === 'down' && e.button === 2) return;
+    if (kind === 'down') {
+      if (sv.shieldMode && h0) {
+        const on = sv.place.some(s => s.x >= 0 && svCells(s).some(([x, y]) => x === h0.x && y === h0.y));
+        if (on) { sv.shield = svKey(h0.x, h0.y); sv.shieldMode = false; svRender(g); }
+        return;
+      }
+      // Pick up a placed ship, or one from the dock.
+      let ship = h0 && sv.place.find(s => s.x >= 0 && svCells(s).some(([x, y]) => x === h0.x && y === h0.y)), grab = 0;
+      if (ship) grab = ship.dir ? h0.y - ship.y : h0.x - ship.x;
+      else { const d = svDockPos(g).find(({s, x, y}) => s.x < 0 && px >= x && px <= x + s.len * SV_C && py >= y && py <= y + SV_C); if (d) { ship = d.s; grab = Math.floor((px - d.x) / SV_C); } }
+      if (!ship) return;
+      cv.setPointerCapture(e.pointerId);
+      sv.drag = {ship, grab, from: {x: ship.x, y: ship.y, dir: ship.dir}, px, py, cell: null, at: {dir: ship.dir}};
+      if (sv.shield && svCells(ship).some(([x, y]) => svKey(x, y) === sv.shield)) sv.shield = null;
+    }
+    if (sv.drag && (kind === 'move' || kind === 'down')) {
+      const d = sv.drag;
+      d.px = px; d.py = py;
+      d.cell = h0;
+      const dir = d.at.dir;
+      if (h0) d.at = {dir, x: h0.x - (dir ? 0 : d.grab), y: h0.y - (dir ? d.grab : 0)};
+      else d.at = {dir};
+    }
+    if (sv.drag && kind === 'up') {
+      const d = sv.drag, s = {...d.ship, ...d.at};
+      sv.drag = null;
+      if (d.cell && svValid([...sv.place.filter(q => q.x >= 0 && q !== d.ship), s])) Object.assign(d.ship, {x: s.x, y: s.y, dir: s.dir});
+      else if (!d.cell) Object.assign(d.ship, {x: -1, y: -1, dir: 0});
+      else Object.assign(d.ship, d.from);
+      svRender(g);
+    }
+    return;
+  }
+  if (kind === 'down' && h1 && svMyTurn(g)) svFire(g, h1.x, h1.y);
+}
+function svRotate(g) {
+  const sv = g.sv;
+  if (sv.phase !== 'place' || sv.ready) return;
+  if (sv.drag) { const d = sv.drag; d.at.dir = 1 - d.at.dir; if (d.cell) d.at = {dir: d.at.dir, x: d.cell.x - (d.at.dir ? 0 : d.grab), y: d.cell.y - (d.at.dir ? d.grab : 0)}; return; }
+  const h = sv.hover, s = h && h.board === 0 && sv.place.find(q => q.x >= 0 && svCells(q).some(([x, y]) => x === h.x && y === h.y));
+  if (!s) return;
+  const r = {...s, dir: 1 - s.dir};
+  if (svValid([...sv.place.filter(q => q.x >= 0 && q !== s), r])) { s.dir = r.dir; if (sv.shield && !svCells(s).some(([x, y]) => svKey(x, y) === sv.shield)) sv.shield = null; svRender(g); }
+}
+// The board and its buttons.
+function svRender(g) {
+  if (!g || !g.sv) return;
+  const off = !!g.offline, grid = $(off ? 'ogrid' : 'cmpgrid'), sv = g.sv;
+  if (!off && (mpGame !== g || conv !== mpConv(g))) return;
+  if (grid.dataset.gid !== g.gid || !grid.querySelector('canvas.sv-cv')) {
+    grid.className = 'sv-wrap';
+    grid.dataset.gid = g.gid;
+    const cv = el('canvas', {class: 'sv-cv'});
+    for (const [ev, kind] of [['pointerdown', 'down'], ['pointermove', 'move'], ['pointerup', 'up']]) cv.addEventListener(ev, e => svPointer(g, cv, e, kind));
+    cv.addEventListener('pointerleave', () => { sv.hover = null; });
+    cv.addEventListener('contextmenu', e => { e.preventDefault(); svRotate(g); });
+    grid.replaceChildren(cv, el('div', {class: 'sv-bar'}));
+  }
+  const bar = grid.querySelector('.sv-bar'), btn = (text, on, click, dis, cls) => el('button', {class: 'vbtn' + (on ? ' on' : '') + (cls ? ' ' + cls : ''), type: 'button', text, disabled: !!dis, onclick: click});
+  if (sv.phase === 'place') {
+    const all = sv.place.every(s => s.x >= 0);
+    bar.replaceChildren(
+      btn('🎲 Zufällig', false, () => { if (sv.ready) return; const f = svRandomFleet(); sv.place.forEach((s, i) => Object.assign(s, f[i])); sv.shield = null; svRender(g); }, sv.ready),
+      btn('↻ Drehen (R)', false, () => svRotate(g), sv.ready),
+      ...(sv.mode === 'crazy' ? [btn(sv.shield ? '🛡️ Schild versetzen' : '🛡️ Schild setzen', sv.shieldMode, () => { sv.shieldMode = !sv.shieldMode; svRender(g); }, sv.ready || !all)] : []),
+      btn(sv.ready ? '⏳ Warte auf ' + g.opName : '✅ Fertig', false, () => svReady(g), sv.ready || !all, 'sv-go'));
+  } else if (sv.phase === 'play' && sv.mode === 'crazy') {
+    bar.replaceChildren(...Object.entries(SV_WEAP).map(([k, w]) => btn(w.icon + ' ' + w.name + (w.cost ? ' ' + w.cost + '⚡' : ''), sv.weap === k, () => { sv.weap = k; svRender(g); }, w.cost > sv.energy || !svMyTurn(g))),
+      el('span', {class: 'sv-energy', text: 'Energie ' + sv.energy + '/6 (pro Treffer +1)'}));
+  } else bar.replaceChildren();
+  const status = $(off ? 'ostatus' : 'cmpstatus'), opn = g.opName + (off || people.has(g.opponent) ? '' : ' (offline)');
+  status.textContent = sv.phase === 'over'
+    ? (g.winner === g.myMark ? '🏆 Du hast gewonnen!' : g.opName + ' hat gewonnen.') + (sv.cheat ? ' ❌ ' + g.opName + ' hat geschummelt: ' + sv.cheat : sv.revealed && !off ? ' ✔ Fair gespielt (geprüft).' : '')
+    : '🚢 Schiffe versenken' + (sv.mode === 'crazy' ? ' CRAZY' : '') + ' vs ' + opn + (sv.phase === 'place' ? ' — stell deine Flotte auf' : '');
+  const res = $(off ? 'oresult' : 'cmpresult');
+  res.hidden = false;
+  res.replaceChildren(off ? el('button', {class: 'vbtn', text: g.over ? 'Zurück' : 'Beenden', onclick: () => { offStop(); offShow('sv'); }})
+    : g.over ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
+      : el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
+}
+// R turns a ship; 1 is the owner's look at the other fleet.
+document.addEventListener('keydown', e => {
+  const g = svGames()[0];
+  if (!g || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) return;
+  if (e.code === 'KeyR') svRotate(g);
+  else if (e.key === '1' && (store.get('adminKey', '') || pgAssistOn)) g.sv.peek = !g.sv.peek;
+});
+// Offline against the bot.
+const SV_OPP = {leicht: 'Leicht', mittel: 'Mittel', profi: 'Profi'};
+function svOffShow() {
+  if (svOff) { $('osetup').hidden = true; $('oboard').hidden = false; svRender(svOff); return; }
+  $('osetup').hidden = false;
+  $('oboard').hidden = true;
+  const set = offSet.sv || (offSet.sv = {lvl: 'mittel', mode: 'crazy'}), wins = offWins.sv || {};
+  const opt = (key, val, label) => el('button', {class: 'vbtn' + (set[key] === val ? ' on' : ''), type: 'button', text: label, onclick: () => { set[key] = val; store.set('offSet', offSet); svOffShow(); }});
+  $('osetup').replaceChildren(el('div', {class: 'osetbox'},
+    el('div', {class: 'upddlg-head', text: '🚢 Schiffe versenken gegen einen Bot'}),
+    el('div', {class: 'olabel', text: 'Schwierigkeit'}),
+    el('div', {class: 'orow'}, ...Object.entries(SV_OPP).map(([k, v]) => opt('lvl', k, v + (wins[k] ? ' · ' + wins[k] + ' 🏆' : '')))),
+    el('div', {class: 'olabel', text: 'Modus'}),
+    el('div', {class: 'orow'}, opt('mode', 'classic', 'Klassisch'), opt('mode', 'crazy', '💥 Crazy')),
+    el('p', {text: 'Stell deine Flotte auf (5er, 4er, zwei 3er, 2er – die Schiffe dürfen sich nicht berühren), dann wird abwechselnd geschossen. Ein Treffer gibt einen Extraschuss. Wer zuerst alle Schiffe versenkt, gewinnt.'}),
+    el('p', {text: '💥 Crazy: Treffer laden Energie auf. 📡 Radar (2⚡) zeigt, wie viele Schiffsteile in einem 3×3-Feld liegen · 💣 Streubombe (3⚡) trifft 5 Felder · 🚀 Torpedo (3⚡) fährt eine Reihe entlang bis zum ersten Schiff · 🛡️ ein Schild schützt einen deiner Schiffsteile einmal.'}),
+    el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Los geht\'s', disabled: mpRunning() && mpGame.game === 'sv', onclick: svOffStart}),
+    el('p', {class: 'sg-keys', text: '🖱 Ziehen zum Aufstellen · R oder Rechtsklick dreht · Klick aufs gegnerische Meer schießt'})));
+}
+function svOffStart() {
+  const set = offSet.sv || {lvl: 'mittel', mode: 'crazy'};
+  const g = {gid: 'off' + Date.now().toString(36), game: 'sv', offline: {...set}, myMark: 1, over: false, opName: 'Bot'};
+  svInit(g, set.mode, set.lvl);
+  svOff = g;
+  $('osetup').hidden = true;
+  $('oboard').hidden = false;
+  svRender(g);
 }
 
 /* Reaktions-Duell: each side measures its own reaction locally, so network delay doesn't matter. */
@@ -8909,7 +9628,7 @@ class Breach extends Room {
 
   return {Kick, Tron, Breach, Arena, br: {MAPS: BR_MAPS, MAP: BR_MAP, W: BR_W, H: BR_H, R: BR_R, RUN: BR_RUN, WALK: BR_WALK, BOMB: BR_BOMB, DEFUSE: BR_DEFUSE, GUN: BR_GUN, move: brMove, ray: brRay}};
 })();
-const offlineDocs = {golf: {panel: true, offline: 'golf'}, pong: {panel: true, offline: 'pong'}, kick: {panel: true, offline: 'kick'}, tron: {panel: true, offline: 'tron'}, breach: {panel: true, offline: 'breach'}};
+const offlineDocs = {sv: {panel: true, offline: 'sv'}, golf: {panel: true, offline: 'golf'}, pong: {panel: true, offline: 'pong'}, kick: {panel: true, offline: 'kick'}, tron: {panel: true, offline: 'tron'}, breach: {panel: true, offline: 'breach'}};
 const OFF_LEVEL_NAMES = {leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer', profi: 'Profi'};
 const OFF_BOTS = ['Bot Kevin', 'Bot Jana', 'Bot Ömer', 'Bot Lina', 'Bot Finn', 'Bot Mia'];
 let offSet = Object.assign({pong: {lvl: 'mittel', pu: true}, kick: {lvl: 'mittel', mode: 1, pu: true}, tron: {lvl: 'mittel', bots: 2, pu: true}, breach: {lvl: 'mittel', map: 'rand'}}, store.get('offSet', {}));
@@ -9243,6 +9962,7 @@ function nrBrain(R, lvl) {
 // online. Settings and wins per level are remembered.
 function offShow(game) {
   if (game === 'golf') { gfOffShow(); return; }
+  if (game === 'sv') { svOffShow(); return; }
   const doc = offlineDocs[game], pong = game === 'pong', g = pong ? pgGame : sgGame;
   const running = g && g.offline && g.game === game && !g.over && (pong ? pgLive(g) : sgLive(g));
   $('osetup').hidden = !!running;
@@ -9302,6 +10022,7 @@ function offStart(game) {
 }
 function offStop() {
   if (gfOff) { gfOff.over = true; gfOff = null; }
+  if (svOff) { svOff.over = true; svOff = null; }
   const p = pgGame;
   if (p && p.offline) {
     p.over = true;
@@ -10895,6 +11616,8 @@ $('cmpEmoji').addEventListener('click', () => { closePops(); inviteMp('emoji'); 
 $('cmpReact').addEventListener('click', () => { closePops(); inviteMp('react'); });
 $('cmpPong').addEventListener('click', () => { closePops(); inviteMp('pong'); });
 $('cmpGolf').addEventListener('click', () => { closePops(); inviteMp('golf'); });
+$('cmpSv').addEventListener('click', () => { closePops(); inviteMp('sv', 'classic'); });
+$('cmpSvC').addEventListener('click', () => { closePops(); inviteMp('sv', 'crazy'); });
 $('cmpKick').addEventListener('click', () => { closePops(); if (conv === ALL) sgOpenTable('kick'); else inviteMp('kick'); });
 $('cmpTron').addEventListener('click', () => { closePops(); if (conv === ALL) sgOpenTable('tron'); else inviteMp('tron'); });
 $('cmpBreach').addEventListener('click', () => { closePops(); if (conv !== ALL) inviteMp('breach'); });
