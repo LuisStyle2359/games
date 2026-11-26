@@ -312,6 +312,12 @@ tbody tr.sel td { background: var(--select); }
 .dr-log { font-size: 11px; color: var(--muted); min-height: 14px; width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dr-log .ok { color: #27ae60; font-weight: 600; }
 .dr-log .near { color: #e67e22; font-weight: 600; }
+.gf-wrap { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; overflow: hidden; }
+.gf-cv { flex: none; display: block; border-radius: 8px; touch-action: none; cursor: crosshair; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.gf-card table { border-collapse: collapse; font-size: 12px; }
+.gf-card td { padding: 2px 7px; border: 1px solid rgba(127,127,127,.3); text-align: center; }
+.gf-card td:first-child { text-align: left; font-weight: 600; }
+.gf-card td.cur { background: rgba(255,210,63,.4); font-weight: 700; }
 .rx-wrap, .em-wrap, .uno-wrap { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .rx-score { font-weight: 600; font-size: 13px; white-space: pre; }
 .rx-box { flex: 1; min-height: 110px; width: 100%; max-width: 560px; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 8px; font-size: 24px; font-weight: 700; color: #fff; background: #7f8c8d; cursor: pointer; user-select: none; text-align: center; touch-action: manipulation; }
@@ -577,6 +583,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
           <tr data-doc="Commercial Invoice" data-game="snake"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-03</td><td>Commercial Invoice</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:31</td><td></td><td></td></tr>
           <tr data-doc="Correspondence" data-chat="1"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-11</td><td>Correspondence</td><td>Email</td><td></td><td>1</td><td>16.10.2026 08:47</td><td></td><td></td></tr>
           <tr data-doc="Customer Images" data-video="1"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-10</td><td>Customer Images</td><td>Scan</td><td class="flag">Q</td><td>1</td><td>15.10.2026 09:12</td><td></td><td></td></tr>
+          <tr data-doc="Delivery Note" data-offline="golf"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-16</td><td>Delivery Note</td><td>Logistics</td><td></td><td>2</td><td>31.10.2026 10:12</td><td></td><td></td></tr>
           <tr data-doc="Freight Invoice" data-offline="pong"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-15</td><td>Freight Invoice</td><td>Billing</td><td></td><td>2</td><td>30.10.2026 14:18</td><td></td><td></td></tr>
           <tr data-doc="House Airway Bill" data-game="tetris"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-04</td><td>House Airway Bill - Original</td><td></td><td class="flag">Q</td><td>1</td><td>24.09.2026 10:32</td><td></td><td></td></tr>
           <tr data-doc="OLA"><td><svg class="i16"><use href="#i-pdf"/></svg>2563318804-05</td><td>OLA</td><td></td><td></td><td>6</td><td>24.09.2026 14:48</td><td></td><td></td></tr>
@@ -639,7 +646,7 @@ if (location.hash === '#app' || matchMedia('(display-mode: standalone)').matches
               <div class="cgifprev" id="cgifprev"></div>
               <p class="cnote" id="cgifnote"></p>
             </div>
-            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button><button class="vbtn" id="cmpKick" type="button" style="width:100%">⚽ Fußball</button><button class="vbtn" id="cmpTron" type="button" style="width:100%">🏍️ Neon Rush</button><button class="vbtn" id="cmpBreach" type="button" style="width:100%">⚔️ Breach (1 gegen 1)</button></div>
+            <div class="cpop" id="cmppop" hidden role="dialog" aria-label="Spiel wählen" style="padding:8px;gap:4px;flex-direction:column"><button class="vbtn" id="cmpTtt" type="button" style="width:100%">Tic-Tac-Toe</button><button class="vbtn" id="cmpC4" type="button" style="width:100%">4 Gewinnt</button><button class="vbtn" id="cmpDraw" type="button" style="width:100%">Malen &amp; Raten</button><button class="vbtn" id="cmpEmoji" type="button" style="width:100%">Emoji-Raten</button><button class="vbtn" id="cmpReact" type="button" style="width:100%">Reaktions-Duell</button><button class="vbtn" id="cmpUno" type="button" style="width:100%">Uno</button><button class="vbtn" id="cmpPong" type="button" style="width:100%">Ping Pong</button><button class="vbtn" id="cmpKick" type="button" style="width:100%">⚽ Fußball</button><button class="vbtn" id="cmpTron" type="button" style="width:100%">🏍️ Neon Rush</button><button class="vbtn" id="cmpBreach" type="button" style="width:100%">⚔️ Breach (1 gegen 1)</button><button class="vbtn" id="cmpGolf" type="button" style="width:100%">⛳ Crazy Minigolf</button></div>
             <div class="cpop" id="cflexpop" hidden role="dialog" aria-label="Score zeigen" style="padding:8px;gap:4px;flex-direction:column"></div>
             <div class="cimgbar" id="cimgbar" hidden><img id="cimgthumb" alt=""><span id="cimginfo">Bild senden?</span><button class="vbtn" id="cimgsend" type="button">Senden</button><button class="vbtn" id="cimgcancel" type="button">Abbrechen</button></div>
             <div class="cimgview" id="cimgview" hidden></div>
@@ -1874,8 +1881,8 @@ let typingTimer = 0, lastTypingSent = 0;
 let replyTo = null;
 const readState = {};
 let lb = {}, lbGame = 'snake';
-const MP_GAMES = ['ttt', 'c4', 'draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach'];
-const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong gegen Bot', kick: 'Fußball', tron: 'Neon Rush', breach: 'Breach'};
+const MP_GAMES = ['ttt', 'c4', 'draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach', 'golf'];
+const GAME_NAMES = {snake: 'Snake', tetris: 'Tetris', '2048': '2048', flappy: 'Flappy Bird', wordle: 'Wordle', ttt: 'Tic-Tac-Toe', c4: '4 Gewinnt', draw: 'Malen & Raten', uno: 'Uno', react: 'Reaktions-Duell', emoji: 'Emoji-Raten', pong: 'Ping Pong', pongtop: 'Ping Pong Tempo', pongbot: 'Pong gegen Bot', kick: 'Fußball', tron: 'Neon Rush', breach: 'Breach', golf: 'Crazy Minigolf'};
 let mpGame = null, mpInvites = [], mpOutbox = [];
 
 function mqttClient({url, user, pass}, {clientId, will, onopen, onmessage, onclose}) {
@@ -2034,7 +2041,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 78;
+const APP_VERSION = 79;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -2486,7 +2493,7 @@ function toggleLb() {
   if (!p.hidden) renderLb();
 }
 function renderLb() {
-  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong', 'pongtop', 'kick', 'tron', 'breach'];
+  const allGames = ['snake', 'tetris', '2048', 'flappy', 'wordle', 'pongbot', 'ttt', 'c4', 'uno', 'react', 'pong', 'pongtop', 'kick', 'tron', 'breach', 'golf'];
   const avail = allGames.filter(g => lb[g] && Object.keys(lb[g]).length);
   if (!avail.includes(lbGame)) lbGame = avail[0] || 'snake';
   $('clbtabs').replaceChildren(...avail.map(g =>
@@ -2497,7 +2504,7 @@ function renderLb() {
     .sort((a, b) => b.score - a.score);
   if (!entries.length) { $('clbbody').replaceChildren(el('div', {class: 'clbempty', text: 'Noch keine Punkte für ' + GAME_NAMES[lbGame] + '. Spiel einfach drauf los!'})); return; }
   const medals = ['gold', 'silver', 'bronze'];
-  const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong', 'kick', 'tron', 'breach'];
+  const mpGames = ['ttt', 'c4', 'uno', 'react', 'pong', 'kick', 'tron', 'breach', 'golf'];
   $('clbbody').replaceChildren(el('table', {class: 'clbtable'},
     el('thead', {}, el('tr', {}, el('th', {class: 'rank', text: '#'}), el('th', {text: 'Name'}), el('th', {text: mpGames.includes(lbGame) ? 'Siege' : ['pongbot', 'pongtop'].includes(lbGame) ? 'Tempo' : 'Punkte'}))),
     el('tbody', {}, ...entries.map((e, i) => el('tr', {},
@@ -2550,6 +2557,7 @@ function startMp(gid, game, opponent, opName, myMark, key) {
   else if (game === 'react') rxInit(mpGame);
   else if (game === 'uno') unoStartDuo(mpGame);
   else if (game === 'pong') pgInit(mpGame, key);
+  else if (game === 'golf') gfInit(mpGame);
   else if (SG_GAMES.includes(game)) sgInit(mpGame, key, true);
   for (const i of mpInvites) if (i.mine && i.gid !== gid) mpDeadInvites.add(i.gid);
   mpInvites = mpInvites.filter(i => i.from !== opponent && !i.mine);
@@ -2569,12 +2577,13 @@ function syncMpView() {
 }
 function renderMpBoard() {
   if (!mpGame) return;
-  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach'].includes(mpGame.game));
+  $('cmpboard').classList.toggle('drawing', ['draw', 'emoji', 'react', 'uno', 'pong', 'kick', 'tron', 'breach', 'golf'].includes(mpGame.game));
   if (mpGame.game === 'draw') { renderDraw(); return; }
   if (mpGame.game === 'emoji') { renderEmoji(); return; }
   if (mpGame.game === 'react') { renderReact(); return; }
   if (mpGame.game === 'uno') { renderUno(); return; }
   if (mpGame.game === 'pong') { renderPong(); return; }
+  if (mpGame.game === 'golf') { renderGolf(mpGame); return; }
   if (SG_GAMES.includes(mpGame.game)) { renderSg(mpGame); return; }
   const g = mpGame, myTurn = g.turn === g.myMark;
   const opLabel = g.opName + (people.has(g.opponent) ? '' : ' (offline)');
@@ -2659,7 +2668,7 @@ const mpDeadInvites = new Set();
 // instead of waiting forever.
 setInterval(() => {
   const g = mpGame;
-  if (!g || g.over || !['ttt', 'c4', 'draw', 'emoji', 'react'].includes(g.game)) return;
+  if (!g || g.over || !['ttt', 'c4', 'draw', 'emoji', 'react', 'golf'].includes(g.game)) return;
   g.goneT = people.has(g.opponent) ? 0 : (g.goneT || 0) + 1;
   if (g.goneT < 24) return;
   mpGame = null;
@@ -2757,6 +2766,8 @@ function handleMp(from, dm) {
     handleUno(from, gid, dm);
   } else if (DRAW_TYPES.has(dm.type)) {
     if (g && g.gid === gid && g.opponent === from && g.game === 'draw' && !g.over) handleDraw(g, dm);
+  } else if (dm.type === 'gs') {
+    if (g && g.gid === gid && g.opponent === from && g.game === 'golf' && !g.over && g.gf) gfRemoteShot(g, dm);
   } else if (dm.type === 'move') {
     if (!g || !['ttt', 'c4'].includes(g.game) || g.gid !== gid || g.opponent !== from || g.over || dm.n !== g.moves + 1 || g.turn === g.myMark) return;
     if (!applyMove(g, 3 - g.myMark, dm)) return;
@@ -2770,6 +2781,542 @@ function handleMp(from, dm) {
     bumpUnread(from);
     if (conv === from) renderMpBoard();
   }
+}
+
+/* Crazy Minigolf: 9 crazy holes (a windmill, pinball bumpers, portals, ice, a black hole, conveyor belts, sliding
+   doors, boost pads, and a hole that wanders), each with a random twist (wind, bouncy walls, moon friction, a tiny
+   or a giant hole). Both players play a hole at the same time and see each other's ball. A shot is a direction and
+   a strength: the shooter's page works out where the ball goes and sends that with the shot; the other page plays
+   the shot back for the show and then puts the ball where the shooter's page said (browsers can round a little
+   differently, so only one page decides). Fewest strokes after 9 holes wins. Offline the same against a bot that
+   tries shots in its head and takes a good one, a little off like a person. */
+const GF_W = 640, GF_H = 400, GF_M = 16, GF_BR = 6, GF_MAXV = 12, GF_MAXS = 10, GF_TICK = 1000 / 60;
+const GF_MODS = {wind: '🌬️ Wind', flummi: '🏀 Flummi-Wände', mond: '🌙 Mondgravitation', mini: '🔬 Mini-Loch', riesen: '🕳️ Riesenloch'};
+const GF_HOLES = [
+  {name: 'Windmühle', par: 2, tee: [70, 200], hole: [570, 200],
+    blocks: [[16, 16, 608, 110], [16, 274, 608, 110]], mills: [{c: [320, 200], len: 70, n: 4, w: 0.03}]},
+  {name: 'Flipper', par: 3, tee: [70, 330], hole: [565, 75],
+    bumpers: [[200, 260, 18], [270, 185, 18], [340, 270, 18], [400, 160, 22], [475, 245, 18], [525, 150, 16], [305, 95, 16], [150, 150, 16]],
+    walls: [[440, 16, 440, 105]]},
+  {name: 'Teleporter', par: 2, tee: [80, 200], hole: [560, 95],
+    walls: [[320, 16, 320, 384]], portals: [[[255, 200], [385, 305]]], zones: [{k: 'water', r: [440, 215, 130, 150]}, {k: 'water', r: [130, 16, 120, 70]}]},
+  {name: 'Eisbahn', par: 3, tee: [60, 340], hole: [580, 345],
+    zones: [{k: 'ice', r: [110, 16, 420, 368]}, {k: 'sand', r: [535, 290, 89, 94]}],
+    walls: [[220, 16, 220, 285], [360, 115, 360, 384], [500, 16, 500, 285]]},
+  {name: 'Schwarzes Loch', par: 2, tee: [70, 320], hole: [570, 80],
+    wells: [[330, 205, 135, 0.1]], bumpers: [[470, 300, 16]]},
+  {name: 'Förderbänder', par: 3, tee: [60, 200], hole: [585, 200],
+    zones: [{k: 'belt', r: [150, 16, 70, 368], d: [0, 1]}, {k: 'belt', r: [300, 16, 70, 368], d: [0, -1]}, {k: 'belt', r: [450, 16, 70, 368], d: [0, 1]},
+      {k: 'lava', r: [300, 16, 70, 34]}, {k: 'lava', r: [150, 350, 70, 34]}, {k: 'lava', r: [450, 350, 70, 34]}]},
+  {name: 'Schiebetüren', par: 2, tee: [60, 200], hole: [585, 200],
+    blocks: [[16, 16, 608, 60], [16, 324, 608, 60]],
+    movers: [{r: [180, 150, 24, 100], ax: [0, 74], per: 160}, {r: [320, 150, 24, 100], ax: [0, -74], per: 210}, {r: [460, 150, 24, 100], ax: [0, 74], per: 130}]},
+  {name: 'Booster-Schleife', par: 3, tee: [80, 320], hole: [85, 85],
+    blocks: [[140, 140, 400, 120]], walls: [[16, 200, 140, 200]],
+    zones: [{k: 'boost', r: [210, 285, 80, 70], d: [1, 0]}, {k: 'boost', r: [560, 165, 55, 70], d: [0, -1]}, {k: 'boost', r: [380, 45, 80, 70], d: [-1, 0]},
+      {k: 'water', r: [300, 16, 60, 26]}, {k: 'sand', r: [140, 40, 70, 90]}]},
+  {name: 'Chaos-Finale', par: 4, tee: [60, 330], hole: [530, 200], holeMove: {ax: [60, 0], per: 240},
+    mills: [{c: [300, 115], len: 58, n: 3, w: -0.04}], bumpers: [[230, 285, 16], [385, 295, 16], [180, 150, 14]],
+    portals: [[[140, 70], [420, 330]]], zones: [{k: 'sand', r: [330, 170, 70, 60]}, {k: 'water', r: [470, 300, 110, 60]}, {k: 'ice', r: [420, 40, 180, 90]}],
+    walls: [[440, 140, 440, 260]]}
+];
+// Same random numbers on both pages: from the game's id.
+function gfRng(seed) {
+  let h = 2166136261;
+  for (const c of String(seed)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+function gfMods(seed) {
+  const r = gfRng(seed + 'mods'), list = ['', '', 'wind', 'flummi', 'mond', 'mini', 'riesen'];
+  return GF_HOLES.map(() => { const k = list[Math.floor(r() * list.length)]; return k === 'wind' ? {k, a: r() * Math.PI * 2} : {k}; });
+}
+// Everything that stands still or moves on a hole, at time t (ticks since the hole started).
+function gfHoleAt(h, t) {
+  const H = GF_HOLES[h], hm = H.holeMove, s = hm ? Math.sin(2 * Math.PI * t / hm.per) : 0;
+  return {hole: hm ? [H.hole[0] + hm.ax[0] * s, H.hole[1] + hm.ax[1] * s] : H.hole,
+    movers: (H.movers || []).map(m => { const k = Math.sin(2 * Math.PI * t / m.per); return {x: m.r[0] + m.ax[0] * k, y: m.r[1] + m.ax[1] * k, w: m.r[2], h: m.r[3], vx: m.ax[0] * Math.cos(2 * Math.PI * t / m.per) * 2 * Math.PI / m.per, vy: m.ax[1] * Math.cos(2 * Math.PI * t / m.per) * 2 * Math.PI / m.per}; }),
+    blades: (H.mills || []).flatMap(m => Array.from({length: m.n}, (_, i) => { const a = (m.ph || 0) + m.w * t + 2 * Math.PI * i / m.n; return {c: m.c, a, len: m.len, w: m.w}; }))};
+}
+const gfRectSegs = (x, y, w, h) => [[x, y, x + w, y], [x + w, y, x + w, y + h], [x + w, y + h, x, y + h], [x, y + h, x, y]];
+const gfIn = (b, r) => b.x > r[0] && b.x < r[0] + r[2] && b.y > r[1] && b.y < r[1] + r[3];
+// Bounce the ball off a segment (moving at vx, vy); true if it touched.
+function gfSeg(b, x1, y1, x2, y2, e, vx = 0, vy = 0) {
+  const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy || 1;
+  const u = Math.max(0, Math.min(1, ((b.x - x1) * dx + (b.y - y1) * dy) / l2)), px = x1 + u * dx, py = y1 + u * dy;
+  const ox = b.x - px, oy = b.y - py, d = Math.hypot(ox, oy);
+  if (d >= GF_BR || d === 0) return false;
+  const nx = ox / d, ny = oy / d;
+  b.x = px + nx * GF_BR; b.y = py + ny * GF_BR;
+  const rv = (b.vx - vx) * nx + (b.vy - vy) * ny;
+  if (rv < 0) { b.vx -= (1 + e) * rv * nx; b.vy -= (1 + e) * rv * ny; }
+  return true;
+}
+// One shot from (x, y): strength p (0..1) toward angle a, starting at hole time ph. Returns the way the ball took
+// (one point a tick), where it stopped, whether it went in and penalty strokes (water, lava, the black hole).
+function gfSim(h, mod, x, y, a, p, ph) {
+  const H = GF_HOLES[h], b = {x, y, vx: Math.cos(a) * p * GF_MAXV, vy: Math.sin(a) * p * GF_MAXV}, path = [], fx = [];
+  const e = mod.k === 'flummi' ? 1.02 : 0.78, fr = mod.k === 'mond' ? 0.99 : 0.977, hr = mod.k === 'mini' ? 7 : mod.k === 'riesen' ? 16 : 10;
+  const segs = [...gfRectSegs(GF_M, GF_M, GF_W - 2 * GF_M, GF_H - 2 * GF_M), ...(H.walls || []), ...(H.blocks || []).flatMap(r => gfRectSegs(...r))];
+  let still = 0, cool = 0;
+  for (let t = 0; t < 900; t++) {
+    const T = gfHoleAt(h, ph + t);
+    // Surfaces and forces.
+    let f = fr;
+    for (const z of H.zones || []) {
+      if (!gfIn(b, z.r)) continue;
+      if (z.k === 'sand') f = Math.min(f, 0.9);
+      else if (z.k === 'ice') f = Math.max(f, 0.993);
+      else if (z.k === 'boost') { b.vx += z.d[0] * 0.55; b.vy += z.d[1] * 0.55; }
+      else if (z.k === 'belt') { b.vx += z.d[0] * 0.3; b.vy += z.d[1] * 0.3; }
+      else if (z.k === 'water' || z.k === 'lava') { path.push([b.x, b.y]); fx.push({t, k: z.k}); return {path, fx, x, y, in: false, pen: 1, why: z.k}; }
+    }
+    for (const [wx, wy, R, s] of H.wells || []) {
+      const dx = wx - b.x, dy = wy - b.y, d = Math.hypot(dx, dy);
+      if (d < 9) { path.push([b.x, b.y]); fx.push({t, k: 'well'}); return {path, fx, x, y, in: false, pen: 1, why: 'well'}; }
+      if (d < R) { const k = s * (1 - d / R) + 0.02; b.vx += dx / d * k; b.vy += dy / d * k; }
+    }
+    if (mod.k === 'wind') { b.vx += Math.cos(mod.a) * 0.03; b.vy += Math.sin(mod.a) * 0.03; }
+    // Hole: in when it rolls over it slowly enough; a fast ball jumps over (and gets a little nudge).
+    const hx = T.hole[0] - b.x, hy = T.hole[1] - b.y, hd = Math.hypot(hx, hy), sp = Math.hypot(b.vx, b.vy);
+    if (hd < hr - 1 && sp < 4.2 + hr * 0.12) { path.push([T.hole[0], T.hole[1]]); fx.push({t, k: 'in'}); return {path, fx, x: T.hole[0], y: T.hole[1], in: true, pen: 0}; }
+    if (hd < hr && sp > 1) { b.vx += hx / hd * 0.25; b.vy += hy / hd * 0.25; }
+    const v = Math.hypot(b.vx, b.vy);
+    if (v > GF_MAXV * 1.25) { b.vx *= GF_MAXV * 1.25 / v; b.vy *= GF_MAXV * 1.25 / v; }
+    // Move in small steps so nothing is skipped.
+    const n = Math.max(1, Math.ceil(Math.hypot(b.vx, b.vy) / 2.5));
+    for (let i = 0; i < n; i++) {
+      b.x += b.vx / n; b.y += b.vy / n;
+      for (const s of segs) gfSeg(b, ...s, e);
+      for (const m of T.movers) for (const s of gfRectSegs(m.x, m.y, m.w, m.h)) gfSeg(b, ...s, e, m.vx, m.vy);
+      for (const bl of T.blades) {
+        const ex = bl.c[0] + Math.cos(bl.a) * bl.len, ey = bl.c[1] + Math.sin(bl.a) * bl.len;
+        // A blade pushes the ball the way it turns, faster at its tip.
+        const rx = b.x - bl.c[0], ry = b.y - bl.c[1];
+        if (gfSeg(b, bl.c[0], bl.c[1], ex, ey, 0.6, -ry * bl.w, rx * bl.w)) fx.push({t, k: 'mill'});
+      }
+      for (const [cx, cy, R] of H.bumpers || []) {
+        const dx = b.x - cx, dy = b.y - cy, d = Math.hypot(dx, dy);
+        if (d >= R + GF_BR || !d) continue;
+        const nx = dx / d, ny = dy / d, rv = b.vx * nx + b.vy * ny;
+        b.x = cx + nx * (R + GF_BR); b.y = cy + ny * (R + GF_BR);
+        if (rv < 0) { b.vx -= 2 * rv * nx; b.vy -= 2 * rv * ny; }
+        // A bumper kicks the ball away (harder with bouncy walls).
+        const out = Math.max(Math.hypot(b.vx, b.vy) * 1.05, mod.k === 'flummi' ? 6.5 : 5.2);
+        const l = Math.hypot(b.vx, b.vy) || 1;
+        b.vx = b.vx / l * out; b.vy = b.vy / l * out;
+        fx.push({t, k: 'bump', x: cx, y: cy});
+      }
+    }
+    // Portals: in at one end, out at the other, same speed.
+    if (cool > 0) cool--;
+    else for (const [A, B] of H.portals || []) {
+      for (const [P, Q] of [[A, B], [B, A]]) {
+        if (Math.hypot(b.x - P[0], b.y - P[1]) < 12) {
+          const l = Math.hypot(b.vx, b.vy) || 1;
+          b.x = Q[0] + b.vx / l * 16; b.y = Q[1] + b.vy / l * 16;
+          cool = 25;
+          fx.push({t, k: 'portal'});
+          break;
+        }
+      }
+      if (cool) break;
+    }
+    b.vx *= f; b.vy *= f;
+    // Rolling resistance, so a slow ball comes to rest instead of creeping on.
+    const sp2 = Math.hypot(b.vx, b.vy);
+    if (sp2 > 0) { const k = Math.max(0, sp2 - 0.015) / sp2; b.vx *= k; b.vy *= k; }
+    path.push([b.x, b.y]);
+    const moving = Math.hypot(b.vx, b.vy) > 0.05;
+    still = moving ? 0 : still + 1;
+    if (!moving) { b.vx = 0; b.vy = 0; }
+    // Stopped (and nothing pushing it any more).
+    if (still > 3) break;
+  }
+  return {path, fx, x: b.x, y: b.y, in: false, pen: 0};
+}
+
+let gfOff = null;
+function gfInit(g, opp) {
+  const seed = g.gid;
+  g.gf = {h: 0, t: 0, at: 0, mods: gfMods(seed), sc: [[], []], st: 'play', endT: 0, opq: [], opp,
+    me: null, op: null, banner: null, drag: null, parts: []};
+  gfStartHole(g, 0);
+  if (!gfLoopOn) { gfLoopOn = true; requestAnimationFrame(gfFrame); }
+}
+function gfStartHole(g, h) {
+  const gf = g.gf, H = GF_HOLES[h];
+  gf.h = h; gf.t = 0; gf.st = 'play'; gf.endT = 0;
+  const ball = () => ({x: H.tee[0], y: H.tee[1], s: 0, in: false, anim: null, from: null, last: H.tee.slice(), botAt: 0});
+  gf.me = ball(); gf.op = ball();
+  const mod = gf.mods[h];
+  gf.banner = {text: 'Loch ' + (h + 1) + ': ' + H.name + ' · Par ' + H.par + (mod.k ? ' · Chaos: ' + GF_MODS[mod.k] : ''), until: 200};
+  // Shots of the other player for this hole that came early.
+  gfDrainQueue(g);
+}
+const gfDone = p => p.in || p.s >= GF_MAXS;
+function gfShoot(g, a, p) {
+  const gf = g.gf, me = gf.me;
+  if (gf.st !== 'play' || gfDone(me) || me.anim) return;
+  a = Math.round(a * 10000) / 10000; p = Math.round(Math.max(0.03, Math.min(1, p)) * 1000) / 1000;
+  const ph = gf.t, r = gfSim(gf.h, gf.mods[gf.h], me.x, me.y, a, p, ph);
+  me.s += 1 + r.pen;
+  me.anim = {r, i: 0, endX: r.x, endY: r.y, inn: r.in};
+  if (r.in || me.s >= GF_MAXS) me.in = r.in || me.in;
+  if (!g.offline) sendReliable(g.opponent, {type: 'gs', gid: g.gid, n: 1000 + gf.h * 100 + me.s, h: gf.h, s: me.s, a, p, ph,
+    x: Math.round(r.x * 100) / 100, y: Math.round(r.y * 100) / 100, in: r.in, pen: r.pen});
+}
+// A shot of the other player, played back here.
+function gfRemoteShot(g, dm) {
+  const gf = g.gf;
+  if (!Number.isInteger(dm.h) || dm.h < 0 || dm.h >= GF_HOLES.length || !Number.isInteger(dm.s) || dm.s < 1 || dm.s > GF_MAXS + 9) return;
+  if (gf.opq.some(q => q.h === dm.h && q.s === dm.s)) return;
+  gf.opq.push({h: dm.h, s: dm.s, a: +dm.a || 0, p: Math.max(0, Math.min(1, +dm.p || 0)), ph: Math.max(0, +dm.ph || 0),
+    x: Math.max(0, Math.min(GF_W, +dm.x || 0)), y: Math.max(0, Math.min(GF_H, +dm.y || 0)), in: !!dm.in, pen: dm.pen ? 1 : 0});
+  gfDrainQueue(g);
+}
+function gfDrainQueue(g) {
+  const gf = g.gf, op = gf.op;
+  for (;;) {
+    if (op.anim) return;
+    const i = gf.opq.findIndex(q => q.h === gf.h && q.s > op.s);
+    if (i < 0) return;
+    const q = gf.opq.splice(i, 1)[0];
+    const r = gfSim(gf.h, gf.mods[gf.h], op.x, op.y, q.a, q.p, q.ph);
+    op.s = q.s;
+    op.anim = {r, i: 0, endX: q.x, endY: q.y, inn: q.in};
+    if (q.in) op.in = true;
+  }
+}
+function gfBall(g, P) {
+  const a = P.anim;
+  if (!a) return;
+  a.i++;
+  const path = a.r.path, pt = path[Math.min(a.i, path.length - 1)];
+  P.x = pt[0]; P.y = pt[1];
+  for (const f of a.r.fx) if (f.t === a.i) gfEffect(g, f, P);
+  if (a.i >= path.length - 1) {
+    P.anim = null;
+    P.x = a.endX; P.y = a.endY;
+    if (a.r.pen) gfEffect(g, {k: a.r.why === 'well' ? 'well' : a.r.why, x: pt[0], y: pt[1]}, P);
+    if (a.inn) { P.in = true; gfEffect(g, {k: 'sink'}, P); }
+    if (P === g.gf.op) gfDrainQueue(g);
+  }
+}
+function gfEffect(g, f, P) {
+  const gf = g.gf, mine = P === gf.me;
+  if (f.k === 'bump') gf.parts.push({k: 'ring', x: f.x, y: f.y, t: 0});
+  else if (f.k === 'portal') gf.parts.push({k: 'ring', x: P.x, y: P.y, t: 0, c: '#c084fc'});
+  else if (f.k === 'water' || f.k === 'lava' || f.k === 'well') {
+    for (let i = 0; i < 14; i++) gf.parts.push({k: 'dot', x: f.x ?? P.x, y: f.y ?? P.y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, t: 0, c: f.k === 'water' ? '#7dd3fc' : f.k === 'lava' ? '#fb923c' : '#a78bfa'});
+    if (mine) gf.banner = {text: f.k === 'water' ? '💦 Platsch! +1 Strafschlag' : f.k === 'lava' ? '🔥 Lava! +1 Strafschlag' : '🌀 Vom schwarzen Loch verschluckt! +1', until: 110};
+  } else if (f.k === 'sink') {
+    for (let i = 0; i < 26; i++) gf.parts.push({k: 'dot', x: P.x, y: P.y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 1, t: 0, c: ['#ffd23f', '#22c55e', '#3e7bfa', '#e5484d'][i % 4]});
+    if (mine) { const H = GF_HOLES[gf.h], d = P.s - H.par; gf.banner = {text: P.s === 1 ? '🏆 HOLE IN ONE!' : d <= -2 ? '🦅 Eagle!' : d === -1 ? '🐦 Birdie!' : d === 0 ? '✅ Par' : d === 1 ? 'Bogey' : '+' + d, until: 130}; }
+  }
+}
+// The bot: tries shots in its head (many directions and strengths, then finer around the best) and takes the one
+// that ends nearest the hole, with an error like a person's (smaller on higher levels).
+const GF_BOT = {leicht: {aim: 0.09, pow: 0.12, wait: [1600, 2800]}, mittel: {aim: 0.035, pow: 0.06, wait: [1200, 2200]}, profi: {aim: 0.012, pow: 0.025, wait: [900, 1600]}};
+// How far it is to the hole along the course (round walls, not over water), on a grid of 8 px: the bot judges a
+// shot by this, so it doesn't aim at a hole behind a wall.
+const GF_CELL = 8, gfFields = [];
+function gfField(h) {
+  if (gfFields[h]) return gfFields[h];
+  const H = GF_HOLES[h], cw = GF_W / GF_CELL, ch = GF_H / GF_CELL, dist = new Float32Array(cw * ch).fill(1e9), bad = new Uint8Array(cw * ch);
+  const segs = [...(H.walls || []), ...(H.blocks || []).flatMap(r => gfRectSegs(...r))];
+  for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+    const x = (i + 0.5) * GF_CELL, y = (j + 0.5) * GF_CELL, b = {x, y};
+    if (x < GF_M + GF_BR || y < GF_M + GF_BR || x > GF_W - GF_M - GF_BR || y > GF_H - GF_M - GF_BR) bad[j * cw + i] = 1;
+    else if ((H.blocks || []).some(r => gfIn(b, [r[0] - GF_BR, r[1] - GF_BR, r[2] + 2 * GF_BR, r[3] + 2 * GF_BR]))) bad[j * cw + i] = 1;
+    else if ((H.zones || []).some(z => (z.k === 'water' || z.k === 'lava') && gfIn(b, z.r))) bad[j * cw + i] = 1;
+    else if ((H.wells || []).some(([wx, wy]) => Math.hypot(x - wx, y - wy) < 22)) bad[j * cw + i] = 1;
+    else if (segs.some(([x1, y1, x2, y2]) => { const dx = x2 - x1, dy = y2 - y1, u = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(x - x1 - u * dx, y - y1 - u * dy) < GF_BR + 3; })) bad[j * cw + i] = 1;
+  }
+  // Portals join their two ends.
+  const cell = ([x, y]) => Math.floor(y / GF_CELL) * cw + Math.floor(x / GF_CELL);
+  const links = new Map();
+  for (const [A, B] of H.portals || []) { links.set(cell(A), cell(B)); links.set(cell(B), cell(A)); }
+  const start = cell(H.hole), q = [start];
+  dist[start] = 0;
+  for (let k = 0; k < q.length; k++) {
+    const c = q[k], i = c % cw, j = (c / cw) | 0;
+    const next = [];
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) if (di || dj) {
+      const ni = i + di, nj = j + dj;
+      if (ni >= 0 && nj >= 0 && ni < cw && nj < ch) next.push([nj * cw + ni, di && dj ? 1.414 : 1]);
+    }
+    if (links.has(c)) next.push([links.get(c), 1]);
+    for (const [n, w] of next) if (!bad[n] && dist[c] + w < dist[n] - 0.01) { dist[n] = dist[c] + w; q.push(n); }
+  }
+  return (gfFields[h] = {at: (x, y) => { const i = Math.max(0, Math.min(cw - 1, Math.floor(x / GF_CELL))), j = Math.max(0, Math.min(ch - 1, Math.floor(y / GF_CELL))); return dist[j * cw + i] * GF_CELL; }});
+}
+// The bot: tries shots in its head (directions and strengths, then finer around the best) and takes the one that
+// ends nearest the hole along the course, with an error like a person's (smaller on higher levels).
+function gfBotShot(g) {
+  const gf = g.gf, op = gf.op, lv = GF_BOT[gf.opp] || GF_BOT.mittel, mod = gf.mods[gf.h], ph = gf.t, F = gfField(gf.h);
+  const score = r => r.in ? 0 : r.pen ? 1e6 : Math.min(F.at(r.x, r.y), 1e5) + 5;
+  let best = null;
+  const tryShot = (a, p) => { const v = score(gfSim(gf.h, mod, op.x, op.y, a, p, ph)); if (!best || v < best.v) best = {a, p, v}; };
+  for (let i = 0; i < 36; i++) for (const p of [0.2, 0.38, 0.56, 0.75, 1]) tryShot(i / 36 * 2 * Math.PI, p);
+  for (let k = 0; k < 2; k++) { const b0 = best; for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) tryShot(b0.a + i * 0.035 / (k + 1), Math.max(0.05, Math.min(1, b0.p + j * 0.05 / (k + 1)))); }
+  const r = gfSim(gf.h, mod, op.x, op.y, best.a + (Math.random() * 2 - 1) * lv.aim, Math.max(0.05, Math.min(1, best.p * (1 + (Math.random() * 2 - 1) * lv.pow))), ph);
+  op.s += 1 + r.pen;
+  op.anim = {r, i: 0, endX: r.x, endY: r.y, inn: r.in};
+  if (r.in) op.in = true;
+}
+let gfLoopOn = false, gfLast = 0;
+function gfGames() { return [mpGame && mpGame.game === 'golf' && mpGame.gf ? mpGame : null, gfOff].filter(Boolean); }
+function gfFrame(now) {
+  const list = gfGames();
+  if (!list.length) { gfLoopOn = false; return; }
+  const steps = gfLast ? Math.min(6, Math.round((now - gfLast) / GF_TICK)) : 1;
+  if (steps > 0 || !gfLast) gfLast = now;
+  for (const g of list) {
+    const gf = g.gf;
+    for (let s = 0; s < steps; s++) {
+      gf.t++;
+      gfBall(g, gf.me);
+      gfBall(g, gf.op);
+      for (const p of gf.parts) { p.t++; if (p.k === 'dot') { p.x += p.vx; p.y += p.vy; p.vx *= 0.94; p.vy *= 0.94; } }
+      gf.parts = gf.parts.filter(p => p.t < 45);
+      if (gf.banner && --gf.banner.until <= 0) gf.banner = null;
+      if (g.over) continue;
+      // The bot's turn, a moment after its ball stopped.
+      if (g.offline && gf.opp !== 'solo' && gf.st === 'play' && !gfDone(gf.op) && !gf.op.anim) {
+        if (!gf.op.botAt) gf.op.botAt = now + (GF_BOT[gf.opp] || GF_BOT.mittel).wait[0] + Math.random() * 900;
+        else if (now >= gf.op.botAt) { gf.op.botAt = 0; gfBotShot(g); }
+      }
+      const opDone = g.offline && gf.opp === 'solo' ? true : gfDone(gf.op);
+      if (gf.st === 'play' && gfDone(gf.me) && opDone && !gf.me.anim && !gf.op.anim) {
+        gf.st = 'end';
+        gf.endT = gf.t;
+        gf.sc[0][gf.h] = gf.me.s;
+        gf.sc[1][gf.h] = g.offline && gf.opp === 'solo' ? null : gf.op.s;
+      }
+      if (gf.st === 'end' && gf.t - gf.endT > 170) {
+        if (gf.h + 1 < GF_HOLES.length) gfStartHole(g, gf.h + 1);
+        else gfFinish(g);
+      }
+    }
+    // Score line and card again when something changed.
+    const key = [gf.h, gf.st, gf.me.s, gf.op.s, g.over].join();
+    if (key !== gf.key) { gf.key = key; if (gfShown(g)) renderGolf(g); }
+    gfDraw(g);
+  }
+  requestAnimationFrame(gfFrame);
+}
+const gfTotal = a => a.reduce((s, v) => s + (v || 0), 0);
+function gfFinish(g) {
+  const gf = g.gf;
+  gf.st = 'over';
+  g.over = true;
+  const a = gfTotal(gf.sc[0]), b = gfTotal(gf.sc[1]);
+  if (g.offline) {
+    g.winner = gf.opp === 'solo' ? 1 : a < b ? 1 : a > b ? 2 : 0;
+    if (gf.opp === 'solo') { const best = store.get('golfBest', 0); if (!best || a < best) store.set('golfBest', a); }
+    else if (g.winner === 1) { (offWins.golf = offWins.golf || {})[gf.opp] = ((offWins.golf || {})[gf.opp] || 0) + 1; store.set('offWins', offWins); }
+    renderGolf(g);
+    return;
+  }
+  // Mark 1 is the one who invited; the totals decide, the same on both pages.
+  const mine = a, theirs = b;
+  g.winner = mine === theirs ? 0 : mine < theirs ? g.myMark : 3 - g.myMark;
+  finishMp();
+  renderMpBoard();
+}
+// The board: a canvas that fits the width, the score line above, buttons below.
+function renderGolf(g) {
+  const off = !!g.offline, grid = $(off ? 'ogrid' : 'cmpgrid'), gf = g.gf;
+  if (grid.dataset.gid !== g.gid || !grid.querySelector('canvas.gf-cv')) {
+    grid.className = 'gf-wrap';
+    grid.dataset.gid = g.gid;
+    const cv = el('canvas', {class: 'gf-cv'});
+    cv.addEventListener('pointerdown', e => gfPointer(g, cv, e, 'down'));
+    cv.addEventListener('pointermove', e => gfPointer(g, cv, e, 'move'));
+    cv.addEventListener('pointerup', e => gfPointer(g, cv, e, 'up'));
+    cv.addEventListener('pointercancel', () => { gf.drag = null; });
+    grid.replaceChildren(cv, el('div', {class: 'gf-card', id: off ? 'gfcardO' : 'gfcard'}));
+  }
+  const a = gfTotal(gf.sc[0]) + (gf.st === 'play' ? gf.me.s : 0), b = gfTotal(gf.sc[1]) + (gf.st === 'play' ? gf.op.s : 0);
+  const solo = off && gf.opp === 'solo', opName = g.opName + (off || people.has(g.opponent) ? '' : ' (offline)');
+  const quit = g.over && gf.st !== 'over';
+  $(off ? 'ostatus' : 'cmpstatus').textContent = quit ? (g.winner === g.myMark ? '🏆 ' + g.opName + ' hat aufgegeben – du gewinnst!' : 'Aufgegeben – ' + g.opName + ' gewinnt.')
+    : g.over
+    ? (solo ? '⛳ Fertig: ' + a + ' Schläge' : g.winner === 0 ? 'Unentschieden! ' + a + ' : ' + b : g.winner === g.myMark ? '🏆 Du hast gewonnen! ' + a + ' : ' + b + ' Schläge' : g.opName + ' hat gewonnen! ' + a + ' : ' + b + ' Schläge')
+    : '⛳ Crazy Minigolf' + (solo ? '' : ' vs ' + opName) + ' — Loch ' + (gf.h + 1) + '/' + GF_HOLES.length + ' · Par ' + GF_HOLES[gf.h].par + ' · Schläge gesamt: Du ' + a + (solo ? '' : ' · ' + g.opName + ' ' + b);
+  const card = $(off ? 'gfcardO' : 'gfcard');
+  if (card) {
+    const row = (label, arr) => el('tr', {}, el('td', {text: label}), ...GF_HOLES.map((_, i) => el('td', {text: arr[i] == null ? '' : String(arr[i])})), el('td', {text: String(gfTotal(arr))}));
+    card.replaceChildren(el('table', {},
+      el('tr', {}, el('td', {text: 'Loch'}), ...GF_HOLES.map((_, i) => el('td', {text: String(i + 1), class: i === gf.h && !g.over ? 'cur' : ''})), el('td', {text: 'Σ'})),
+      el('tr', {}, el('td', {text: 'Par'}), ...GF_HOLES.map(H => el('td', {text: String(H.par)})), el('td', {text: String(GF_HOLES.reduce((s, H) => s + H.par, 0))})),
+      row('Du', gf.sc[0]), ...(solo ? [] : [row(g.opName, gf.sc[1])])));
+  }
+  const res = $(off ? 'oresult' : 'cmpresult');
+  res.hidden = false;
+  res.replaceChildren(off
+    ? el('button', {class: 'vbtn', text: g.over ? 'Zurück' : 'Beenden', onclick: () => { offStop(); offShow('golf'); }})
+    : g.over ? el('button', {class: 'vbtn', text: 'Zurück zum Chat', onclick: () => { mpGame = null; renderMsgs(); }})
+      : el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
+  gfDraw(g);
+}
+// Aiming: press anywhere, pull back like a slingshot, let go to shoot (further = harder).
+function gfPointer(g, cv, e, kind) {
+  const gf = g.gf, rc = cv.getBoundingClientRect(), k = GF_W / rc.width, x = (e.clientX - rc.left) * k, y = (e.clientY - rc.top) * k;
+  if (kind === 'down') {
+    if (g.over || gf.st !== 'play' || gfDone(gf.me) || gf.me.anim) return;
+    cv.setPointerCapture(e.pointerId);
+    gf.drag = {x0: x, y0: y, x, y};
+  } else if (gf.drag && kind === 'move') { gf.drag.x = x; gf.drag.y = y; }
+  else if (gf.drag && kind === 'up') {
+    const d = gf.drag, dx = d.x0 - d.x, dy = d.y0 - d.y, len = Math.hypot(dx, dy);
+    gf.drag = null;
+    if (len > 8) gfShoot(g, Math.atan2(dy, dx), len / 150);
+  }
+}
+function gfDraw(g) {
+  const off = !!g.offline, grid = $(off ? 'ogrid' : 'cmpgrid'), cv = grid && grid.querySelector('canvas.gf-cv');
+  if (!cv || !cv.isConnected || grid.dataset.gid !== g.gid || !cv.offsetParent) return;
+  // As big as fits next to the score card.
+  const card = grid.querySelector('.gf-card'), room = grid.clientHeight - (card ? card.offsetHeight : 0) - 10;
+  const cw = Math.max(240, Math.floor(Math.min(grid.clientWidth - 4, 980, room * GF_W / GF_H))), ch = Math.round(cw * GF_H / GF_W);
+  if (cv.style.width !== cw + 'px') cv.style.width = cw + 'px';
+  const gf = g.gf, dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); cv.style.height = ch + 'px'; }
+  const c = cv.getContext('2d'), sc = cw / GF_W * dpr, H = GF_HOLES[gf.h], T = gfHoleAt(gf.h, gf.t), mod = gf.mods[gf.h], t = gf.t;
+  c.setTransform(sc, 0, 0, sc, 0, 0);
+  // Out of bounds, then the green with stripes.
+  c.fillStyle = '#14532d'; c.fillRect(0, 0, GF_W, GF_H);
+  for (let i = 0; i < 12; i++) { c.fillStyle = i % 2 ? '#3f9a45' : '#45a34b'; c.fillRect(GF_M + i * (GF_W - 2 * GF_M) / 12, GF_M, (GF_W - 2 * GF_M) / 12 + 1, GF_H - 2 * GF_M); }
+  for (const z of H.zones || []) {
+    const [x, y, w, h] = z.r;
+    if (z.k === 'sand') { c.fillStyle = '#e8d29a'; c.fillRect(x, y, w, h); c.fillStyle = 'rgba(160,120,60,.25)'; for (let i = 0; i < 30; i++) c.fillRect(x + (i * 37 % w), y + (i * 53 % h), 2, 2); }
+    else if (z.k === 'ice') { c.fillStyle = 'rgba(200,240,255,.75)'; c.fillRect(x, y, w, h); c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 1.5; for (let i = 0; i < w + h; i += 46) { c.beginPath(); c.moveTo(x + Math.min(i, w), y + Math.max(0, i - w)); c.lineTo(x + Math.max(0, i - h), y + Math.min(i, h)); c.stroke(); } }
+    else if (z.k === 'water' || z.k === 'lava') {
+      const lava = z.k === 'lava';
+      c.fillStyle = lava ? '#c2410c' : '#1d72b8'; c.fillRect(x, y, w, h);
+      c.strokeStyle = lava ? 'rgba(253,186,116,.8)' : 'rgba(186,230,253,.7)'; c.lineWidth = 2;
+      for (let yy = y + 8; yy < y + h; yy += 12) { c.beginPath(); for (let xx = x; xx <= x + w; xx += 6) c.lineTo(xx, yy + Math.sin((xx + t * (lava ? 1.5 : 2)) / 9) * 2); c.stroke(); }
+    } else if (z.k === 'boost' || z.k === 'belt') {
+      const boost = z.k === 'boost';
+      c.fillStyle = boost ? 'rgba(250,204,21,.35)' : '#4b5563'; c.fillRect(x, y, w, h);
+      c.fillStyle = boost ? '#facc15' : '#9ca3af';
+      const [dx, dy] = z.d, step = boost ? 26 : 22, off2 = (t * (boost ? 1.2 : 0.6)) % step;
+      c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+      for (let s = -step; s < (dx ? w : h) + step; s += step) {
+        const cx = dx ? x + (dx > 0 ? s + off2 : w - s - off2) : x + w / 2, cy = dy ? y + (dy > 0 ? s + off2 : h - s - off2) : y + h / 2;
+        c.save(); c.translate(cx, cy); c.rotate(Math.atan2(dy, dx)); c.beginPath(); c.moveTo(-6, -9); c.lineTo(4, 0); c.lineTo(-6, 9); c.lineTo(-2, 0); c.closePath(); c.fill(); c.restore();
+      }
+      c.restore();
+    }
+  }
+  for (const [wx, wy, R] of H.wells || []) {
+    const gr = c.createRadialGradient(wx, wy, 4, wx, wy, R);
+    gr.addColorStop(0, '#000'); gr.addColorStop(0.12, '#1e1b4b'); gr.addColorStop(0.5, 'rgba(76,29,149,.35)'); gr.addColorStop(1, 'rgba(76,29,149,0)');
+    c.fillStyle = gr; c.beginPath(); c.arc(wx, wy, R, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(196,181,253,.5)'; c.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(wx, wy, 14 + i * 14 + (t * 0.4 % 14), t * 0.05 + i, t * 0.05 + i + 2.2); c.stroke(); }
+  }
+  // Walls and blocks (wood).
+  c.fillStyle = '#7c4a1e';
+  for (const [x, y, w, h] of H.blocks || []) { c.fillRect(x, y, w, h); }
+  c.strokeStyle = '#7c4a1e'; c.lineWidth = 5; c.lineCap = 'round';
+  c.strokeRect(GF_M - 2.5, GF_M - 2.5, GF_W - 2 * GF_M + 5, GF_H - 2 * GF_M + 5);
+  for (const [x1, y1, x2, y2] of H.walls || []) { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }
+  c.fillStyle = '#b45309';
+  for (const m of T.movers) { c.fillRect(m.x, m.y, m.w, m.h); c.fillStyle = '#fbbf24'; c.fillRect(m.x + 4, m.y + 6, m.w - 8, 6); c.fillRect(m.x + 4, m.y + m.h - 12, m.w - 8, 6); c.fillStyle = '#b45309'; }
+  // Portals.
+  for (const pair of H.portals || []) pair.forEach(([px, py], i) => {
+    c.strokeStyle = i ? '#fb923c' : '#c084fc'; c.lineWidth = 4;
+    c.beginPath(); c.arc(px, py, 12, t * 0.08, t * 0.08 + 4.8); c.stroke();
+    c.fillStyle = i ? 'rgba(251,146,60,.35)' : 'rgba(192,132,252,.35)'; c.beginPath(); c.arc(px, py, 10, 0, 7); c.fill();
+  });
+  // The hole and its flag.
+  const hr = mod.k === 'mini' ? 7 : mod.k === 'riesen' ? 16 : 10, [hx, hy] = T.hole;
+  c.fillStyle = '#0b0f0b'; c.beginPath(); c.arc(hx, hy, hr, 0, 7); c.fill();
+  c.strokeStyle = '#eee'; c.lineWidth = 2; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx, hy - 34); c.stroke();
+  c.fillStyle = '#e5484d'; c.beginPath(); c.moveTo(hx, hy - 34); c.lineTo(hx + 18 + Math.sin(t / 8) * 2, hy - 28); c.lineTo(hx, hy - 22); c.fill();
+  // Bumpers (they light up when hit), windmill.
+  for (const [bx, by, R] of H.bumpers || []) {
+    const hit = gf.parts.some(p => p.k === 'ring' && p.x === bx && p.y === by && p.t < 10);
+    c.fillStyle = hit ? '#fde047' : '#dc2626'; c.beginPath(); c.arc(bx, by, R, 0, 7); c.fill();
+    c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.arc(bx, by, R - 4, 0, 7); c.stroke();
+  }
+  for (const m of H.mills || []) { c.fillStyle = '#92400e'; c.beginPath(); c.arc(m.c[0], m.c[1], 12, 0, 7); c.fill(); }
+  c.strokeStyle = '#f5f5f4'; c.lineWidth = 7;
+  for (const bl of T.blades) { c.beginPath(); c.moveTo(bl.c[0], bl.c[1]); c.lineTo(bl.c[0] + Math.cos(bl.a) * bl.len, bl.c[1] + Math.sin(bl.a) * bl.len); c.stroke(); }
+  c.strokeStyle = '#ef4444'; c.lineWidth = 3;
+  for (const bl of T.blades) { c.beginPath(); c.moveTo(bl.c[0] + Math.cos(bl.a) * bl.len * 0.55, bl.c[1] + Math.sin(bl.a) * bl.len * 0.55); c.lineTo(bl.c[0] + Math.cos(bl.a) * bl.len, bl.c[1] + Math.sin(bl.a) * bl.len); c.stroke(); }
+  // Wind.
+  if (mod.k === 'wind') {
+    c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2;
+    for (let i = 0; i < 9; i++) { const sx = (i * 97 + t * 2.2 * Math.cos(mod.a)) % GF_W, sy = (i * 53 + t * 2.2 * Math.sin(mod.a)) % GF_H, x0 = (sx + GF_W) % GF_W, y0 = (sy + GF_H) % GF_H; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x0 - Math.cos(mod.a) * 22, y0 - Math.sin(mod.a) * 22); c.stroke(); }
+  }
+  // Balls: the other player's (with name), then yours on top; a sunk ball isn't shown.
+  const solo = off && gf.opp === 'solo';
+  const drawBall = (P, col, name) => {
+    if (P.in && !P.anim) return;
+    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.arc(P.x + 2, P.y + 2, GF_BR, 0, 7); c.fill();
+    c.fillStyle = col; c.beginPath(); c.arc(P.x, P.y, GF_BR, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 1; c.stroke();
+    if (name) { c.font = '700 11px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'center'; c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.6)'; c.strokeText(name, P.x, P.y - 11); c.fillStyle = '#fff'; c.fillText(name, P.x, P.y - 11); }
+  };
+  if (!solo) drawBall(gf.op, '#fb923c', g.opName);
+  drawBall(gf.me, '#ffffff', solo ? '' : 'Du');
+  // Aim: a dotted line the way the ball goes (longer = harder) and a power bar.
+  if (gf.drag) {
+    const d = gf.drag, dx = d.x0 - d.x, dy = d.y0 - d.y, len = Math.hypot(dx, dy), p = Math.min(1, len / 150), a = Math.atan2(dy, dx);
+    if (len > 4) {
+      c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2.5; c.setLineDash([5, 6]);
+      c.beginPath(); c.moveTo(gf.me.x, gf.me.y); c.lineTo(gf.me.x + Math.cos(a) * (20 + p * 110), gf.me.y + Math.sin(a) * (20 + p * 110)); c.stroke(); c.setLineDash([]);
+      c.fillStyle = 'rgba(0,0,0,.45)'; c.fillRect(GF_W - 30, 60, 14, 120);
+      c.fillStyle = p > 0.85 ? '#ef4444' : p > 0.55 ? '#f59e0b' : '#22c55e'; c.fillRect(GF_W - 30, 180 - 120 * p, 14, 120 * p);
+    }
+  }
+  for (const p of gf.parts) {
+    const k = 1 - p.t / 45;
+    if (p.k === 'ring') { c.strokeStyle = p.c || 'rgba(253,224,71,' + k + ')'; c.globalAlpha = k; c.lineWidth = 3; c.beginPath(); c.arc(p.x, p.y, 14 + p.t * 0.8, 0, 7); c.stroke(); c.globalAlpha = 1; }
+    else { c.globalAlpha = k; c.fillStyle = p.c; c.fillRect(p.x - 2, p.y - 2, 4, 4); c.globalAlpha = 1; }
+  }
+  // Text: the banner, and what to do.
+  const say = (s, y, size) => { c.font = '800 ' + size + 'px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'center'; c.lineWidth = 5; c.strokeStyle = 'rgba(0,0,0,.65)'; c.strokeText(s, GF_W / 2, y); c.fillStyle = '#fff'; c.fillText(s, GF_W / 2, y); };
+  if (gf.banner) say(gf.banner.text, 52, gf.banner.text.length > 40 ? 17 : 22);
+  if (gf.st === 'end' && !g.over) say('Loch ' + (gf.h + 1) + ': Du ' + gf.me.s + (solo ? '' : ' · ' + g.opName + ' ' + gf.op.s) + ' – weiter geht\'s…', GF_H / 2, 22);
+  else if (!g.over && gfDone(gf.me) && !gf.me.anim && !solo) say('Warte auf ' + g.opName + '…', GF_H - 28, 16);
+  else if (!g.over && gf.me.s === 0 && !gf.drag && gf.t > 60) say('Ziehen und loslassen zum Schlagen', GF_H - 28, 15);
+  if (g.over) say(solo ? 'Fertig! ' + gfTotal(gf.sc[0]) + ' Schläge' : g.winner === 0 ? 'Unentschieden!' : g.winner === g.myMark ? '🏆 Gewonnen!' : g.opName + ' gewinnt!', GF_H / 2, 30);
+}
+function gfShown(g) {
+  return g.offline ? showing && current === offlineDocs.golf && !$('oboard').hidden
+    : mpGame === g && conv === mpConv(g) && !$('cmpboard').hidden;
+}
+// Offline: alone (for the best score) or against a bot.
+const GF_OPP = {solo: 'Allein', leicht: 'Bot: Leicht', mittel: 'Bot: Mittel', profi: 'Bot: Profi'};
+function gfOffShow() {
+  if (gfOff) { $('osetup').hidden = true; $('oboard').hidden = false; renderGolf(gfOff); return; }
+  $('osetup').hidden = false;
+  $('oboard').hidden = true;
+  const set = offSet.golf || (offSet.golf = {opp: 'mittel'}), wins = offWins.golf || {}, best = store.get('golfBest', 0);
+  const blocked = mpRunning() && mpGame.game === 'golf';
+  $('osetup').replaceChildren(el('div', {class: 'osetbox'},
+    el('div', {class: 'upddlg-head', text: '⛳ Crazy Minigolf'}),
+    el('div', {class: 'olabel', text: 'Gegner'}),
+    el('div', {class: 'orow'}, ...Object.entries(GF_OPP).map(([k, v]) => el('button', {class: 'vbtn' + (set.opp === k ? ' on' : ''), type: 'button',
+      text: v + (k === 'solo' ? (best ? ' · Rekord ' + best : '') : wins[k] ? ' · ' + wins[k] + ' 🏆' : ''), onclick: () => { set.opp = k; store.set('offSet', offSet); gfOffShow(); }}))),
+    el('p', {text: '9 verrückte Bahnen: Windmühle, Flipper-Bumper, Teleporter, Eisbahn, ein schwarzes Loch, Förderbänder, Schiebetüren, Booster und ein Finale, in dem das Loch wandert. Auf jeder Bahn kann noch ein Chaos dazukommen: Wind, Flummi-Wände, Mondgravitation, ein Mini- oder ein Riesenloch.'}),
+    el('p', {text: 'Wasser, Lava und das schwarze Loch kosten einen Strafschlag (der Ball kommt zurück). Höchstens ' + GF_MAXS + ' Schläge pro Loch. Wer nach 9 Löchern weniger Schläge hat, gewinnt.'}),
+    el('button', {class: 'vbtn sg-start', type: 'button', text: '▶ Los geht\'s', disabled: blocked, onclick: gfOffStart}),
+    blocked ? el('p', {text: 'Erst das laufende Minigolf im Chat beenden.'}) : null,
+    el('p', {class: 'sg-keys', text: '🖱 Irgendwo drücken, nach hinten ziehen wie eine Schleuder und loslassen – je weiter, desto fester'})));
+}
+function gfOffStart() {
+  const opp = (offSet.golf || {}).opp || 'mittel';
+  const g = {gid: 'off' + Date.now().toString(36), game: 'golf', offline: {opp}, myMark: 1, over: false, opName: opp === 'solo' ? '' : 'Bot'};
+  gfInit(g, opp);
+  gfOff = g;
+  $('osetup').hidden = true;
+  $('oboard').hidden = false;
+  renderGolf(g);
 }
 
 /* Reaktions-Duell: each side measures its own reaction locally, so network delay doesn't matter. */
@@ -8362,7 +8909,7 @@ class Breach extends Room {
 
   return {Kick, Tron, Breach, Arena, br: {MAPS: BR_MAPS, MAP: BR_MAP, W: BR_W, H: BR_H, R: BR_R, RUN: BR_RUN, WALK: BR_WALK, BOMB: BR_BOMB, DEFUSE: BR_DEFUSE, GUN: BR_GUN, move: brMove, ray: brRay}};
 })();
-const offlineDocs = {pong: {panel: true, offline: 'pong'}, kick: {panel: true, offline: 'kick'}, tron: {panel: true, offline: 'tron'}, breach: {panel: true, offline: 'breach'}};
+const offlineDocs = {golf: {panel: true, offline: 'golf'}, pong: {panel: true, offline: 'pong'}, kick: {panel: true, offline: 'kick'}, tron: {panel: true, offline: 'tron'}, breach: {panel: true, offline: 'breach'}};
 const OFF_LEVEL_NAMES = {leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer', profi: 'Profi'};
 const OFF_BOTS = ['Bot Kevin', 'Bot Jana', 'Bot Ömer', 'Bot Lina', 'Bot Finn', 'Bot Mia'];
 let offSet = Object.assign({pong: {lvl: 'mittel', pu: true}, kick: {lvl: 'mittel', mode: 1, pu: true}, tron: {lvl: 'mittel', bots: 2, pu: true}, breach: {lvl: 'mittel', map: 'rand'}}, store.get('offSet', {}));
@@ -8695,6 +9242,7 @@ function nrBrain(R, lvl) {
 // The document: settings first (level, mode or number of bots, power-ups), then the game on the same board as
 // online. Settings and wins per level are remembered.
 function offShow(game) {
+  if (game === 'golf') { gfOffShow(); return; }
   const doc = offlineDocs[game], pong = game === 'pong', g = pong ? pgGame : sgGame;
   const running = g && g.offline && g.game === game && !g.over && (pong ? pgLive(g) : sgLive(g));
   $('osetup').hidden = !!running;
@@ -8753,6 +9301,7 @@ function offStart(game) {
   renderSg(g);
 }
 function offStop() {
+  if (gfOff) { gfOff.over = true; gfOff = null; }
   const p = pgGame;
   if (p && p.offline) {
     p.over = true;
@@ -10345,6 +10894,7 @@ $('cmpDraw').addEventListener('click', () => { closePops(); inviteMp('draw'); })
 $('cmpEmoji').addEventListener('click', () => { closePops(); inviteMp('emoji'); });
 $('cmpReact').addEventListener('click', () => { closePops(); inviteMp('react'); });
 $('cmpPong').addEventListener('click', () => { closePops(); inviteMp('pong'); });
+$('cmpGolf').addEventListener('click', () => { closePops(); inviteMp('golf'); });
 $('cmpKick').addEventListener('click', () => { closePops(); if (conv === ALL) sgOpenTable('kick'); else inviteMp('kick'); });
 $('cmpTron').addEventListener('click', () => { closePops(); if (conv === ALL) sgOpenTable('tron'); else inviteMp('tron'); });
 $('cmpBreach').addEventListener('click', () => { closePops(); if (conv !== ALL) inviteMp('breach'); });
