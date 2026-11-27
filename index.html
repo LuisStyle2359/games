@@ -319,9 +319,6 @@ tbody tr.sel td { background: var(--select); }
 .sv-bar .sv-go:not(:disabled) { background: #16a34a; color: #fff; border-color: #15803d; font-weight: 700; }
 .sv-energy { font-size: 12px; opacity: .75; }
 .gf-wrap { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; overflow: hidden; }
-.gf-stage { position: relative; flex: none; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.3); }
-.gf-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.gf-hud { touch-action: none; cursor: grab; }
 .gf-cv { flex: none; display: block; border-radius: 8px; touch-action: none; cursor: crosshair; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
 .gf-card table { border-collapse: collapse; font-size: 12px; }
 .gf-card td { padding: 2px 7px; border: 1px solid rgba(127,127,127,.3); text-align: center; }
@@ -2051,7 +2048,7 @@ async function publish(t, obj, retain) {
 }
 
 // Raised whenever chat features change, so people with an old copy of the page can be told to reload.
-const APP_VERSION = 83;
+const APP_VERSION = 84;
 // Updates: the page looks for a newer version of itself every two minutes, when the window gets focus again
 // and as soon as someone online runs a newer one; then a button in the status bar reloads it. The check
 // fetches the page past the browser cache, so the reload afterwards gets the new version too.
@@ -3247,359 +3244,18 @@ function gfFinish(g) {
   finishMp();
   renderMpBoard();
 }
-/* Minigolf in 3D: a small WebGL renderer (no library, so nothing has to load from elsewhere). The game itself is the
-   same as from above (course x/y = world x/z, height = y); this only draws it, with a camera behind the ball.
-   Aim by dragging sideways, pull back (drag down) for strength, let go to hit; mouse wheel zooms, M = overview. */
-const G3_VS = 'attribute vec3 aP;attribute vec3 aN;attribute vec3 aC;attribute float aM;uniform mat4 uVP;uniform mat4 uM;uniform vec3 uTint;uniform float uUseTint;'
-  + 'varying vec3 vN;varying vec3 vC;varying vec3 vW;varying float vM;'
-  + 'void main(){vec4 w=uM*vec4(aP,1.);vW=w.xyz;vN=mat3(uM)*aN;vC=mix(aC,uTint,uUseTint);vM=aM;gl_Position=uVP*w;}';
-const G3_FS = 'precision mediump float;uniform vec3 uL;uniform vec3 uFog;uniform vec3 uCam;uniform float uT;uniform float uAlpha;uniform float uFogD;'
-  + 'varying vec3 vN;varying vec3 vC;varying vec3 vW;varying float vM;'
-  + 'void main(){vec3 c=vC;vec3 n=normalize(vN);float lit=.42+.68*max(dot(n,uL),0.);'
-  + 'if(vM>.5&&vM<1.5){float w=sin(vW.x*.09+uT*2.)*sin(vW.z*.1-uT*1.6);c=mix(c,vec3(.8,.93,1.),.16+.16*w);lit=1.;}'
-  + 'else if(vM>1.5&&vM<2.5){float w=sin(vW.x*.07+uT*1.3)+sin(vW.z*.06-uT);c=mix(c,vec3(1.,.85,.2),.3+.2*w);lit=1.;}'
-  + 'else if(vM>2.5){lit=1.;}'
-  + 'c*=lit;float f=clamp((length(vW-uCam)-uFogD)/1400.,0.,.8);gl_FragColor=vec4(mix(c,uFog,f),uAlpha);}';
-const G3_THEME = {
-  grass: {sky: [0.55, 0.78, 0.95], out: [0.2, 0.42, 0.18], g1: [0.25, 0.6, 0.27], g2: [0.28, 0.65, 0.3], wall: [0.5, 0.3, 0.14], block: [0.47, 0.28, 0.12], wallH: 13},
-  desert: {sky: [0.98, 0.84, 0.62], out: [0.78, 0.55, 0.3], g1: [0.91, 0.77, 0.42], g2: [0.89, 0.74, 0.39], wall: [0.6, 0.22, 0.07], block: [0.62, 0.25, 0.09], wallH: 15},
-  space: {sky: [0.01, 0.02, 0.07], out: [0.02, 0.03, 0.08], g1: [0.05, 0.08, 0.2], g2: [0.07, 0.1, 0.24], wall: [0.22, 0.74, 0.97], block: [0.12, 0.16, 0.24], wallH: 10}};
-const g3hex = h => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
-// Geometry: a list of triangles with normal, colour and material (0 lit, 1 water, 2 lava, 3 glowing).
-function g3Builder() {
-  const d = [];
-  const tri = (a, b, c, col, m = 0) => {
-    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
-    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
-    for (const p of [a, b, c]) d.push(p[0], p[1], p[2], nx, ny, nz, col[0], col[1], col[2], m);
-  };
-  const quad = (a, b, c, e, col, m) => { tri(a, b, c, col, m); tri(a, c, e, col, m); };
-  const B = {
-    d, tri, quad,
-    // A box between two corners (y is up).
-    box(x0, y0, z0, x1, y1, z1, col, m, top) {
-      const P = (x, y, z) => [x, y, z];
-      quad(P(x0, y1, z0), P(x0, y1, z1), P(x1, y1, z1), P(x1, y1, z0), top || col, m);
-      quad(P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1), col, m);
-      quad(P(x1, y0, z0), P(x0, y0, z0), P(x0, y1, z0), P(x1, y1, z0), col, m);
-      quad(P(x1, y0, z1), P(x1, y0, z0), P(x1, y1, z0), P(x1, y1, z1), col, m);
-      quad(P(x0, y0, z0), P(x0, y0, z1), P(x0, y1, z1), P(x0, y1, z0), col, m);
-    },
-    // A wall along a segment (course coordinates), thickness w, from y0 up to y1.
-    wall(x1, z1, x2, z2, w, y0, y1, col, m, top) {
-      const dx = x2 - x1, dz = z2 - z1, l = Math.hypot(dx, dz) || 1, nx = -dz / l * w / 2, nz = dx / l * w / 2, ex = dx / l * w / 2, ez = dz / l * w / 2;
-      const a = [x1 - ex + nx, z1 - ez + nz], b = [x2 + ex + nx, z2 + ez + nz], c = [x2 + ex - nx, z2 + ez - nz], e = [x1 - ex - nx, z1 - ez - nz];
-      const q = (p, y) => [p[0], y, p[1]];
-      quad(q(a, y1), q(b, y1), q(c, y1), q(e, y1), top || col, m);
-      quad(q(e, y0), q(c, y0), q(c, y1), q(e, y1), col, m);
-      quad(q(b, y0), q(a, y0), q(a, y1), q(b, y1), col, m);
-      quad(q(c, y0), q(b, y0), q(b, y1), q(c, y1), col, m);
-      quad(q(a, y0), q(e, y0), q(e, y1), q(a, y1), col, m);
-    },
-    cyl(cx, cz, r, y0, y1, col, n = 18, m, top) {
-      for (let i = 0; i < n; i++) {
-        const a0 = i / n * 6.2832, a1 = (i + 1) / n * 6.2832, p0 = [cx + Math.cos(a0) * r, cz + Math.sin(a0) * r], p1 = [cx + Math.cos(a1) * r, cz + Math.sin(a1) * r];
-        quad([p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p1[0], y1, p1[1]], [p0[0], y1, p0[1]], col, m);
-        tri([cx, y1, cz], [p1[0], y1, p1[1]], [p0[0], y1, p0[1]], top || col, m);
-      }
-    },
-    disk(cx, cz, r, y, col, m, n = 24) { for (let i = 0; i < n; i++) { const a0 = i / n * 6.2832, a1 = (i + 1) / n * 6.2832; tri([cx, y, cz], [cx + Math.cos(a1) * r, y, cz + Math.sin(a1) * r], [cx + Math.cos(a0) * r, y, cz + Math.sin(a0) * r], col, m); } },
-    ring(cx, cz, r0, r1, y, col, m, n = 28) {
-      for (let i = 0; i < n; i++) {
-        const a0 = i / n * 6.2832, a1 = (i + 1) / n * 6.2832, P = (r, a) => [cx + Math.cos(a) * r, y, cz + Math.sin(a) * r];
-        quad(P(r0, a0), P(r0, a1), P(r1, a1), P(r1, a0), col, m);
-      }
-    },
-    flat(x, z, w, h, y, col, m) { quad([x, y, z], [x, y, z + h], [x + w, y, z + h], [x + w, y, z], col, m); },
-    sphere(r, col, m, nu = 14, nv = 9) {
-      const P = (u, v) => { const th = u / nu * 6.2832, ph = v / nv * Math.PI; return [Math.cos(th) * Math.sin(ph) * r, Math.cos(ph) * r, Math.sin(th) * Math.sin(ph) * r]; };
-      for (let u = 0; u < nu; u++) for (let v = 0; v < nv; v++) {
-        const a = P(u, v), b = P(u + 1, v), c = P(u + 1, v + 1), e = P(u, v + 1);
-        // Normals of a sphere point outward: give the triangles that order.
-        tri(a, c, b, col, m); tri(a, e, c, col, m);
-      }
-    }};
-  return B;
-}
-function g3Mesh(gl, d) {
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(d), gl.STATIC_DRAW);
-  return {buf, n: d.length / 10};
-}
-const m4 = {
-  persp(f, a, n, fa) { const t = 1 / Math.tan(f / 2); return [t / a, 0, 0, 0, 0, t, 0, 0, 0, 0, (fa + n) / (n - fa), -1, 0, 0, 2 * fa * n / (n - fa), 0]; },
-  look(e, c, u) {
-    let z = [e[0] - c[0], e[1] - c[1], e[2] - c[2]], l = Math.hypot(...z); z = z.map(v => v / l);
-    let x = [u[1] * z[2] - u[2] * z[1], u[2] * z[0] - u[0] * z[2], u[0] * z[1] - u[1] * z[0]]; l = Math.hypot(...x) || 1; x = x.map(v => v / l);
-    const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-    return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1];
-  },
-  mul(a, b) { const o = new Array(16); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + j] * b[i * 4 + k]; o[i * 4 + j] = s; } return o; },
-  // Move, turn about the up axis (course angle a), scale.
-  trs(x, y, z, a, sx, sy, sz) { const c = Math.cos(-a), s = Math.sin(-a); return [c * sx, 0, -s * sx, 0, 0, sy, 0, 0, s * sz, 0, c * sz, 0, x, y, z, 1]; }};
-function g3Init(cv) {
-  const gl = cv.getContext('webgl', {antialias: true}) || cv.getContext('experimental-webgl');
-  if (!gl) return null;
-  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
-  const prog = gl.createProgram();
-  gl.attachShader(prog, sh(gl.VERTEX_SHADER, G3_VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, G3_FS)); gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
-  const V = {gl, prog, a: {}, u: {}};
-  for (const n of ['aP', 'aN', 'aC', 'aM']) V.a[n] = gl.getAttribLocation(prog, n);
-  for (const n of ['uVP', 'uM', 'uTint', 'uUseTint', 'uL', 'uFog', 'uCam', 'uT', 'uAlpha', 'uFogD']) V.u[n] = gl.getUniformLocation(prog, n);
-  const unit = f => { const b = g3Builder(); f(b); return g3Mesh(gl, b.d); };
-  V.box = unit(b => b.box(-0.5, 0, -0.5, 0.5, 1, 0.5, [1, 1, 1]));
-  V.ball = unit(b => b.sphere(1, [1, 1, 1], 0, 16, 10));
-  V.rock = unit(b => b.sphere(1, [1, 1, 1], 0, 7, 5));
-  V.cyl = unit(b => b.cyl(0, 0, 1, 0, 1, [1, 1, 1], 16));
-  V.disk = unit(b => b.disk(0, 0, 1, 0, [1, 1, 1], 0, 20));
-  V.flag = unit(b => { b.tri([0, 0, 0], [1, -0.35, 0], [0, -0.7, 0], [1, 1, 1], 3); b.tri([0, 0, 0], [0, -0.7, 0], [1, -0.35, 0], [1, 1, 1], 3); });
-  gl.enable(gl.DEPTH_TEST);
-  gl.enable(gl.CULL_FACE);
-  return V;
-}
-// Everything on a hole that doesn't move, in one buffer.
-function g3Static(V, H, mod) {
-  const th = G3_THEME[H.theme] || G3_THEME.grass, b = g3Builder(), W = GF_W, Hh = GF_H, M = GF_M, wh = th.wallH;
-  b.flat(-1500, -1500, 3600, 3400, -0.6, th.out);
-  // The ground: stripes on grass, tiles in space.
-  const cols = 12;
-  for (let i = 0; i < cols; i++) b.flat(M + i * (W - 2 * M) / cols, M, (W - 2 * M) / cols + 0.5, Hh - 2 * M, 0, i % 2 ? th.g1 : th.g2);
-  if (H.theme === 'space') for (let x = M; x < W - M; x += 40) for (let z = M; z < Hh - M; z += 40) if (((x + z) / 40) % 2 < 1) b.flat(x + 1, z + 1, 38, 38, 0.05, [0.09, 0.13, 0.3]);
-  if (H.theme === 'space') {
-    // Stars all round.
-    const r = gfRng('stars');
-    for (let i = 0; i < 260; i++) { const a = r() * 6.2832, e = r() * 1.3 + 0.05, R = 1700, x = 320 + Math.cos(a) * Math.cos(e) * R, y = Math.sin(e) * R - 200, z = 200 + Math.sin(a) * Math.cos(e) * R, s = 2 + r() * 5; b.box(x - s, y - s, z - s, x + s, y + s, z + s, [1, 1, 0.9], 3); }
-  }
-  const zc = {water: [0.11, 0.45, 0.72], lava: [0.76, 0.25, 0.05], ice: [0.8, 0.94, 1], sand: H.theme === 'space' ? [0.2, 0.25, 0.33] : [0.91, 0.82, 0.6], quick: [0.72, 0.47, 0.12],
-    boost: [0.98, 0.8, 0.08], belt: [0.29, 0.33, 0.39], grav: [0.45, 0.37, 0.8], chasm: [0.05, 0.03, 0.02]};
-  for (const z of H.zones || []) {
-    const [x, y, w, h] = z.r, k = z.k;
-    if (k === 'chasm') {
-      // A canyon: dark walls going down.
-      b.flat(x, y, w, h, -60, [0.03, 0.02, 0.01]);
-      b.quad([x, 0.2, y], [x, -60, y], [x, -60, y + h], [x, 0.2, y + h], [0.35, 0.16, 0.05]);
-      b.quad([x + w, 0.2, y + h], [x + w, -60, y + h], [x + w, -60, y], [x + w, 0.2, y], [0.35, 0.16, 0.05]);
-      b.flat(x, y, w, h, 0.1, [0.06, 0.03, 0.01]);
-      continue;
-    }
-    b.flat(x, y, w, h, k === 'water' || k === 'lava' ? -0.2 : 0.15, zc[k] || [1, 0, 1], k === 'water' ? 1 : k === 'lava' ? 2 : k === 'grav' ? 3 : 0);
-    if (k === 'boost' || k === 'belt') {
-      // Arrows the way it pushes.
-      const [dx, dz] = z.d, cx = x + w / 2, cz = y + h / 2, n = Math.max(1, Math.floor((dx ? w : h) / 28));
-      for (let i = 0; i < n; i++) {
-        const o = (i - (n - 1) / 2) * 28, px = cx + dx * o, pz = cz + dz * o, s = 9, ox = -dz * s, oz = dx * s;
-        b.tri([px + dx * s, 0.4, pz + dz * s], [px - dx * s + ox, 0.4, pz - dz * s + oz], [px - dx * s - ox, 0.4, pz - dz * s - oz], k === 'boost' ? [1, 0.95, 0.6] : [0.7, 0.72, 0.75], 3);
-      }
-    }
-    if (k === 'quick') for (let i = 1; i < 4; i++) b.ring(x + w / 2, y + h / 2, Math.min(w, h) * 0.12 * i, Math.min(w, h) * 0.12 * i + 2, 0.3, [0.5, 0.3, 0.08]);
-  }
-  for (const [wx, wy, R] of H.wells || []) {
-    b.disk(wx, wy, R, 0.25, [0.12, 0.06, 0.3], 3);
-    for (let i = 0; i < 4; i++) b.ring(wx, wy, 14 + i * R / 5, 16 + i * R / 5, 0.35, [0.55, 0.45, 0.95], 3);
-    b.disk(wx, wy, 12, 0.4, [0, 0, 0], 3);
-  }
-  // The border and the walls.
-  const top = H.theme === 'space' ? [0.5, 0.9, 1] : th.wall.map(v => Math.min(1, v * 1.25));
-  b.box(M - 8, 0, M - 8, W - M + 8, wh, M, th.wall, H.theme === 'space' ? 3 : 0, top);
-  b.box(M - 8, 0, Hh - M, W - M + 8, wh, Hh - M + 8, th.wall, H.theme === 'space' ? 3 : 0, top);
-  b.box(M - 8, 0, M, M, wh, Hh - M, th.wall, H.theme === 'space' ? 3 : 0, top);
-  b.box(W - M, 0, M, W - M + 8, wh, Hh - M, th.wall, H.theme === 'space' ? 3 : 0, top);
-  for (const [x1, y1, x2, y2] of H.walls || []) b.wall(x1, y1, x2, y2, 6, 0, wh, th.wall, H.theme === 'space' ? 3 : 0, top);
-  for (const [x, y, w, h] of H.blocks || []) b.box(x, 0, y, x + w, wh + 6, y + h, th.block, 0, H.theme === 'space' ? [0.22, 0.74, 0.97] : th.block.map(v => v * 1.2));
-  // Low hedges (laser fences in space): a flying ball goes over them.
-  for (const [x1, y1, x2, y2] of H.hedges || []) {
-    if (H.theme === 'space') { b.wall(x1, y1, x2, y2, 2, 2, 5, [1, 0.25, 0.25], 3); continue; }
-    b.wall(x1, y1, x2, y2, 10, 0, 6, [0.09, 0.4, 0.2], 0, [0.13, 0.5, 0.25]);
-  }
-  // Ramps: a wedge rising the way it launches.
-  for (const rp of H.ramps || []) {
-    const [x, y, w, h] = rp.r, [dx, dz] = rp.d, hi = 9, col = H.theme === 'space' ? [0.6, 0.65, 0.72] : [0.85, 0.65, 0.25];
-    const Y = (px, pz) => hi * Math.max(0, Math.min(1, dx > 0 ? (px - x) / w : dx < 0 ? (x + w - px) / w : dz > 0 ? (pz - y) / h : (y + h - pz) / h));
-    const c4 = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].map(([px, pz]) => [px, Y(px, pz) + 0.3, pz]);
-    b.quad(c4[0], c4[3], c4[2], c4[1], col);
-    for (let i = 0; i < 4; i++) { const a = c4[i], e = c4[(i + 1) % 4]; if (a[1] > 0.4 || e[1] > 0.4) b.quad(a, e, [e[0], 0, e[2]], [a[0], 0, a[2]], col.map(v => v * 0.7)); }
-  }
-  // Bumpers: pinball bumpers, cacti, crystals.
-  for (const [cx, cy, R] of H.bumpers || []) {
-    if (H.theme === 'desert') {
-      b.cyl(cx, cy, R * 0.8, 0, 30, [0.13, 0.5, 0.2], 10, 0, [0.2, 0.6, 0.25]);
-      b.cyl(cx + R * 0.8, cy, R * 0.35, 12, 24, [0.13, 0.5, 0.2], 8); b.cyl(cx - R * 0.8, cy, R * 0.35, 8, 20, [0.13, 0.5, 0.2], 8);
-      b.disk(cx, cy, R, 0.3, [0.4, 0.3, 0.15]);
-    } else if (H.theme === 'space') b.cyl(cx, cy, R, 0, 16, [0.05, 0.55, 0.65], 6, 3, [0.5, 0.95, 1]);
-    else { b.cyl(cx, cy, R, 0, 12, [0.86, 0.15, 0.15], 18, 0, [1, 1, 1]); b.cyl(cx, cy, R - 4, 12, 13.5, [0.86, 0.15, 0.15], 18); }
-  }
-  for (const m of H.mills || []) b.cyl(m.c[0], m.c[1], 13, 0, 34, [0.57, 0.25, 0.05], 12, 0, [0.7, 0.3, 0.1]);
-  // Portals: a glowing ring on the ground and an arch, one colour per pair.
-  (H.portals || []).forEach((pair, n) => pair.forEach(([px, py]) => {
-    const col = [[0.75, 0.52, 0.99], [0.13, 0.83, 0.93], [0.96, 0.45, 0.71]][n % 3];
-    b.ring(px, py, 10, 14, 0.4, col, 3);
-    for (let i = 0; i <= 12; i++) { const a = i / 12 * Math.PI, x = px + Math.cos(a) * 13, y = Math.sin(a) * 18 + 1; b.box(x - 1.5, y - 1.5, py - 1.5, x + 1.5, y + 1.5, py + 1.5, col, 3); }
-  }));
-  return g3Mesh(V.gl, b.d);
-}
-function g3Use(V, mesh) {
-  const gl = V.gl;
-  gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
-  const st = 40;
-  gl.vertexAttribPointer(V.a.aP, 3, gl.FLOAT, false, st, 0); gl.enableVertexAttribArray(V.a.aP);
-  gl.vertexAttribPointer(V.a.aN, 3, gl.FLOAT, false, st, 12); gl.enableVertexAttribArray(V.a.aN);
-  gl.vertexAttribPointer(V.a.aC, 3, gl.FLOAT, false, st, 24); gl.enableVertexAttribArray(V.a.aC);
-  gl.vertexAttribPointer(V.a.aM, 1, gl.FLOAT, false, st, 36); gl.enableVertexAttribArray(V.a.aM);
-}
-function g3Put(V, mesh, M, tint, alpha = 1) {
-  const gl = V.gl;
-  g3Use(V, mesh);
-  gl.uniformMatrix4fv(V.u.uM, false, M);
-  gl.uniform1f(V.u.uUseTint, tint ? 1 : 0);
-  if (tint) gl.uniform3fv(V.u.uTint, tint);
-  gl.uniform1f(V.u.uAlpha, alpha);
-  gl.drawArrays(gl.TRIANGLES, 0, mesh.n);
-}
-const G3_ID = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-// The camera: behind the ball that moves (the shot being shown) or behind yours, looking the way you aim.
-function g3Camera(g, V) {
-  const gf = g.gf, A = gf.anim;
-  let tx, tz, ty = 0, yaw;
-  if (V.top) { const c = [320, 620, 470], tg = [320, 0, 215]; V.eye = V.eye ? V.eye.map((v, i) => v + (c[i] - v) * 0.12) : c; V.at = V.at ? V.at.map((v, i) => v + (tg[i] - v) * 0.12) : tg; return; }
-  if (A) {
-    const P = A.balls[0], path = A.r.balls[0].path, i = Math.min(A.i, path.length - 1), j = Math.max(0, i - 8);
-    tx = P.x; tz = P.y; ty = Math.max(0, P.z) * 22;
-    const dx = path[i][0] - path[j][0], dz = path[i][1] - path[j][1];
-    yaw = Math.hypot(dx, dz) > 2 ? Math.atan2(dz, dx) : V.yaw;
-    if (P.z < 0) { tx = path[i][0]; tz = path[i][1]; }
-  } else {
-    const P = gf.turn === g.myMark || gfSolo(g) ? gf.me : gf.op.in ? gf.me : gf.op;
-    tx = P.x; tz = P.y;
-    yaw = gf.turn === g.myMark || gfSolo(g) ? gf.aim : Math.atan2(gf.holes[gf.h].hole[1] - P.y, gf.holes[gf.h].hole[0] - P.x);
-  }
-  // Turn the short way round, smoothly.
-  if (V.yaw === undefined) V.yaw = yaw;
-  let dyaw = yaw - V.yaw;
-  while (dyaw > Math.PI) dyaw -= 2 * Math.PI;
-  while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
-  V.yaw += dyaw * (A ? 0.06 : 0.25);
-  const D = V.dist || 105, cx = Math.cos(V.yaw), cz = Math.sin(V.yaw);
-  const eye = [tx - cx * D, ty + D * 0.5 + 12, tz - cz * D], at = [tx + cx * 35, ty + 4, tz + cz * 35];
-  V.eye = V.eye ? V.eye.map((v, i) => v + (eye[i] - v) * 0.2) : eye;
-  V.at = V.at ? V.at.map((v, i) => v + (at[i] - v) * 0.2) : at;
-}
-function g3Draw(g, cv, hud) {
-  const gf = g.gf, V = gf.v3, gl = V.gl, H = gf.holes[gf.h], mod = gf.mods[gf.h], th = G3_THEME[H.theme] || G3_THEME.grass, t = gf.t;
-  const key = g.gid + '|' + gf.h;
-  if (V.key !== key) { if (V.stat) gl.deleteBuffer(V.stat.buf); V.stat = g3Static(V, H, mod); V.key = key; V.eye = null; V.yaw = undefined; }
-  gl.viewport(0, 0, cv.width, cv.height);
-  gl.clearColor(th.sky[0], th.sky[1], th.sky[2], 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  gl.useProgram(V.prog);
-  g3Camera(g, V);
-  const P = m4.persp(0.95, cv.width / cv.height, 2, 5000), VP = m4.mul(P, m4.look(V.eye, V.at, [0, 1, 0]));
-  V.vp = VP;
-  gl.uniformMatrix4fv(V.u.uVP, false, VP);
-  gl.uniform3fv(V.u.uL, [0.35, 0.85, 0.4].map(v => v / 1.0)); gl.uniform3fv(V.u.uFog, th.sky); gl.uniform3fv(V.u.uCam, V.eye);
-  gl.uniform1f(V.u.uT, t / 60); gl.uniform1f(V.u.uFogD, 500);
-  g3Put(V, V.stat, G3_ID, null);
-  const T = gfHoleAt(H, t), hr = mod.k === 'mini' ? 7 : mod.k === 'riesen' ? 16 : 10, [hx, hz] = T.hole;
-  // The hole, its flag (it can wander), movers, blades, rolling things.
-  g3Put(V, V.disk, m4.trs(hx, 0.3, hz, 0, hr + 2, 1, hr + 2), [0.95, 0.95, 0.95]);
-  g3Put(V, V.disk, m4.trs(hx, 0.35, hz, 0, hr, 1, hr), [0.02, 0.02, 0.02]);
-  g3Put(V, V.cyl, m4.trs(hx, 0, hz, 0, 0.8, 42, 0.8), [0.95, 0.95, 0.95]);
-  g3Put(V, V.flag, m4.trs(hx, 42, hz, Math.sin(t / 25) * 0.4 + 0.6, 18, 18, 18), H.theme === 'space' ? [1, 0.85, 0.2] : [0.9, 0.15, 0.2]);
-  for (const m of T.movers) g3Put(V, V.box, m4.trs(m.x + m.w / 2, 0, m.y + m.h / 2, 0, m.w, 16, m.h), H.theme === 'space' ? [0.9, 0.45, 0.1] : [0.7, 0.33, 0.04]);
-  for (const bl of T.blades) {
-    const cx = bl.c[0] + Math.cos(bl.a) * bl.len / 2, cz = bl.c[1] + Math.sin(bl.a) * bl.len / 2;
-    g3Put(V, V.box, m4.trs(cx, 4, cz, bl.a, bl.len, 10, 6), [0.95, 0.95, 0.92]);
-    g3Put(V, V.box, m4.trs(bl.c[0] + Math.cos(bl.a) * bl.len * 0.8, 4.2, bl.c[1] + Math.sin(bl.a) * bl.len * 0.8, bl.a, bl.len * 0.38, 10.4, 6.4), [0.9, 0.2, 0.2]);
-  }
-  for (const m of T.rollers) {
-    const rot = t * 0.05;
-    if (H.theme === 'space') g3Put(V, V.rock, m4.trs(m.x, m.r * 0.9, m.y, rot, m.r, m.r * 0.85, m.r), [0.42, 0.4, 0.38]);
-    else g3Put(V, V.rock, m4.trs(m.x, m.r * 0.9, m.y, rot, m.r, m.r, m.r), H.theme === 'desert' ? [0.62, 0.42, 0.18] : [0.45, 0.3, 0.15]);
-  }
-  // Balls (yours white, the other orange), raised when in the air; sunk or lost ones aren't drawn.
-  const solo = gfSolo(g), balls = [[gf.me, [1, 1, 1]], ...(solo ? [] : [[gf.op, [0.98, 0.57, 0.24]]])];
-  for (const [B, col] of balls) {
-    if (B.z < 0 || (B.in && !gf.anim)) continue;
-    g3Put(V, V.ball, m4.trs(B.x, GF_BR + Math.max(0, B.z) * 22, B.y, t * 0.1, GF_BR, GF_BR, GF_BR), col);
-  }
-  // Aim: little dots the way the ball goes, more and further the harder you pull.
-  const myTurn = !gf.anim && !g.over && gf.st === 'play' && (gf.turn === g.myMark || solo) && !gfDone(gf.me);
-  if (myTurn) {
-    const p = gf.pull || 0, n = 4 + Math.round(p * 10);
-    for (let i = 1; i <= n; i++) { const d = 10 + i * (8 + p * 6); g3Put(V, V.ball, m4.trs(gf.me.x + Math.cos(gf.aim) * d, 1.5, gf.me.y + Math.sin(gf.aim) * d, 0, 1.6, 1, 1.6), p > 0.85 ? [1, 0.3, 0.3] : p > 0.5 ? [1, 0.75, 0.2] : [1, 1, 1]); }
-  }
-  for (const q of gf.parts) if (q.k === 'dot') g3Put(V, V.box, m4.trs(q.x, 3 + q.t * 0.25, q.y, q.t * 0.2, 2.4, 2.4, 2.4), g3hex(q.c.length === 7 ? q.c : '#ffffff'));
-  // Soft shadows under the balls (see-through, last).
-  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-  for (const [B] of balls) if (!(B.z < 0 || (B.in && !gf.anim))) g3Put(V, V.disk, m4.trs(B.x + 1.5, 0.5, B.y + 1.5, 0, GF_BR * (1 - Math.max(0, B.z) * 0.3), 1, GF_BR * (1 - Math.max(0, B.z) * 0.3)), [0, 0, 0], 0.35);
-  gl.depthMask(true); gl.disable(gl.BLEND);
-  g3Hud(g, cv, hud, VP);
-}
-// Course position (and height) to screen.
-function g3Screen(VP, x, y, z, w, h) {
-  const c = [VP[0] * x + VP[4] * y + VP[8] * z + VP[12], VP[1] * x + VP[5] * y + VP[9] * z + VP[13], 0, VP[3] * x + VP[7] * y + VP[11] * z + VP[15]];
-  if (c[3] <= 0.1) return null;
-  return [(c[0] / c[3] * 0.5 + 0.5) * w, (1 - (c[1] / c[3] * 0.5 + 0.5)) * h];
-}
-// On top: names over the balls, the strength bar, messages, and the course from above in a corner.
-function g3Hud(g, cv, hud, VP) {
-  const gf = g.gf, c = hud.getContext('2d'), w = hud.width, h = hud.height, dpr = window.devicePixelRatio || 1, solo = gfSolo(g);
-  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, h);
-  c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const W = w / dpr, Hh = h / dpr;
-  const label = (B, s) => { if (B.z < 0 || (B.in && !gf.anim)) return; const p = g3Screen(VP, B.x, GF_BR * 2 + 8 + Math.max(0, B.z) * 22, B.y, W, Hh); if (!p) return; c.font = '700 12px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'center'; c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.6)'; c.strokeText(s, p[0], p[1]); c.fillStyle = '#fff'; c.fillText(s, p[0], p[1]); };
-  if (!solo) { label(gf.op, g.opName || 'Bot'); label(gf.me, 'Du'); }
-  // The course from above.
-  const mw = Math.min(200, W * 0.26), mh = mw * GF_H / GF_W;
-  c.save(); c.translate(W - mw - 10, 10); c.globalAlpha = 0.92; c.scale(mw / GF_W, mh / GF_H);
-  gfPaint2D(c, g, true);
-  c.restore();
-  c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 1.5; c.strokeRect(W - mw - 10, 10, mw, mh);
-  // Strength.
-  if (gf.pull > 0) {
-    const p = gf.pull;
-    c.fillStyle = 'rgba(0,0,0,.45)'; c.fillRect(18, Hh / 2 - 80, 16, 160);
-    c.fillStyle = p > 0.85 ? '#ef4444' : p > 0.55 ? '#f59e0b' : '#22c55e'; c.fillRect(18, Hh / 2 + 80 - 160 * p, 16, 160 * p);
-  }
-  const say = (s, y, size) => { c.font = '800 ' + size + 'px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'center'; c.lineWidth = 5; c.strokeStyle = 'rgba(0,0,0,.65)'; c.strokeText(s, W / 2, y); c.fillStyle = '#fff'; c.fillText(s, W / 2, y); };
-  if (gf.banner) say(gf.banner.text, 40, gf.banner.text.length > 40 ? 16 : 21);
-  const myTurn = !gf.anim && !g.over && gf.st === 'play' && (gf.turn === g.myMark || solo) && !gfDone(gf.me);
-  if (gf.st === 'end' && !g.over) say('Loch ' + (gf.h + 1) + ': Du ' + gf.me.s + (solo ? '' : ' · ' + g.opName + ' ' + gf.op.s) + ' – weiter geht\'s…', Hh / 2, 22);
-  else if (g.over) say(solo ? 'Fertig! ' + gfTotal(gf.sc[0]) + ' Schläge' : g.winner === 0 ? 'Unentschieden!' : g.winner === g.myMark ? '🏆 Gewonnen!' : g.opName + ' gewinnt!', Hh / 2, 30);
-  else if (myTurn && !gf.pull && gf.me.s === 0) say('Seitlich ziehen = zielen · nach unten ziehen = Kraft · loslassen = schlagen', Hh - 22, 14);
-  else if (!myTurn && !gf.anim && gf.st === 'play' && !solo) say((g.opName || 'Bot') + ' ist dran…', Hh - 22, 15);
-  if (myTurn && !gf.pull) { c.font = '12px "Segoe UI", system-ui, sans-serif'; c.textAlign = 'left'; c.fillStyle = 'rgba(255,255,255,.75)'; c.fillText('🖱 Rad = Zoom · M = Übersicht', 10, Hh - 8); }
-}
-
 // The board: a canvas that fits the width, the score line above, buttons below.
 function renderGolf(g) {
   const off = !!g.offline, grid = $(off ? 'ogrid' : 'cmpgrid'), gf = g.gf;
   if (grid.dataset.gid !== g.gid || !grid.querySelector('canvas.gf-cv')) {
     grid.className = 'gf-wrap';
     grid.dataset.gid = g.gid;
-    const cv3 = el('canvas', {class: 'gf-cv gf-3d'});
-    let V = null;
-    try { V = g3Init(cv3); } catch (e) { V = null; }
-    if (V) {
-      gf.v3 = V;
-      V.dist = 105;
-      const hud = el('canvas', {class: 'gf-hud'}), stage = el('div', {class: 'gf-stage'}, cv3, hud);
-      hud.addEventListener('pointerdown', e => gfPointer3(g, hud, e, 'down'));
-      hud.addEventListener('pointermove', e => gfPointer3(g, hud, e, 'move'));
-      hud.addEventListener('pointerup', e => gfPointer3(g, hud, e, 'up'));
-      hud.addEventListener('pointercancel', () => { gf.drag = null; gf.pull = 0; });
-      hud.addEventListener('wheel', e => { e.preventDefault(); V.dist = Math.max(55, Math.min(260, V.dist * (1 + e.deltaY * 0.001))); }, {passive: false});
-      grid.replaceChildren(stage, el('div', {class: 'gf-card', id: off ? 'gfcardO' : 'gfcard'}));
-    } else {
-      const cv = el('canvas', {class: 'gf-cv'});
-      cv.addEventListener('pointerdown', e => gfPointer(g, cv, e, 'down'));
-      cv.addEventListener('pointermove', e => gfPointer(g, cv, e, 'move'));
-      cv.addEventListener('pointerup', e => gfPointer(g, cv, e, 'up'));
-      cv.addEventListener('pointercancel', () => { gf.drag = null; });
-      grid.replaceChildren(cv, el('div', {class: 'gf-card', id: off ? 'gfcardO' : 'gfcard'}));
-    }
+    const cv = el('canvas', {class: 'gf-cv'});
+    cv.addEventListener('pointerdown', e => gfPointer(g, cv, e, 'down'));
+    cv.addEventListener('pointermove', e => gfPointer(g, cv, e, 'move'));
+    cv.addEventListener('pointerup', e => gfPointer(g, cv, e, 'up'));
+    cv.addEventListener('pointercancel', () => { gf.drag = null; });
+    grid.replaceChildren(cv, el('div', {class: 'gf-card', id: off ? 'gfcardO' : 'gfcard'}));
   }
   const a = gfTotal(gf.sc[0]) + (gf.st === 'play' ? gf.me.s : 0), b = gfTotal(gf.sc[1]) + (gf.st === 'play' ? gf.op.s : 0);
   const solo = off && gf.opp === 'solo', opName = g.opName + (off || people.has(g.opponent) ? '' : ' (offline)');
@@ -3627,29 +3283,6 @@ function renderGolf(g) {
       : el('button', {class: 'vbtn', text: 'Aufgeben', onclick: resignMp}));
   gfDraw(g);
 }
-// 3D: drag sideways to aim, drag down (pull back) for strength, let go to hit.
-function gfPointer3(g, hud, e, kind) {
-  const gf = g.gf, solo = gfSolo(g), mine = !g.over && gf.st === 'play' && (gf.turn === g.myMark || solo) && !gf.anim && !gfDone(gf.me);
-  if (kind === 'down') {
-    hud.setPointerCapture(e.pointerId);
-    gf.drag = {x0: e.clientX, y0: e.clientY, aim0: gf.aim, mine};
-  } else if (gf.drag && kind === 'move') {
-    const d = gf.drag;
-    gf.aim = d.aim0 + (e.clientX - d.x0) * 0.007;
-    gf.pull = d.mine && mine ? Math.max(0, Math.min(1, (e.clientY - d.y0) / 170)) : 0;
-  } else if (gf.drag && kind === 'up') {
-    const p = gf.pull || 0;
-    gf.drag = null; gf.pull = 0;
-    if (mine && p > 0.06) gfShoot(g, gf.aim, p);
-  }
-}
-document.addEventListener('keydown', e => {
-  const g = gfGames().find(q => q.gf && q.gf.v3 && gfShown(q));
-  if (!g || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) return;
-  if (e.code === 'ArrowLeft' || e.code === 'KeyA') { g.gf.aim -= 0.035; e.preventDefault(); }
-  else if (e.code === 'ArrowRight' || e.code === 'KeyD') { g.gf.aim += 0.035; e.preventDefault(); }
-  else if (e.code === 'KeyM') g.gf.v3.top = !g.gf.v3.top;
-});
 // Aiming: press anywhere, pull back like a slingshot, let go to shoot (further = harder).
 function gfPointer(g, cv, e, kind) {
   const gf = g.gf, rc = cv.getBoundingClientRect(), k = GF_W / rc.width, x = (e.clientX - rc.left) * k, y = (e.clientY - rc.top) * k;
@@ -3667,16 +3300,6 @@ function gfPointer(g, cv, e, kind) {
 function gfDraw(g) {
   const off = !!g.offline, grid = $(off ? 'ogrid' : 'cmpgrid'), cv = grid && grid.querySelector('canvas.gf-cv');
   if (!cv || !cv.isConnected || grid.dataset.gid !== g.gid || !cv.offsetParent) return;
-  if (g.gf.v3 && cv.classList.contains('gf-3d')) {
-    // 3D: the stage as big as fits next to the score card, both canvases the same size.
-    const card = grid.querySelector('.gf-card'), room = grid.clientHeight - (card ? card.offsetHeight : 0) - 10, hud = grid.querySelector('canvas.gf-hud');
-    const cw = Math.max(240, Math.floor(Math.min(grid.clientWidth - 4, 1100, room * 16 / 9))), ch = Math.round(cw * 9 / 16), dpr = window.devicePixelRatio || 1;
-    const stage = cv.parentNode;
-    if (stage.style.width !== cw + 'px') { stage.style.width = cw + 'px'; stage.style.height = ch + 'px'; }
-    for (const k of [cv, hud]) if (k.width !== Math.round(cw * dpr) || k.height !== Math.round(ch * dpr)) { k.width = Math.round(cw * dpr); k.height = Math.round(ch * dpr); }
-    g3Draw(g, cv, hud);
-    return;
-  }
   // As big as fits next to the score card.
   const card = grid.querySelector('.gf-card'), room = grid.clientHeight - (card ? card.offsetHeight : 0) - 10;
   const cw = Math.max(240, Math.floor(Math.min(grid.clientWidth - 4, 980, room * GF_W / GF_H))), ch = Math.round(cw * GF_H / GF_W);
